@@ -42,7 +42,7 @@ const LeaveRequestsList = () => {
           reason,
           status,
           created_at,
-          staff_profiles!inner (
+          staff_profiles!leave_requests_staff_id_fkey (
             first_name,
             last_name,
             employee_id
