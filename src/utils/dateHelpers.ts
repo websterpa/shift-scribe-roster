@@ -13,3 +13,8 @@ export function isPublicHoliday(date: Date): boolean {
   console.log('Public holiday check for:', date.toDateString());
   return false;
 }
+
+export function weekdayLabel(date: Date): string {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return days[date.getDay()];
+}
