@@ -1,5 +1,5 @@
 
-type ShiftCode = "D" | "E" | "L" | "N" | "R";
+type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
 
 interface CycleAssignment {
   [weekIndex: number]: { [dayIndex: number]: { [staffId: string]: ShiftCode } };
