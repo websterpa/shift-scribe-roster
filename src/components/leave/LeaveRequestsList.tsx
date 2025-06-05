@@ -21,7 +21,7 @@ interface LeaveRequest {
     first_name: string;
     last_name: string;
     employee_id: string;
-  };
+  } | null;
 }
 
 const LeaveRequestsList = () => {
@@ -34,8 +34,15 @@ const LeaveRequestsList = () => {
       const { data, error } = await supabase
         .from('leave_requests')
         .select(`
-          *,
-          staff_profiles:staff_id (
+          id,
+          leave_type,
+          start_date,
+          end_date,
+          days_requested,
+          reason,
+          status,
+          created_at,
+          staff_profiles!inner (
             first_name,
             last_name,
             employee_id
@@ -44,16 +51,23 @@ const LeaveRequestsList = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error('Supabase error:', error);
         toast({
           title: "Error",
           description: "Failed to load leave requests",
           variant: "destructive",
         });
       } else {
+        console.log('Fetched requests:', data);
         setRequests(data || []);
       }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load leave requests",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -118,10 +132,10 @@ const LeaveRequestsList = () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
                   <span className="font-medium">
-                    {request.staff_profiles.first_name} {request.staff_profiles.last_name}
+                    {request.staff_profiles?.first_name} {request.staff_profiles?.last_name}
                   </span>
                   <span className="text-sm text-gray-500">
-                    ({request.staff_profiles.employee_id})
+                    ({request.staff_profiles?.employee_id})
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
