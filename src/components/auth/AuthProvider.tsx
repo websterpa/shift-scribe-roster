@@ -1,7 +1,6 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
@@ -20,29 +19,25 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  // Mock user for development
+  const [user] = useState<User | null>({
+    id: 'dev-user-123',
+    email: 'dev@example.com',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    app_metadata: {},
+    user_metadata: {},
+    aud: 'authenticated',
+    confirmation_sent_at: new Date().toISOString(),
+    email_confirmed_at: new Date().toISOString(),
+    last_sign_in_at: new Date().toISOString(),
+    role: 'authenticated'
+  } as User);
+  
+  const [loading] = useState(false);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    console.log('Sign out disabled during development');
   };
 
   const value = {

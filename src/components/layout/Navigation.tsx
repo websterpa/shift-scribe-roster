@@ -2,14 +2,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { Calendar, Users, FileText, Settings, LogOut } from 'lucide-react';
+import { Calendar, Users, FileText, Settings } from 'lucide-react';
 
 const Navigation = () => {
-  const { user, signOut } = useAuth();
   const location = useLocation();
-
-  if (!user) return null;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -69,10 +65,9 @@ const Navigation = () => {
             </div>
           </div>
           <div className="flex items-center">
-            <span className="text-sm text-gray-700 mr-4">{user.email}</span>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+            <span className="text-sm text-gray-700 mr-4">dev@example.com</span>
+            <Button variant="outline" size="sm" disabled>
+              Development Mode
             </Button>
           </div>
         </div>
