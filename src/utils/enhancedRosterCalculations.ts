@@ -48,21 +48,14 @@ export async function generateAndSaveRoster(
     }
   });
 
-  // 2. Fetch past (cycle_length_weeks - 1) weeks' hours for each staff_id
+  // 2. For now, initialize empty historical hours since staff_hours_history table doesn't exist
+  // TODO: Create staff_hours_history table or use roster_assignments to calculate historical hours
   const pastWeeksMap: Record<string, number[]> = {};
-  await Promise.all(
-    staffList.map(async (s) => {
-      const { data: history } = await supabase
-        .from("staff_hours_history")
-        .select("hours_worked")
-        .eq("staff_id", s.id)
-        .order("week_index", { ascending: true })
-        .limit(config.cycle_length_weeks - 1);
-      pastWeeksMap[s.id] = history?.map((h: any) => h.hours_worked) || Array(config.cycle_length_weeks - 1).fill(0);
-    })
-  );
+  staffList.forEach((staff) => {
+    pastWeeksMap[staff.id] = Array(config.cycle_length_weeks - 1).fill(0);
+  });
 
-  console.log('Fetched historical hours for', Object.keys(pastWeeksMap).length, 'staff members');
+  console.log('Initialized historical hours for', Object.keys(pastWeeksMap).length, 'staff members');
 
   // 3. Build one cycle assignments
   const cycle = buildRosterCycle(
