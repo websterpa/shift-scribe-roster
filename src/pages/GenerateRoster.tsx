@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,10 +55,16 @@ const GenerateRoster = () => {
         fetchStaffMembers()
       ]);
       
-      setConfigs(configsData);
+      // Type cast the returned configs to ensure they match our ConfigItem interface
+      const typedConfigs: ConfigItem[] = configsData.map(config => ({
+        ...config,
+        shift_type: config.shift_type as "8h" | "12h"
+      }));
+      
+      setConfigs(typedConfigs);
       setStaffList(staffData);
       
-      if (configIdFromUrl && configsData.find(c => c.id === configIdFromUrl)) {
+      if (configIdFromUrl && typedConfigs.find(c => c.id === configIdFromUrl)) {
         setSelectedConfigId(configIdFromUrl);
       }
     } catch (error) {
