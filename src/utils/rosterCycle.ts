@@ -34,9 +34,10 @@ export function buildRosterCycle(
           else code = eligible.includes(slot === 0 ? "E" : "L") ? (slot === 0 ? "E" : "L") : "R";
         }
 
-        // Supervisors only if shift_worker OR Day shift
-        if (!staff.is_shift_worker && code !== "D") {
-          code = "R";
+        // Supervisors: if not shift_worker, only D on weekdays
+        if (!staff.is_shift_worker) {
+          const isWeekendDay = [0, 6].includes(d); // d is the day index (0-6)
+          code = (code === "D" && !isWeekendDay) ? "D" : "R";
         }
 
         assignment[w][d][staff.id] = code;
