@@ -71,6 +71,7 @@ export const AppRouter: React.FC = () => {
       <Routes>
         <Route path="/" element={<AuthenticatedLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="generate-roster" element={<GenerateRoster />} />
           <Route path="my-configurations" element={<MyConfigurations />} />
           <Route path="my-rosters" element={<MyRosters />} />
