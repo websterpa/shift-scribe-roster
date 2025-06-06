@@ -1,92 +1,30 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface StaffOption {
-  id: string;
-  first_name: string;
-  last_name: string;
-  leave_allowance_days?: number;
-  leave_taken_monthly: Record<string, number>;
-}
+import { StaffSelector } from "@/components/leave/StaffSelector";
+import { DateSelector } from "@/components/leave/DateSelector";
+import { LeaveTypeSelector } from "@/components/leave/LeaveTypeSelector";
+import { LeaveSummary } from "@/components/leave/LeaveSummary";
+import { useStaffData } from "@/hooks/useStaffData";
+import { calculateDaysBetween } from "@/utils/leaveCalculations";
 
 export default function ManageLeave() {
-  const [staffList, setStaffList] = useState<StaffOption[]>([]);
+  const { staffList, loading, refetchStaffList } = useStaffData();
   const [selectedStaff, setSelectedStaff] = useState<string>("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [type, setType] = useState<"annual-leave" | "sick">("annual-leave");
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchStaffList();
-  }, []);
-
-  const fetchStaffList = async () => {
-    try {
-      console.log('Fetching staff list...');
-      const { data, error } = await supabase
-        .from("staff_profiles")
-        .select("id, first_name, last_name")
-        .eq("is_active", true);
-
-      if (error) {
-        console.error('Error fetching staff:', error);
-        toast({ title: "Error fetching staff", description: error.message, variant: "destructive" });
-        return;
-      }
-
-      console.log('Staff data:', data);
-
-      const enriched = await Promise.all(
-        data?.map(async (s) => {
-          // Count monthly leave requests for this staff member
-          const { data: leaveData } = await supabase
-            .from("leave_requests")
-            .select("start_date, leave_type")
-            .eq("staff_id", s.id)
-            .eq("status", "approved");
-
-          const monthlyCounts: Record<string, number> = {};
-          leaveData?.forEach((lr: any) => {
-            const monthKey = lr.start_date.slice(0, 7); // "YYYY-MM"
-            monthlyCounts[monthKey] = (monthlyCounts[monthKey] || 0) + 1;
-          });
-
-          return { 
-            ...s, 
-            leave_taken_monthly: monthlyCounts,
-            leave_allowance_days: 25 // Default allowance, could be stored in staff_profiles
-          };
-        }) || []
-      );
-
-      setStaffList(enriched);
-      if (enriched.length > 0) {
-        setSelectedStaff(enriched[0].id);
-      }
-    } catch (error) {
-      console.error('Error in fetchStaffList:', error);
-      toast({ title: "Error loading staff", variant: "destructive" });
-    } finally {
-      setLoading(false);
+  // Set first staff member as selected when data loads
+  React.useEffect(() => {
+    if (staffList.length > 0 && !selectedStaff) {
+      setSelectedStaff(staffList[0].id);
     }
-  };
-
-  const calculateDaysBetween = (start: string, end: string): number => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const timeDiff = endDate.getTime() - startDate.getTime();
-    return Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1; // Include both start and end dates
-  };
+  }, [staffList, selectedStaff]);
 
   const submitLeave = async () => {
     if (!selectedStaff || !startDate || !endDate) {
@@ -130,7 +68,7 @@ export default function ManageLeave() {
         setStartDate("");
         setEndDate("");
         // Refresh staff list to update leave counts
-        fetchStaffList();
+        refetchStaffList();
       }
     } catch (error) {
       console.error('Error in submitLeave:', error);
@@ -157,69 +95,30 @@ export default function ManageLeave() {
           <CardTitle>Manage Leave</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="staff-select">Staff Member</Label>
-            <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select staff member" />
-              </SelectTrigger>
-              <SelectContent>
-                {staffList.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.first_name} {s.last_name} (Allowance: {s.leave_allowance_days || 25} days)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <StaffSelector 
+            staffList={staffList}
+            selectedStaff={selectedStaff}
+            onStaffChange={setSelectedStaff}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="start-date">Start Date</Label>
-            <Input
-              id="start-date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </div>
+          <DateSelector 
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="end-date">End Date</Label>
-            <Input
-              id="end-date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              min={startDate}
-            />
-          </div>
+          <LeaveTypeSelector 
+            type={type}
+            onTypeChange={setType}
+          />
 
-          <div className="space-y-3">
-            <Label>Leave Type</Label>
-            <RadioGroup value={type} onValueChange={(value) => setType(value as "annual-leave" | "sick")}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="annual-leave" id="annual-leave" />
-                <Label htmlFor="annual-leave">Annual Leave</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="sick" id="sick" />
-                <Label htmlFor="sick">Sick Leave</Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {startDate && endDate && (
-            <div className="p-3 bg-gray-50 rounded-md">
-              <p className="text-sm text-gray-600">
-                Days requested: {calculateDaysBetween(startDate, endDate)}
-              </p>
-              {selectedStaffData && (
-                <p className="text-sm text-gray-600">
-                  Current month leave taken: {selectedStaffData.leave_taken_monthly[new Date().toISOString().slice(0, 7)] || 0} days
-                </p>
-              )}
-            </div>
-          )}
+          <LeaveSummary 
+            startDate={startDate}
+            endDate={endDate}
+            selectedStaffData={selectedStaffData}
+            calculateDaysBetween={calculateDaysBetween}
+          />
 
           <Button 
             onClick={submitLeave} 

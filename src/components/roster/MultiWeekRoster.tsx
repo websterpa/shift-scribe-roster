@@ -1,170 +1,167 @@
 
-import React, { useState, useEffect } from "react";
-import { generateAndSaveRoster } from "@/utils/enhancedRosterCalculations";
-import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
-interface Staff {
+interface RosterAssignment {
   id: string;
-  name: string;
-  role: string;
-  eligible_shifts: string[];
-  is_shift_worker: boolean;
-  min_hours_per_week: number;
-  max_hours_per_week: number;
-  opted_out_wtd: boolean;
-  hourly_rate: number;
-  holiday_multiplier: number;
-  leave_allowance_days: number;
+  date: string;
+  staff_id: string;
+  shift_code: string;
+  hours: number;
+  cost: number;
+  staff_profiles: {
+    first_name: string;
+    last_name: string;
+    employee_id: string;
+  };
 }
 
-interface Config {
-  id?: string;
-  cycle_length_weeks: number;
-  shift_type: "8h" | "12h";
-  operational_hours_per_day: number;
-  handshake_minutes: number;
-  start_date: string;
+interface WeekData {
+  weekStart: Date;
+  assignments: RosterAssignment[];
 }
 
-interface Props {
-  staffList: Staff[];
-  config: Config;
-  showWeeks?: number; // how many weeks to display (e.g. 4 or 8)
-}
-
-function weekdayLabel(date: Date): string {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return days[date.getDay()];
-}
-
-export default function MultiWeekRoster({ staffList, config, showWeeks = 4 }: Props) {
-  const [versionId, setVersionId] = useState<string | null>(null);
-  const [assignments, setAssignments] = useState<Record<string, Record<string, string>>>({});
-  const [totalHours, setTotalHours] = useState<Record<string, number>>({});
-  const [totalCost, setTotalCost] = useState<Record<string, number>>({});
-  const [columns, setColumns] = useState<Date[]>([]);
-  const [loading, setLoading] = useState(false);
+export function MultiWeekRoster() {
+  const [weeks, setWeeks] = useState<WeekData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
 
   useEffect(() => {
-    console.log('MultiWeekRoster: Starting roster generation');
-    
-    // Generate & save roster version
-    (async () => {
-      setLoading(true);
-      try {
-        const vid = await generateAndSaveRoster(staffList, { ...config, id: config.id! });
-        console.log('Generated roster version:', vid);
-        setVersionId(vid);
+    fetchRosterData();
+  }, [currentWeekOffset]);
 
-        // Fetch assignments for this version
-        const { data: rows, error } = await supabase
-          .from("roster_assignments")
-          .select("*")
-          .eq("roster_version_id", vid);
+  const fetchRosterData = async () => {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() + (currentWeekOffset * 7));
+      
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 28); // 4 weeks
 
-        if (error) {
-          console.error('Error fetching assignments:', error);
-          return;
-        }
+      const { data, error } = await supabase
+        .from('roster_assignments')
+        .select(`
+          *,
+          staff_profiles!inner(first_name, last_name, employee_id)
+        `)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0])
+        .order('date');
 
-        console.log('Fetched assignments:', rows?.length || 0);
-
-        // Build assignments map and totals
-        const assignMap: Record<string, Record<string, string>> = {};
-        const hoursMap: Record<string, number> = {};
-        const costMap: Record<string, number> = {};
-        
-        rows?.forEach((r: any) => {
-          const dateKey = new Date(r.shift_date).toDateString();
-          assignMap[dateKey] = assignMap[dateKey] || {};
-          assignMap[dateKey][r.staff_id] = r.shift_type;
-          // Note: hours and cost would need to be calculated from shift times
-          // For now, using basic estimates
-          const hours = r.shift_type === "R" ? 0 : (config.shift_type === "12h" ? 12 : 8);
-          hoursMap[r.staff_id] = (hoursMap[r.staff_id] || 0) + hours;
-          
-          const staff = staffList.find(s => s.id === r.staff_id);
-          const cost = staff ? hours * staff.hourly_rate : 0;
-          costMap[r.staff_id] = (costMap[r.staff_id] || 0) + cost;
-        });
-        
-        setAssignments(assignMap);
-        setTotalHours(hoursMap);
-        setTotalCost(costMap);
-
-        // Build column dates for showWeeks
-        const cols: Date[] = [];
-        for (let w = 0; w < showWeeks; w++) {
-          for (let d = 0; d < 7; d++) {
-            const date = new Date(config.start_date);
-            date.setDate(date.getDate() + w * 7 + d);
-            cols.push(date);
-          }
-        }
-        setColumns(cols);
-      } catch (error) {
-        console.error('Error in roster generation:', error);
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('Error fetching roster data:', error);
+        return;
       }
-    })();
-  }, [staffList, config, showWeeks]);
+
+      // Group assignments by week
+      const weekMap = new Map<string, RosterAssignment[]>();
+      
+      data?.forEach((assignment: any) => {
+        const assignmentDate = new Date(assignment.date);
+        const weekStart = new Date(assignmentDate);
+        weekStart.setDate(assignmentDate.getDate() - assignmentDate.getDay() + 1); // Monday
+        
+        const weekKey = weekStart.toISOString().split('T')[0];
+        
+        if (!weekMap.has(weekKey)) {
+          weekMap.set(weekKey, []);
+        }
+        
+        weekMap.get(weekKey)?.push({
+          id: assignment.id,
+          date: assignment.date,
+          staff_id: assignment.staff_id,
+          shift_code: assignment.shift_code,
+          hours: assignment.hours || 0,
+          cost: assignment.cost || 0,
+          staff_profiles: assignment.staff_profiles
+        });
+      });
+
+      // Convert to array and sort by week start
+      const weeksArray: WeekData[] = Array.from(weekMap.entries())
+        .map(([weekKey, assignments]) => ({
+          weekStart: new Date(weekKey),
+          assignments
+        }))
+        .sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime());
+
+      setWeeks(weeksArray);
+    } catch (error) {
+      console.error('Error in fetchRosterData:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatWeekRange = (weekStart: Date) => {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    return `${weekStart.toLocaleDateString()} - ${weekEnd.toLocaleDateString()}`;
+  };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-lg">Generating roster...</div>
-      </div>
-    );
+    return <div>Loading multi-week roster...</div>;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="sticky left-0 bg-white z-10 min-w-[120px]">Name</TableHead>
-            {columns.map((date, idx) => (
-              <TableHead key={idx} className="text-center min-w-[50px] text-xs">
-                <div>{weekdayLabel(date)}</div>
-                <div>{date.getDate()}</div>
-              </TableHead>
-            ))}
-            <TableHead className="text-center min-w-[80px]">Total Hrs</TableHead>
-            <TableHead className="text-center min-w-[80px]">Total £</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {staffList.map((staff) => (
-            <TableRow key={staff.id}>
-              <TableCell className="sticky left-0 bg-white font-medium">{staff.name}</TableCell>
-              {columns.map((date) => {
-                const code = assignments[date.toDateString()]?.[staff.id] || "R";
-                return (
-                  <TableCell key={date.toDateString()} className="text-center h-12">
-                    <span className={`text-sm font-medium ${
-                      code === "R" ? "text-gray-400" : 
-                      code === "S" ? "text-red-500" :
-                      code === "D" ? "text-blue-600" :
-                      code === "N" ? "text-purple-600" :
-                      code === "E" ? "text-green-600" :
-                      code === "L" ? "text-orange-600" :
-                      "text-black"
-                    }`}>
-                      {code}
-                    </span>
-                  </TableCell>
-                );
-              })}
-              <TableCell className="text-center">{totalHours[staff.id] || 0}</TableCell>
-              <TableCell className="text-center">
-                £{(totalCost[staff.id] || 0).toFixed(2)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex justify-between items-center">
+          Multi-Week Roster View
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentWeekOffset(currentWeekOffset - 4)}
+            >
+              Previous 4 Weeks
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentWeekOffset(currentWeekOffset + 4)}
+            >
+              Next 4 Weeks
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {weeks.length === 0 ? (
+            <p className="text-gray-500">No roster data found for this period</p>
+          ) : (
+            weeks.map((week, index) => (
+              <div key={index} className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-3">
+                  Week {index + 1}: {formatWeekRange(week.weekStart)}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {week.assignments.length === 0 ? (
+                    <p className="text-gray-400 col-span-full">No assignments this week</p>
+                  ) : (
+                    week.assignments.map((assignment) => (
+                      <div key={assignment.id} className="p-2 bg-gray-50 rounded">
+                        <div className="font-medium text-sm">
+                          {assignment.staff_profiles.first_name} {assignment.staff_profiles.last_name}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {new Date(assignment.date).toLocaleDateString()} - {assignment.shift_code}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {assignment.hours}h - £{assignment.cost}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

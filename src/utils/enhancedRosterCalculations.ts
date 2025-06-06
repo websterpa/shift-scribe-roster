@@ -1,152 +1,164 @@
 
-import { buildRosterCycle } from "./rosterCycle";
-import { withinWeeklyHours, withinRollingAverage } from "./wtrCompliance";
-import { supabase } from "@/integrations/supabase/client";
-import { fetchLeaveRequests } from "./roster/leaveManager";
-import { calculateShiftDetails, calculateShiftCost } from "./roster/shiftCalculator";
-import { createRosterVersion } from "./roster/rosterVersion";
+import { supabase } from '@/integrations/supabase/client';
 
-interface Staff {
+export interface StaffMember {
   id: string;
   name: string;
   role: string;
-  eligible_shifts: string[];
   is_shift_worker: boolean;
+  eligible_shifts: string[];
   min_hours_per_week: number;
   max_hours_per_week: number;
   opted_out_wtd: boolean;
+  days_off_per_week: number;
   hourly_rate: number;
   holiday_multiplier: number;
-  leave_allowance_days: number;
 }
 
-interface RosterConfig {
+export interface RosterConfig {
   id: string;
+  config_name: string;
   cycle_length_weeks: number;
-  shift_type: "8h" | "12h";
+  shift_type: string;
   operational_hours_per_day: number;
   handshake_minutes: number;
   start_date: string;
 }
 
-export async function generateAndSaveRoster(
-  staffList: Staff[],
-  config: RosterConfig
-): Promise<string> {
-  console.log('Starting roster generation for config:', config.id);
-  
-  // 1. Fetch all approved leave requests
-  const leaveMap = await fetchLeaveRequests();
-
-  // 2. Initialize empty historical hours (simplified for now)
-  const pastWeeksMap: Record<string, number[]> = {};
-  staffList.forEach((staff) => {
-    pastWeeksMap[staff.id] = Array(config.cycle_length_weeks - 1).fill(0);
-  });
-
-  console.log('Initialized historical hours for', Object.keys(pastWeeksMap).length, 'staff members');
-
-  // 3. Build roster cycle assignments
-  const cycle = buildRosterCycle(
-    staffList,
-    config.cycle_length_weeks,
-    config.shift_type,
-    config.operational_hours_per_day,
-    config.handshake_minutes
-  );
-
-  console.log('Generated cycle assignments');
-
-  // 4. Create a new roster version
-  const versionId = await createRosterVersion(
-    config.id,
-    config.start_date,
-    config.cycle_length_weeks
-  );
-
-  // 5. Generate and save all roster assignments
-  await generateRosterAssignments(
-    staffList,
-    config,
-    cycle,
-    leaveMap,
-    pastWeeksMap,
-    versionId
-  );
-
-  console.log('Roster generation completed for version:', versionId);
-  return versionId;
+export interface Assignment {
+  date: string;
+  staff_id: string;
+  shift_code: string;
+  shift_start?: string;
+  shift_end?: string;
+  hours?: number;
+  cost?: number;
 }
 
-async function generateRosterAssignments(
-  staffList: Staff[],
-  config: RosterConfig,
-  cycle: any,
-  leaveMap: Record<string, { date: string; type: string }[]>,
-  pastWeeksMap: Record<string, number[]>,
-  versionId: string
-): Promise<void> {
-  for (let w = 0; w < config.cycle_length_weeks; w++) {
-    for (let d = 0; d < 7; d++) {
-      const dateObj = new Date(config.start_date);
-      dateObj.setDate(dateObj.getDate() + w * 7 + d);
-      const dateKey = dateObj.toDateString();
+export async function generateRosterAssignments(
+  configId: string,
+  staffMembers: StaffMember[],
+  startDate: Date,
+  endDate: Date
+): Promise<Assignment[]> {
+  console.log('Generating roster assignments...', { configId, startDate, endDate });
+  
+  const assignments: Assignment[] = [];
+  const currentDate = new Date(startDate);
 
-      await Promise.all(
-        staffList.map(async (staff) => {
-          let code = cycle[w][d][staff.id];
-          
-          // Override if on leave/sick
-          const leaveEntry = leaveMap[staff.id]?.find((e) => e.date === dateKey);
-          if (leaveEntry) {
-            code = leaveEntry.type === "sick" ? "S" : "R";
-          }
-
-          // Calculate shift details
-          const { shiftStart, shiftEnd, hours } = calculateShiftDetails(
-            code,
-            dateObj,
-            config.shift_type,
-            config.handshake_minutes
-          );
-
-          // Check WTR compliance
-          const weekIndex = w;
-          const prevHours = pastWeeksMap[staff.id]?.[weekIndex] || 0;
-          const thisWeekHours = prevHours + hours;
-          const wtdOK = withinWeeklyHours(thisWeekHours, staff.max_hours_per_week, staff.opted_out_wtd);
-          const rollingOK = withinRollingAverage(pastWeeksMap[staff.id], thisWeekHours, 48);
-
-          if (!wtdOK || !rollingOK) {
-            console.log(`WTR violation for staff ${staff.id} on ${dateKey}, forcing rest`);
-            code = "R";
-          }
-
-          // Calculate final shift details after WTR check
-          const finalShiftDetails = code === "R" 
-            ? { shiftStart: null, shiftEnd: null, hours: 0 }
-            : { shiftStart, shiftEnd, hours };
-
-          // Calculate cost
-          const cost = calculateShiftCost(
-            finalShiftDetails.hours,
-            staff.hourly_rate,
-            dateObj,
-            staff.holiday_multiplier
-          );
-
-          // Insert assignment to database
-          await supabase.from("roster_assignments").insert({
-            roster_version_id: versionId,
-            shift_date: dateObj.toISOString().split("T")[0],
-            staff_id: staff.id,
-            shift_type: code,
-            shift_start: finalShiftDetails.shiftStart?.toTimeString().split(' ')[0] || null,
-            shift_end: finalShiftDetails.shiftEnd?.toTimeString().split(' ')[0] || null,
-            notes: leaveEntry ? `On ${leaveEntry.type} leave` : null
-          });
-        })
+  while (currentDate <= endDate) {
+    // Simple assignment logic - assign first available staff to each shift
+    const shiftCodes = ['E', 'L', 'N']; // Early, Late, Night
+    
+    shiftCodes.forEach((shiftCode, index) => {
+      const availableStaff = staffMembers.filter(staff => 
+        staff.is_shift_worker && 
+        staff.eligible_shifts.includes(getShiftName(shiftCode))
       );
+
+      if (availableStaff.length > 0) {
+        const staffMember = availableStaff[index % availableStaff.length];
+        
+        assignments.push({
+          date: currentDate.toISOString().split('T')[0],
+          staff_id: staffMember.id,
+          shift_code: shiftCode,
+          hours: 8, // Default 8-hour shift
+          cost: staffMember.hourly_rate * 8
+        });
+      }
+    });
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return assignments;
+}
+
+function getShiftName(shiftCode: string): string {
+  switch (shiftCode) {
+    case 'E': return 'Early';
+    case 'L': return 'Late';
+    case 'N': return 'Night';
+    case 'D': return 'Day';
+    default: return 'Unknown';
+  }
+}
+
+export async function saveRosterVersion(
+  configId: string,
+  assignments: Assignment[]
+): Promise<string | null> {
+  try {
+    console.log('Saving roster version...', { configId, assignmentCount: assignments.length });
+
+    // Create new roster version
+    const { data: versionData, error: versionError } = await supabase
+      .from('roster_versions')
+      .insert({
+        config_id: configId,
+        version_number: 1 // In a real implementation, this would increment
+      })
+      .select()
+      .single();
+
+    if (versionError) {
+      console.error('Error creating roster version:', versionError);
+      return null;
     }
+
+    console.log('Created roster version:', versionData);
+
+    // Save assignments
+    const assignmentsWithVersion = assignments.map(assignment => ({
+      ...assignment,
+      version_id: versionData.id
+    }));
+
+    const { error: assignmentsError } = await supabase
+      .from('roster_assignments')
+      .insert(assignmentsWithVersion);
+
+    if (assignmentsError) {
+      console.error('Error saving assignments:', assignmentsError);
+      return null;
+    }
+
+    console.log('Saved assignments successfully');
+    return versionData.id;
+  } catch (error) {
+    console.error('Error in saveRosterVersion:', error);
+    return null;
+  }
+}
+
+export async function fetchStaffMembers(): Promise<StaffMember[]> {
+  try {
+    const { data, error } = await supabase
+      .from('staff_profiles')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error fetching staff members:', error);
+      return [];
+    }
+
+    return data?.map(staff => ({
+      id: staff.id,
+      name: staff.name || `${staff.first_name} ${staff.last_name}`,
+      role: staff.role || 'CCTV Operator',
+      is_shift_worker: staff.is_shift_worker ?? true,
+      eligible_shifts: staff.eligible_shifts || ['Early', 'Late', 'Night'],
+      min_hours_per_week: staff.min_hours_per_week || 32,
+      max_hours_per_week: staff.max_hours_per_week || 48,
+      opted_out_wtd: staff.opted_out_wtd || false,
+      days_off_per_week: staff.days_off_per_week || 2,
+      hourly_rate: staff.hourly_rate || 15.50,
+      holiday_multiplier: staff.holiday_multiplier || 2
+    })) || [];
+  } catch (error) {
+    console.error('Error in fetchStaffMembers:', error);
+    return [];
   }
 }
