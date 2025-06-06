@@ -26,7 +26,7 @@ export function validateForm(data: Record<string, any>, schema: ValidationSchema
     
     // Required validation
     if (rules.required && (!value || (typeof value === 'string' && value.trim() === ''))) {
-      errors[field] = `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required`;
+      errors[field] = `${field.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').toLowerCase()} is required`;
       continue;
     }
     
@@ -36,24 +36,24 @@ export function validateForm(data: Record<string, any>, schema: ValidationSchema
     // Min validation
     if (rules.min !== undefined) {
       if (typeof value === 'number' && value < rules.min) {
-        errors[field] = `${field} must be at least ${rules.min}`;
+        errors[field] = `${field.replace(/_/g, ' ')} must be at least ${rules.min}`;
       } else if (typeof value === 'string' && value.length < rules.min) {
-        errors[field] = `${field} must be at least ${rules.min} characters`;
+        errors[field] = `${field.replace(/_/g, ' ')} must be at least ${rules.min} characters`;
       }
     }
     
     // Max validation
     if (rules.max !== undefined) {
       if (typeof value === 'number' && value > rules.max) {
-        errors[field] = `${field} must be at most ${rules.max}`;
+        errors[field] = `${field.replace(/_/g, ' ')} must be at most ${rules.max}`;
       } else if (typeof value === 'string' && value.length > rules.max) {
-        errors[field] = `${field} must be at most ${rules.max} characters`;
+        errors[field] = `${field.replace(/_/g, ' ')} must be at most ${rules.max} characters`;
       }
     }
     
     // Pattern validation
     if (rules.pattern && typeof value === 'string' && !rules.pattern.test(value)) {
-      errors[field] = `${field} format is invalid`;
+      errors[field] = `${field.replace(/_/g, ' ')} format is invalid`;
     }
     
     // Custom validation
@@ -89,10 +89,10 @@ export function showSuccessToast(message: string) {
   });
 }
 
-// Common validation schemas
+// Common validation schemas - updated to match form field names
 export const staffValidationSchema: ValidationSchema = {
-  firstName: { required: true, min: 2, max: 50 },
-  lastName: { required: true, min: 2, max: 50 },
+  first_name: { required: true, min: 2, max: 50 },
+  last_name: { required: true, min: 2, max: 50 },
   email: { 
     required: true, 
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -101,8 +101,8 @@ export const staffValidationSchema: ValidationSchema = {
       return null;
     }
   },
-  employeeId: { required: true, min: 3, max: 20 },
-  hourlyRate: { 
+  employee_id: { required: true, min: 3, max: 20 },
+  hourly_rate: { 
     required: true, 
     min: 0, 
     max: 200,

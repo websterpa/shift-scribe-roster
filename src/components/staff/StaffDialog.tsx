@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -107,12 +106,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const validation = validateForm(formData, {
-      ...staffValidationSchema,
-      firstName: { required: true, min: 2, max: 50 },
-      lastName: { required: true, min: 2, max: 50 },
-      employeeId: { required: true, min: 3, max: 20 }
-    });
+    // Use the correct field names for validation
+    const validation = validateForm(formData, staffValidationSchema);
 
     if (!validation.isValid) {
       setErrors(validation.errors);
@@ -187,8 +182,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
                 onChange={(e) => handleInputChange('employee_id', e.target.value)}
                 placeholder="EMP001"
               />
-              {errors.employeeId && (
-                <p className="text-sm text-red-600 mt-1">{errors.employeeId}</p>
+              {errors.employee_id && (
+                <p className="text-sm text-red-600 mt-1">{errors.employee_id}</p>
               )}
             </div>
 
@@ -214,8 +209,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
                 onChange={(e) => handleInputChange('first_name', e.target.value)}
                 placeholder="John"
               />
-              {errors.firstName && (
-                <p className="text-sm text-red-600 mt-1">{errors.firstName}</p>
+              {errors.first_name && (
+                <p className="text-sm text-red-600 mt-1">{errors.first_name}</p>
               )}
             </div>
 
@@ -227,8 +222,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
                 onChange={(e) => handleInputChange('last_name', e.target.value)}
                 placeholder="Doe"
               />
-              {errors.lastName && (
-                <p className="text-sm text-red-600 mt-1">{errors.lastName}</p>
+              {errors.last_name && (
+                <p className="text-sm text-red-600 mt-1">{errors.last_name}</p>
               )}
             </div>
 
@@ -280,8 +275,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
                 onChange={(e) => handleInputChange('hourly_rate', parseFloat(e.target.value))}
                 placeholder="15.50"
               />
-              {errors.hourlyRate && (
-                <p className="text-sm text-red-600 mt-1">{errors.hourlyRate}</p>
+              {errors.hourly_rate && (
+                <p className="text-sm text-red-600 mt-1">{errors.hourly_rate}</p>
               )}
             </div>
           </div>
