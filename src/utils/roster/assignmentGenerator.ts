@@ -1,6 +1,5 @@
-
 import { isPublicHoliday } from "../dateHelpers";
-import { hasDailyRest, withinWeeklyHours, withinRollingAverage } from "../wtrCompliance";
+import { hasDailyRest, withinWeeklyHours, calculateRollingAverage, WeeklyHours } from "../wtrCompliance";
 import { StaffMember, Assignment } from "@/types/roster";
 import { createLogger } from "../errorLogger";
 
@@ -195,7 +194,15 @@ function checkWTDCompliance(
   }
 
   if (!staff.opted_out_wtd && pastHours.length > 0) {
-    return withinRollingAverage(pastHours, weeklyHours, 48);
+    // Convert past hours array to WeeklyHours format and calculate rolling average
+    const weeklyHoursData: WeeklyHours[] = pastHours.map((hours, index) => ({
+      weekStart: new Date(Date.now() - (pastHours.length - index) * 7 * 24 * 60 * 60 * 1000),
+      hours,
+      overtime: Math.max(0, hours - 48)
+    }));
+    
+    const rollingAverage = calculateRollingAverage(weeklyHoursData);
+    return rollingAverage <= 48;
   }
 
   return true;
