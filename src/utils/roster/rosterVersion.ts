@@ -4,7 +4,12 @@ import { createLogger } from "../errorLogger";
 
 const logger = createLogger('RosterVersion');
 
-export async function createRosterVersion(configId: string, versionName?: string, startDate?: string, cycleWeeks?: number): Promise<string> {
+export async function createRosterVersion(
+  configId: string, 
+  versionName?: string, 
+  startDate?: string, 
+  cycleWeeks?: number
+): Promise<string> {
   try {
     if (!configId) {
       throw new Error('Config ID is required to create roster version');
@@ -52,7 +57,7 @@ export async function createRosterVersion(configId: string, versionName?: string
       version_number: nextVersionNumber
     };
     
-    // Add version name if provided
+    // Add version name - either provided or default
     if (versionName && versionName.trim()) {
       versionData.version_name = versionName.trim();
       logger.info('Including version name:', versionName.trim());

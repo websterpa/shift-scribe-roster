@@ -43,6 +43,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
   const [generating, setGenerating] = useState(false);
   const [weeks, setWeeks] = useState<MultiWeekData[]>([]);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+  const [visibleWeeks, setVisibleWeeks] = useState(4);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
@@ -101,8 +102,11 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
       // For each week, create dummy roster data
       const weekMap = new Map<string, RosterAssignment[]>();
       
+      // Calculate weeks to show based on visibleWeeks and config cycle length
+      const weeksToShow = Math.min(visibleWeeks, config.cycle_length_weeks || showWeeks);
+      
       // Generate for the specified number of weeks
-      for (let week = 0; week < showWeeks; week++) {
+      for (let week = 0; week < weeksToShow; week++) {
         const weekStartDate = addWeeks(startDate, week);
         const weekKey = format(weekStartDate, 'yyyy-MM-dd');
         
@@ -158,7 +162,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
       setGenerating(false);
       setLoading(false);
     }
-  }, [config, staffList, showWeeks]);
+  }, [config, staffList, showWeeks, visibleWeeks]);
   
   // Filter staff based on search and role
   const filteredStaff = demoStaff.filter(staff => {
@@ -173,6 +177,9 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
     name: staff.name,
     role: staff.role || 'Staff'
   }));
+
+  const maxWeeks = config?.cycle_length_weeks || showWeeks;
+  const weeksToShow = Math.min(visibleWeeks, maxWeeks);
   
   return (
     <Card className="h-full">
@@ -189,13 +196,13 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-normal">
-              Week {currentWeekOffset + 1} of {showWeeks}
+              Week {currentWeekOffset + 1} of {weeksToShow}
             </span>
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => setCurrentWeekOffset(prev => Math.min(showWeeks - 1, prev + 1))}
-              disabled={currentWeekOffset === showWeeks - 1}
+              onClick={() => setCurrentWeekOffset(prev => Math.min(weeksToShow - 1, prev + 1))}
+              disabled={currentWeekOffset === weeksToShow - 1}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -248,10 +255,30 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
             </div>
           </div>
         ) : weeks.length > 0 && currentWeekOffset < weeks.length ? (
-          <RosterCalendar 
-            week={weeks[currentWeekOffset]} 
-            staff={displayStaff}
-          />
+          <>
+            <RosterCalendar 
+              week={weeks[currentWeekOffset]} 
+              staff={displayStaff}
+            />
+            {config && maxWeeks > visibleWeeks && (
+              <div className="mt-4 text-center space-x-2">
+                <Button 
+                  onClick={() => setVisibleWeeks(prev => Math.min(prev + 4, maxWeeks))}
+                  disabled={visibleWeeks >= maxWeeks}
+                >
+                  Show Next {Math.min(4, maxWeeks - visibleWeeks)} Weeks
+                </Button>
+                {visibleWeeks < maxWeeks && (
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => setVisibleWeeks(maxWeeks)}
+                  >
+                    Show All Weeks
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex h-64 items-center justify-center">
             <p className="text-gray-500">No roster data available</p>

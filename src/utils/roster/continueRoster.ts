@@ -13,10 +13,10 @@ export async function continueRoster(configId: string): Promise<string> {
   logger.info('Starting roster continuation...', { configId });
 
   try {
-    // 1. Fetch config record
-    const { data: config, error: configError } = await supabase
+    // 1. Fetch the roster_config record
+    const { data: configRow, error: configError } = await supabase
       .from("roster_config")
-      .select("*")
+      .select("id, config_name, start_date, cycle_length_weeks, shift_type, operational_hours_per_day, handshake_minutes")
       .eq("id", configId)
       .single();
 
@@ -25,10 +25,14 @@ export async function continueRoster(configId: string): Promise<string> {
       throw configError;
     }
 
-    logger.info('Fetched config:', config);
+    if (!configRow) {
+      throw new Error('Configuration not found');
+    }
 
-    // 2. Find last version number for this config
-    const { data: lastVersion, error: versionError } = await supabase
+    logger.info('Fetched config:', configRow);
+
+    // 2. Fetch the last version_number for this config
+    const { data: lastVer, error: versionError } = await supabase
       .from("roster_versions")
       .select("version_number")
       .eq("config_id", configId)
@@ -41,18 +45,22 @@ export async function continueRoster(configId: string): Promise<string> {
       throw versionError;
     }
 
-    const nextVersionNumber = lastVersion.version_number + 1;
+    if (!lastVer) {
+      throw new Error('No previous roster version found for this configuration');
+    }
+
+    const nextVersionNumber = lastVer.version_number + 1;
     logger.info('Next version number:', nextVersionNumber);
 
-    // 3. Compute new start date: original start + cycle_length_weeks * 7 * (nextVersion - 1)
-    const baseDate = new Date(config.start_date);
-    baseDate.setDate(
-      baseDate.getDate() + 
-      config.cycle_length_weeks * 7 * (nextVersionNumber - 1)
+    // 3. Compute newStartDate = oldStart + cycle_length_weeks * 7 * (nextVersionNumber - 1)
+    const oldStart = new Date(configRow.start_date);
+    const newStart = new Date(oldStart);
+    newStart.setDate(
+      oldStart.getDate() + configRow.cycle_length_weeks * 7 * (nextVersionNumber - 1)
     );
-    const newStartDate = baseDate.toISOString().split("T")[0];
+    const newStartDateStr = newStart.toISOString().split("T")[0];
     
-    logger.info('Calculated new start date:', newStartDate);
+    logger.info('Calculated new start date:', newStartDateStr);
 
     // 4. Fetch staff members
     const staffList = await fetchStaffMembers();
@@ -60,16 +68,16 @@ export async function continueRoster(configId: string): Promise<string> {
 
     // 5. Prepare config for generation with new start date
     const configForGeneration = {
-      id: config.id,
-      cycle_length_weeks: config.cycle_length_weeks,
-      shift_type: config.shift_type as "8h" | "12h",
-      operational_hours_per_day: config.operational_hours_per_day,
-      handshake_minutes: config.handshake_minutes,
-      start_date: newStartDate
+      id: configRow.id,
+      cycle_length_weeks: configRow.cycle_length_weeks,
+      shift_type: configRow.shift_type as "8h" | "12h",
+      operational_hours_per_day: configRow.operational_hours_per_day,
+      handshake_minutes: configRow.handshake_minutes,
+      start_date: newStartDateStr
     };
 
     // 6. Generate and save roster with auto-generated version name
-    const versionName = `Auto-Continued v${nextVersionNumber} - ${config.config_name}`;
+    const versionName = `Auto-Continued v${nextVersionNumber} - ${configRow.config_name}`;
     const newVersionId = await generateAndSaveRoster(
       staffList,
       configForGeneration,
@@ -79,8 +87,8 @@ export async function continueRoster(configId: string): Promise<string> {
     logger.info('Successfully continued roster', { newVersionId });
     return newVersionId;
 
-  } catch (error) {
+  } catch (error: any) {
     logger.error(new Error('Error continuing roster'), { originalError: error });
-    throw error;
+    throw new Error(`Failed to continue roster: ${error.message}`);
   }
 }
