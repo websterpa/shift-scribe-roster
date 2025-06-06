@@ -1,9 +1,9 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { buildRosterCycle } from "../rosterCycle";
 import { createLogger } from "../errorLogger";
 import { StaffMember, Assignment } from "@/types/roster";
 import { generateAssignments } from "./assignmentGenerator";
+import { createRosterVersion } from "./rosterVersion";
 
 const logger = createLogger('RosterGeneration');
 
@@ -54,12 +54,9 @@ export async function generateAndSaveRoster(
         
       if (leaveError) {
         logger.error(new Error('Failed to fetch leave requests'), { error: leaveError });
-        throw leaveError;
-      }
-        
-      logger.info('Fetched leave requests:', { count: leaves?.length || 0 });
-      
-      if (leaves) {
+        // Continue without leave data rather than failing
+        logger.warn('Continuing roster generation without leave data');
+      } else if (leaves) {
         leaves.forEach((lr: any) => {
           try {
             if (!lr.staff_id || !lr.start_date || !lr.end_date) {
@@ -89,10 +86,10 @@ export async function generateAndSaveRoster(
             });
           }
         });
+        logger.info('Fetched leave requests:', { count: leaves.length });
       }
     } catch (leaveError: any) {
       logger.error(new Error('Error fetching leave requests, continuing without leave data'), { error: leaveError });
-      // Continue with empty leave map rather than failing completely
     }
 
     // 3. Fetch past weeks for rolling average
@@ -100,7 +97,12 @@ export async function generateAndSaveRoster(
     logger.info('Past weeks data prepared');
 
     // 4. Get next version number for this config
-    const versionId = await createRosterVersion(config.id, versionName);
+    const versionId = await createRosterVersion(
+      config.id, 
+      versionName, 
+      config.start_date, 
+      config.cycle_length_weeks
+    );
     logger.info('Created roster version:', versionId);
 
     // 5. Generate assignments
@@ -138,68 +140,6 @@ async function fetchPastWeeks(staffList: StaffMember[], cycleLengthWeeks: number
     logger.error(new Error('Error fetching past weeks data'), { error });
     // Return empty data rather than failing
     return {};
-  }
-}
-
-/**
- * Create a new roster version in the database
- */
-async function createRosterVersion(configId: string, versionName?: string): Promise<string> {
-  try {
-    if (!configId) {
-      throw new Error('Config ID is required to create roster version');
-    }
-
-    logger.info('Creating roster version for config:', configId);
-    
-    // Get next version number
-    const { data: existingVersions, error: versionQueryError } = await supabase
-      .from("roster_versions")
-      .select("version_number")
-      .eq("config_id", configId)
-      .order("version_number", { ascending: false })
-      .limit(1);
-
-    if (versionQueryError) {
-      logger.error(new Error('Error querying existing versions'), { error: versionQueryError });
-      throw versionQueryError;
-    }
-      
-    const nextVersionNumber = existingVersions && existingVersions.length > 0 
-      ? existingVersions[0].version_number + 1 
-      : 1;
-
-    // Create version with version_name
-    const versionData: any = {
-      config_id: configId,
-      version_number: nextVersionNumber
-    };
-    
-    if (versionName && versionName.trim()) {
-      versionData.version_name = versionName.trim();
-      logger.info('Including version name in roster version:', versionName.trim());
-    }
-    
-    const { data: rv, error: versionError } = await supabase
-      .from("roster_versions")
-      .insert(versionData)
-      .select("id")
-      .single();
-      
-    if (versionError) {
-      logger.error(new Error('Failed to create roster version'), { error: versionError });
-      throw versionError;
-    }
-
-    if (!rv || !rv.id) {
-      throw new Error('Failed to get roster version ID from database');
-    }
-    
-    logger.info('Successfully created roster version with ID:', rv.id);
-    return rv.id;
-  } catch (error: any) {
-    logger.error(new Error('Error in createRosterVersion'), { error });
-    throw new Error(`Failed to create roster version: ${error.message}`);
   }
 }
 
