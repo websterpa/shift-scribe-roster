@@ -89,7 +89,7 @@ export function showSuccessToast(message: string) {
   });
 }
 
-// Common validation schemas - updated to match form field names
+// Updated validation schemas to match database field names
 export const staffValidationSchema: ValidationSchema = {
   first_name: { required: true, min: 2, max: 50 },
   last_name: { required: true, min: 2, max: 50 },
@@ -113,9 +113,10 @@ export const staffValidationSchema: ValidationSchema = {
   }
 };
 
+// Fixed configuration validation schema to match database field names
 export const configValidationSchema: ValidationSchema = {
-  configName: { required: true, min: 3, max: 100 },
-  cycleLength: { 
+  config_name: { required: true, min: 3, max: 100 },
+  cycle_length_weeks: { 
     required: true, 
     min: 1, 
     max: 52,
@@ -124,12 +125,28 @@ export const configValidationSchema: ValidationSchema = {
       return null;
     }
   },
-  operationalHours: { 
+  operational_hours_per_day: { 
     required: true, 
     min: 1, 
     max: 24,
     custom: (value) => {
       if (!Number.isInteger(Number(value))) return 'Operational hours must be a whole number';
+      return null;
+    }
+  }
+};
+
+// Additional validation schema for leave requests
+export const leaveRequestValidationSchema: ValidationSchema = {
+  staff_id: { required: true },
+  leave_type: { required: true },
+  start_date: { required: true },
+  end_date: { required: true },
+  days_requested: { 
+    required: true, 
+    min: 1,
+    custom: (value) => {
+      if (!Number.isInteger(Number(value))) return 'Days requested must be a whole number';
       return null;
     }
   }

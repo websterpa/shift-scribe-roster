@@ -26,7 +26,15 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
 
     return data?.map(staff => ({
       id: staff.id,
-      name: staff.name || `${staff.first_name} ${staff.last_name}`,
+      employee_id: staff.employee_id,
+      first_name: staff.first_name,
+      last_name: staff.last_name,
+      email: staff.email,
+      phone: staff.phone,
+      hire_date: staff.hire_date,
+      is_active: staff.is_active,
+      // Compute name field for backwards compatibility
+      name: `${staff.first_name} ${staff.last_name}`,
       role: staff.role || 'CCTV Operator',
       is_shift_worker: staff.is_shift_worker ?? true,
       eligible_shifts: staff.eligible_shifts || ['Early', 'Late', 'Night'],

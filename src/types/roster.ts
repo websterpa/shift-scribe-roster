@@ -10,10 +10,17 @@ export interface ConfigItem {
   created_at?: string;
 }
 
+// Updated StaffMember interface to be consistent with database schema
 export interface StaffMember {
   id: string;
-  name: string;
-  role: string;
+  employee_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  hire_date: string;
+  is_active: boolean;
+  role?: string;
   eligible_shifts: string[];
   is_shift_worker: boolean;
   min_hours_per_week: number;
@@ -23,8 +30,8 @@ export interface StaffMember {
   hourly_rate: number;
   holiday_multiplier: number;
   leave_allowance_days: number;
-  first_name?: string;
-  last_name?: string;
+  // Computed field for backwards compatibility
+  name?: string;
   preferences?: {
     preferred_shifts?: string[];
     avoid_shifts?: string[];

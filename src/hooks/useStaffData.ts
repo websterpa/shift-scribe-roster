@@ -20,7 +20,7 @@ export function useStaffData() {
       console.log('Fetching staff list...');
       const { data, error } = await supabase
         .from("staff_profiles")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, leave_allowance_days")
         .eq("is_active", true);
 
       if (error) {
@@ -49,7 +49,7 @@ export function useStaffData() {
           return { 
             ...s, 
             leave_taken_monthly: monthlyCounts,
-            leave_allowance_days: 25 // Default allowance, could be stored in staff_profiles
+            leave_allowance_days: s.leave_allowance_days || 25 // Use database value or default
           };
         }) || []
       );
