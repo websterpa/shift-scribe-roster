@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { buildRosterCycle } from "../rosterCycle";
 import { createLogger } from "../errorLogger";

@@ -26,7 +26,7 @@ interface RosterAssignment {
   };
 }
 
-interface WeekData {
+interface MultiWeekData {
   weekStart: Date;
   assignments: RosterAssignment[];
 }
@@ -47,7 +47,7 @@ interface Props {
 export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [weeks, setWeeks] = useState<WeekData[]>([]);
+  const [weeks, setWeeks] = useState<MultiWeekData[]>([]);
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
@@ -122,7 +122,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
         });
       });
 
-      const weeksArray: WeekData[] = Array.from(weekMap.entries())
+      const weeksArray: MultiWeekData[] = Array.from(weekMap.entries())
         .map(([weekKey, assignments]) => ({
           weekStart: new Date(weekKey),
           assignments
