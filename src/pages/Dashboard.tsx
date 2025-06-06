@@ -2,13 +2,21 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RosterCalendar } from '@/components/roster/RosterCalendar';
-import { Users, Calendar, FileText, Clock } from 'lucide-react';
+import { ResetDataButton } from '@/components/admin/ResetDataButton';
+import { Users, Calendar, FileText, Clock, AlertTriangle } from 'lucide-react';
 
 const Dashboard = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-amber-600">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="text-sm font-medium">Admin Actions</span>
+          </div>
+          <ResetDataButton />
+        </div>
       </div>
 
       {/* Stats Cards */}
