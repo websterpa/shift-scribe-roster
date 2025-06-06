@@ -37,7 +37,7 @@ interface StaffDialogProps {
 const AVAILABLE_SHIFTS = ['Early', 'Late', 'Night', 'Day'];
 const AVAILABLE_ROLES = ['CCTV Operator', 'Senior Operator', 'Supervisor', 'Manager'];
 
-// Generate a demo UUID for this session
+// Generate a proper UUID v4 format
 const generateDemoUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
@@ -127,6 +127,10 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
 
     setLoading(true);
     try {
+      // Generate a proper UUID for the user_id
+      const generatedUserId = generateDemoUUID();
+      console.log('Generated UUID:', generatedUserId);
+      
       const dataToSave = {
         employee_id: formData.employee_id,
         first_name: formData.first_name,
@@ -141,8 +145,10 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         max_hours_per_week: formData.max_hours_per_week,
         eligible_shifts: formData.eligible_shifts,
         is_shift_worker: formData.is_shift_worker,
-        user_id: generateDemoUUID() // Generate a proper UUID format for demo purposes
+        user_id: generatedUserId
       };
+
+      console.log('Data being saved:', dataToSave);
 
       let result;
       if (staffMember?.id) {
@@ -156,7 +162,10 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
           .insert([dataToSave]);
       }
 
+      console.log('Supabase result:', result);
+
       if (result.error) {
+        console.error('Supabase error:', result.error);
         throw result.error;
       }
 
