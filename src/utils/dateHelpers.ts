@@ -1,6 +1,12 @@
 
 // Helper functions for date-related operations
 
+export function toDate(year: number, dayOfYear: number): Date {
+  const d = new Date(year, 0);
+  d.setDate(dayOfYear);
+  return d;
+}
+
 export function isWeekend(date: Date): boolean {
   const day = date.getDay();
   return day === 0 || day === 6; // Sunday = 0, Saturday = 6
