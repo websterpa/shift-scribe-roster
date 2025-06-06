@@ -116,6 +116,17 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check if user is authenticated first
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
+      showValidationToast({ general: 'You must be logged in to perform this action' });
+      return;
+    }
+
+    console.log('Authenticated user:', user.id);
+    
     // Use the correct field names for validation
     const validation = validateForm(formData, staffValidationSchema);
 
