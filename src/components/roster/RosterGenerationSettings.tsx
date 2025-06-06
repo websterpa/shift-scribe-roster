@@ -115,7 +115,7 @@ export const RosterGenerationSettings = ({
 
         <div className="space-y-2">
           <Label htmlFor="rosterName" className={errors.name ? "text-destructive" : ""}>
-            Roster Name:
+            Roster Name: <span className="text-red-500">*</span>
           </Label>
           <Input
             id="rosterName"
@@ -124,10 +124,12 @@ export const RosterGenerationSettings = ({
             onChange={(e) => onRosterNameChange(e.target.value)}
             placeholder="e.g. June 2025 Month 1"
             className={errors.name ? "border-destructive" : ""}
+            required
           />
           {errors.name && (
             <p className="text-sm text-destructive">{errors.name}</p>
           )}
+          <p className="text-xs text-gray-500">This name will be saved with your roster version</p>
         </div>
 
         <div className="flex items-center gap-2 text-sm text-gray-600">

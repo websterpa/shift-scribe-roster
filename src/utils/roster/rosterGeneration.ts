@@ -111,14 +111,15 @@ async function createRosterVersion(configId: string, versionName?: string): Prom
     ? existingVersions[0].version_number + 1 
     : 1;
 
-  // Create version
+  // Create version with version_name
   const versionData: any = {
     config_id: configId,
     version_number: nextVersionNumber
   };
   
-  if (versionName) {
-    versionData.version_name = versionName;
+  if (versionName && versionName.trim()) {
+    versionData.version_name = versionName.trim();
+    logger.info('Including version name in roster version:', versionName.trim());
   }
   
   const { data: rv, error: versionError } = await supabase
@@ -132,16 +133,23 @@ async function createRosterVersion(configId: string, versionName?: string): Prom
     throw versionError;
   }
   
+  logger.info('Successfully created roster version with ID:', rv.id);
   return rv.id;
 }
 
 /**
  * Save generated assignments to the database
  */
-async function saveAssignments(assignments: any[], versionId: string): Promise<void> {
+async function saveAssignments(assignments: Assignment[], versionId: string): Promise<void> {
+  // Add version_id to each assignment
+  const assignmentsWithVersionId = assignments.map(assignment => ({
+    ...assignment,
+    version_id: versionId
+  }));
+
   const { error: assignmentError } = await supabase
     .from("roster_assignments")
-    .insert(assignments);
+    .insert(assignmentsWithVersionId);
     
   if (assignmentError) {
     logger.error(new Error('Error inserting assignments'), { error: assignmentError });

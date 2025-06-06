@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +21,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   const [errors, setErrors] = useState<{
     configs?: string;
     staff?: string;
+    name?: string;
     general?: string;
   }>({});
 
@@ -134,7 +136,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     }
 
     if (!rosterName.trim()) {
-      validationErrors.name = "Please enter a roster name";
+      validationErrors.name = "Roster name is required";
     }
 
     if (staffList.length === 0) {
@@ -157,6 +159,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       return false;
     }
     
+    // Clear any previous errors
+    setErrors({});
     logger.info('Roster generation validation passed');
     return true;
   };
@@ -169,7 +173,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     try {
       logger.info('Starting roster generation process...', {
         configId: selectedConfig?.id,
-        rosterName,
+        rosterName: rosterName.trim(),
         staffCount: staffList.length
       });
       setIsGenerating(true);
@@ -186,8 +190,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
 
       logger.info('Prepared configuration for generation:', configForGeneration);
 
-      // This will be updated when we modify generateAndSaveRoster to accept versionName
-      const versionId = await generateAndSaveRosterWithName(
+      // Generate and save the roster with the provided version name
+      const versionId = await generateAndSaveRoster(
         staffList,
         configForGeneration,
         rosterName.trim()
@@ -198,7 +202,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       
       toast({
         title: "Roster generated successfully",
-        description: `Generated roster: ${rosterName}`,
+        description: `Generated roster: "${rosterName.trim()}"`,
       });
       
     } catch (error: any) {
@@ -214,24 +218,6 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       });
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  // Helper function to save roster with name
-  const generateAndSaveRosterWithName = async (
-    staffList: StaffMember[], 
-    config: any, 
-    versionName: string
-  ) => {
-    logger.info('Generating and saving roster with name:', versionName);
-    try {
-      // For now, call the existing function and then update the version name
-      const versionId = await generateAndSaveRoster(staffList, config, versionName);
-      logger.info('Roster generated with version ID:', versionId);
-      return versionId;
-    } catch (error) {
-      logger.error(new Error('Error in generateAndSaveRosterWithName'), { originalError: error });
-      throw error;
     }
   };
 
