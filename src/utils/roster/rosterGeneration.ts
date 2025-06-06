@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildRosterCycle } from "../rosterCycle";
 import { createLogger } from "../errorLogger";
 import { StaffMember, Assignment } from "@/types/roster";
+import { generateAssignments } from "./assignmentGenerator";
 
 const logger = createLogger('RosterGeneration');
 

@@ -7,33 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { generateAndSaveRoster } from '@/utils/roster/rosterGeneration';
 import { Loader, Search, SortAsc, SortDesc, Filter } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { StaffMember, WeekData } from '@/types/roster';
+import { StaffMember } from '@/types/roster';
 import { createLogger } from '@/utils/errorLogger';
 
 const logger = createLogger('MultiWeekRoster');
-
-interface Staff {
-  id: string;
-  name: string;
-  role: string;
-  eligible_shifts: string[];
-  is_shift_worker: boolean;
-  min_hours_per_week: number;
-  max_hours_per_week: number;
-  opted_out_wtd: boolean;
-  hourly_rate: number;
-  holiday_multiplier: number;
-  leave_allowance_days: number;
-}
-
-interface Config {
-  id?: string;
-  cycle_length_weeks: number;
-  shift_type: "8h" | "12h";
-  operational_hours_per_day: number;
-  handshake_minutes: number;
-  start_date: string;
-}
 
 interface RosterAssignment {
   id: string;
@@ -55,8 +32,15 @@ interface WeekData {
 }
 
 interface Props {
-  staffList?: Staff[];
-  config?: Config;
+  staffList?: StaffMember[];
+  config?: {
+    id?: string;
+    cycle_length_weeks: number;
+    shift_type: "8h" | "12h";
+    operational_hours_per_day: number;
+    handshake_minutes: number;
+    start_date: string;
+  };
   showWeeks?: number;
 }
 

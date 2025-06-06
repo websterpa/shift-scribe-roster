@@ -1,7 +1,7 @@
 
 import { isPublicHoliday } from "../dateHelpers";
 import { hasDailyRest, withinWeeklyHours, withinRollingAverage } from "../wtrCompliance";
-import { StaffMember } from "@/types/roster";
+import { StaffMember, Assignment } from "@/types/roster";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('AssignmentGenerator');
@@ -22,14 +22,14 @@ export function generateAssignments(
   },
   leaveMap: Record<string, { date: string; type: string }[]>,
   pastWeeksMap: Record<string, number[]>
-): any[] {
+): Assignment[] {
   logger.info('Generating assignments', { 
     staffCount: staffList.length,
     cycleWeeks: config.cycle_length_weeks,
     shiftType: config.shift_type
   });
 
-  const assignments = [];
+  const assignments: Assignment[] = [];
   
   for (let w = 0; w < config.cycle_length_weeks; w++) {
     for (let d = 0; d < 7; d++) {
