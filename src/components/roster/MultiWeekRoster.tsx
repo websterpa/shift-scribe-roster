@@ -1,13 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { generateAndSaveRoster } from '@/utils/enhancedRosterCalculations';
+import { generateAndSaveRoster } from '@/utils/roster/rosterGeneration';
 import { Loader, Search, SortAsc, SortDesc, Filter } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { StaffMember, WeekData } from '@/types/roster';
+import { createLogger } from '@/utils/errorLogger';
+
+const logger = createLogger('MultiWeekRoster');
 
 interface Staff {
   id: string;
@@ -78,6 +81,11 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
 
   const fetchRosterData = async () => {
     try {
+      logger.info('Fetching roster data', { 
+        currentWeekOffset, 
+        showWeeks 
+      });
+      
       setLoading(true);
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + (currentWeekOffset * 7));
@@ -96,7 +104,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
         .order('date');
 
       if (error) {
-        console.error('Error fetching roster data:', error);
+        logger.error(new Error('Error fetching roster data'), { originalError: error });
         toast({ 
           title: "Error loading roster data", 
           description: error.message, 
@@ -144,7 +152,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
         processAssignmentsForTable(data, startDate);
       }
     } catch (error) {
-      console.error('Error in fetchRosterData:', error);
+      logger.error(new Error('Error in fetchRosterData'), { originalError: error });
       toast({ 
         title: "Failed to load roster data", 
         description: "Please try again later", 
@@ -185,6 +193,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
 
   const generateNewRoster = async () => {
     if (!config || !staffList.length) {
+      logger.warn('Cannot generate roster - missing config or staff');
       toast({ 
         title: "Cannot generate roster", 
         description: "Staff list and config are required", 
@@ -194,13 +203,15 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
     }
 
     try {
+      logger.info('Generating new roster', { configId: config.id });
       setGenerating(true);
       const vid = await generateAndSaveRoster(staffList, { ...config, id: config.id! });
       setVersionId(vid);
+      logger.info('New roster generated successfully', { versionId: vid });
       toast({ title: "New roster generated successfully" });
       await fetchRosterData();
     } catch (error) {
-      console.error('Error generating roster:', error);
+      logger.error(new Error('Error generating roster'), { originalError: error });
       toast({ 
         title: "Failed to generate roster", 
         description: "Please try again later", 
