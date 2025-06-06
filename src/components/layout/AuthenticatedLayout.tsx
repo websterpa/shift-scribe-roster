@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Navigation } from './Navigation';
+import Navigation from './Navigation';
 import { initializeSampleData } from '@/utils/sampleDataHelpers';
 import { createLogger } from '@/utils/errorLogger';
 
