@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, Eye, FileText } from 'lucide-react';
+import { Search, Calendar, Eye, FileText, RefreshCcw, Loader2 } from 'lucide-react';
+import { continueRoster } from '@/utils/roster/continueRoster';
 
 interface RosterVersion {
   id: string;
   version_name: string | null;
   version_number: number;
   generated_at: string;
+  config_id: string;
   roster_config: {
     config_name: string;
   } | null;
@@ -22,6 +24,7 @@ const MyRosters = () => {
   const [rosters, setRosters] = useState<RosterVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [continuingRoster, setContinuingRoster] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,6 +41,7 @@ const MyRosters = () => {
           version_name,
           version_number,
           generated_at,
+          config_id,
           roster_config (
             config_name
           )
@@ -64,8 +68,35 @@ const MyRosters = () => {
   };
 
   const handleViewRoster = (rosterId: string) => {
-    // Navigate to a detailed view page - we'll create this route later
     navigate(`/roster-view/${rosterId}`);
+  };
+
+  const handleContinueRoster = async (configId: string) => {
+    try {
+      setContinuingRoster(configId);
+      console.log('Continuing roster for config:', configId);
+      
+      const newVersionId = await continueRoster(configId);
+      
+      console.log('Successfully continued roster:', newVersionId);
+      toast({
+        title: "Roster continued successfully",
+        description: "A new roster version has been generated continuing the pattern",
+      });
+      
+      // Refresh the roster list to show the new version
+      await loadRosters();
+      
+    } catch (error: any) {
+      console.error('Error continuing roster:', error);
+      toast({
+        title: "Failed to continue roster",
+        description: error?.message || "Failed to continue the roster pattern",
+        variant: "destructive",
+      });
+    } finally {
+      setContinuingRoster(null);
+    }
   };
 
   const filteredRosters = rosters.filter(roster =>
@@ -166,6 +197,24 @@ const MyRosters = () => {
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleContinueRoster(roster.config_id)}
+                            disabled={continuingRoster === roster.config_id}
+                          >
+                            {continuingRoster === roster.config_id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Continuing...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCcw className="h-4 w-4 mr-1" />
+                                Continue Pattern
+                              </>
+                            )}
                           </Button>
                         </div>
                       </td>
