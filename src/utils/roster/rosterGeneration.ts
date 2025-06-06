@@ -1,8 +1,9 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { buildRosterCycle } from "../rosterCycle";
 import { createLogger } from "../errorLogger";
 import { StaffMember, Assignment } from "@/types/roster";
-import { generateAssignments } from "./assignmentGenerator";
+import { generateRosterAssignments } from "./assignmentGenerator";
 
 const logger = createLogger('RosterGeneration');
 
@@ -64,7 +65,7 @@ export async function generateAndSaveRoster(
   logger.info('Created roster version:', versionId);
 
   // 5. Generate assignments
-  const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
+  const assignments = generateRosterAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
   logger.info('Generated assignments', { count: assignments.length });
 
   // 6. Save assignments to database
@@ -128,7 +129,7 @@ async function createRosterVersion(configId: string, versionName?: string): Prom
     .single();
     
   if (versionError) {
-    logger.error(new Error('Error creating roster version'), { error: versionError });
+    logger.error(new Error('Failed to create roster version'), { error: versionError });
     throw versionError;
   }
   
