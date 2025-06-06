@@ -53,9 +53,19 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
     
     for (let i = 0; i < count; i++) {
       const role = roles[Math.floor(Math.random() * roles.length)];
+      const firstName = `Staff${i + 1}`;
+      const lastName = `Demo`;
+      
       staff.push({
         id: `demo-${i}`,
-        name: `Staff ${i + 1}`,
+        employee_id: `EMP${String(i + 1).padStart(3, '0')}`,
+        first_name: firstName,
+        last_name: lastName,
+        name: `${firstName} ${lastName}`,
+        email: `staff${i + 1}@demo.com`,
+        phone: `+44 7${String(Math.floor(Math.random() * 900000000) + 100000000)}`,
+        hire_date: '2023-01-01',
+        is_active: true,
         role: role,
         eligible_shifts: ['D', 'E', 'N'],
         is_shift_worker: true,
