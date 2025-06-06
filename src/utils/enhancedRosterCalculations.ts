@@ -12,9 +12,12 @@ logger.info('Using refactored roster calculation utilities');
 // Re-export functionality from new utility files
 export { 
   generateAndSaveRoster,
-  generateRosterAssignments,
-  saveRosterVersion
+  generateRosterAssignments
 } from "./roster/rosterGeneration";
+
+export {
+  saveRosterVersion
+} from "./roster/rosterHelpers";
 
 export {
   fetchStaffMembers

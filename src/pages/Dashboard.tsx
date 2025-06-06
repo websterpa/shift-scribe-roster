@@ -6,6 +6,19 @@ import { ResetDataButton } from '@/components/admin/ResetDataButton';
 import { Users, Calendar, FileText, Clock, AlertTriangle } from 'lucide-react';
 
 const Dashboard = () => {
+  // Create demo data for the roster calendar
+  const demoWeek = {
+    weekStart: new Date(),
+    assignments: []
+  };
+
+  const demoStaff = [
+    { id: '1', name: 'John Smith', role: 'Nurse' },
+    { id: '2', name: 'Sarah Johnson', role: 'Senior Nurse' },
+    { id: '3', name: 'Mike Wilson', role: 'Assistant' },
+    { id: '4', name: 'Emma Davis', role: 'Specialist' }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -67,7 +80,7 @@ const Dashboard = () => {
       </div>
 
       {/* Roster Calendar */}
-      <RosterCalendar />
+      <RosterCalendar week={demoWeek} staff={demoStaff} />
     </div>
   );
 };
