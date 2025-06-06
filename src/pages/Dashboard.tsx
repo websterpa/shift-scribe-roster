@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import RosterCalendar from '@/components/roster/RosterCalendar';
+import { RosterCalendar } from '@/components/roster/RosterCalendar';
 import { Users, Calendar, FileText, Clock } from 'lucide-react';
 
 const Dashboard = () => {
