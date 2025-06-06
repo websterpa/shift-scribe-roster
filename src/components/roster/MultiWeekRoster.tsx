@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { addWeeks, format, startOfWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight, Filter, Search, X } from 'lucide-react';
@@ -7,7 +8,7 @@ import { RosterCalendar } from '@/components/roster/RosterCalendar';
 import { Input } from '@/components/ui/input';
 import { ConfigItem, StaffMember } from '@/types/roster';
 
-// Keep MultiWeekData separate from any imported WeekData
+// Define internal week data structure
 interface MultiWeekData {
   weekStart: Date;
   assignments: RosterAssignment[];
@@ -22,6 +23,13 @@ interface RosterAssignment {
   shiftHours: number;
   shiftStart?: string;
   shiftEnd?: string;
+}
+
+// Define a simplified staff type for the roster display
+interface Staff {
+  id: string;
+  name: string;
+  role: string;
 }
 
 interface Props {
@@ -48,20 +56,17 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
       const role = roles[Math.floor(Math.random() * roles.length)];
       staff.push({
         id: `demo-${i}`,
-        first_name: `Staff`,
-        last_name: `${i + 1}`,
         name: `Staff ${i + 1}`,
         role: role,
-        contract_hours: Math.random() > 0.3 ? 40 : 20, // Full time or part time
-        max_consecutive_shifts: 5,
+        eligible_shifts: ['D', 'E', 'N'],
+        is_shift_worker: true,
         min_hours_per_week: Math.random() > 0.3 ? 35 : 15,
         max_hours_per_week: Math.random() > 0.3 ? 48 : 25,
-        preferences: {
-          preferred_shifts: ['D', 'E'],
-          avoid_shifts: ['N'],
-          preferred_days: [1, 2, 3, 4, 5], // Mon-Fri
-          avoid_days: [0, 6], // Sat, Sun
-        }
+        opted_out_wtd: false,
+        days_off_per_week: 2,
+        hourly_rate: 15,
+        holiday_multiplier: 2,
+        leave_allowance_days: 28
       });
     }
     
@@ -118,8 +123,8 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
             
             const assignment: RosterAssignment = {
               staffId: staffMember.id,
-              staffName: staffMember.name || `${staffMember.first_name} ${staffMember.last_name}`,
-              role: staffMember.role || 'Nurse',
+              staffName: staffMember.name,
+              role: staffMember.role || 'Staff',
               date: date,
               shiftCode: shift,
               shiftHours: shiftHours,
@@ -157,10 +162,17 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
   
   // Filter staff based on search and role
   const filteredStaff = demoStaff.filter(staff => {
-    const nameMatch = (staff.name || `${staff.first_name} ${staff.last_name}`).toLowerCase().includes(searchTerm.toLowerCase());
+    const nameMatch = staff.name.toLowerCase().includes(searchTerm.toLowerCase());
     const roleMatch = filterRole === 'all' || staff.role === filterRole;
     return nameMatch && roleMatch;
   });
+  
+  // Convert StaffMember to the simplified Staff type for display
+  const displayStaff: Staff[] = filteredStaff.map(staff => ({
+    id: staff.id,
+    name: staff.name,
+    role: staff.role || 'Staff'
+  }));
   
   return (
     <Card className="h-full">
@@ -238,11 +250,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
         ) : weeks.length > 0 && currentWeekOffset < weeks.length ? (
           <RosterCalendar 
             week={weeks[currentWeekOffset]} 
-            staff={filteredStaff.map(s => ({
-              id: s.id,
-              name: s.name || `${s.first_name} ${s.last_name}`,
-              role: s.role || 'Staff'
-            }))}
+            staff={displayStaff}
           />
         ) : (
           <div className="flex h-64 items-center justify-center">

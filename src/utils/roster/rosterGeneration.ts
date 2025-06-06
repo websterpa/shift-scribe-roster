@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildRosterCycle } from "../rosterCycle";
 import { createLogger } from "../errorLogger";
 import { StaffMember, Assignment } from "@/types/roster";
-import { generateRosterAssignments } from "./assignmentGenerator";
+import { generateAssignments } from "./assignmentGenerator";
 
 const logger = createLogger('RosterGeneration');
 
@@ -65,7 +65,7 @@ export async function generateAndSaveRoster(
   logger.info('Created roster version:', versionId);
 
   // 5. Generate assignments
-  const assignments = generateRosterAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
+  const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
   logger.info('Generated assignments', { count: assignments.length });
 
   // 6. Save assignments to database
@@ -158,5 +158,5 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
 }
 
 // Export from original file for backward compatibility
-export { generateRosterAssignments, saveRosterVersion } from "./rosterHelpers";
+export { generateAssignments as generateRosterAssignments } from "./assignmentGenerator";
 export { fetchStaffMembers } from "./staffHelpers";

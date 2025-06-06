@@ -93,3 +93,6 @@ export function generateAssignments(
 
   return assignments;
 }
+
+// Export the function under both names for compatibility
+export const generateRosterAssignments = generateAssignments;

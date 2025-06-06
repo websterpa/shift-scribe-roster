@@ -23,6 +23,15 @@ export interface StaffMember {
   hourly_rate: number;
   holiday_multiplier: number;
   leave_allowance_days: number;
+  first_name?: string;
+  last_name?: string;
+  preferences?: {
+    preferred_shifts?: string[];
+    avoid_shifts?: string[];
+    preferred_days?: number[];
+    avoid_days?: number[];
+  };
+  contract_hours?: number;
 }
 
 export interface Assignment {

@@ -3,96 +3,108 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-interface Assignment {
+interface Staff {
   id: string;
-  shift_date: string;
-  staff_id: string;
-  shift_code: string;
-  shift_type: string;
-  hours: number;
-  cost: number;
-  staff_profiles: {
-    first_name: string;
-    last_name: string;
-    employee_id: string;
-  };
+  name: string;
+  role: string;
 }
 
-export function RosterCalendar() {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [loading, setLoading] = useState(true);
+interface RosterAssignment {
+  staffId: string;
+  staffName: string;
+  role: string;
+  date: Date;
+  shiftCode: string;
+  shiftHours: number;
+  shiftStart?: string;
+  shiftEnd?: string;
+}
 
-  useEffect(() => {
-    fetchAssignments();
-  }, []);
+interface WeekData {
+  weekStart: Date;
+  assignments: RosterAssignment[];
+}
 
-  const fetchAssignments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('roster_assignments')
-        .select(`
-          *,
-          staff_profiles!inner(first_name, last_name, employee_id)
-        `)
-        .order('date');
+interface RosterCalendarProps {
+  week: WeekData;
+  staff: Staff[];
+}
 
-      if (error) {
-        console.error('Error fetching assignments:', error);
-        return;
-      }
-
-      // Transform data to match Assignment interface
-      const transformedData: Assignment[] = data?.map((item: any) => ({
-        id: item.id,
-        shift_date: item.date,
-        staff_id: item.staff_id,
-        shift_code: item.shift_code,
-        shift_type: item.shift_code,
-        hours: item.hours || 0,
-        cost: item.cost || 0,
-        staff_profiles: item.staff_profiles
-      })) || [];
-
-      setAssignments(transformedData);
-    } catch (error) {
-      console.error('Error in fetchAssignments:', error);
-    } finally {
-      setLoading(false);
+export function RosterCalendar({ week, staff }: RosterCalendarProps) {
+  const [loading, setLoading] = useState(false);
+  
+  // Group assignments by day
+  const dayMap = new Map<string, RosterAssignment[]>();
+  week.assignments.forEach(assignment => {
+    const dateKey = assignment.date.toISOString().split('T')[0];
+    if (!dayMap.has(dateKey)) {
+      dayMap.set(dateKey, []);
     }
-  };
+    dayMap.get(dateKey)?.push(assignment);
+  });
 
-  if (loading) {
-    return <div>Loading roster calendar...</div>;
-  }
+  // Create an array of dates for the week
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(week.weekStart);
+    date.setDate(date.getDate() + i);
+    return date;
+  });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Roster Calendar</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4">
-          {assignments.length === 0 ? (
-            <p className="text-gray-500">No roster assignments found</p>
-          ) : (
-            assignments.map((assignment) => (
-              <div key={assignment.id} className="p-3 border rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">
-                    {assignment.staff_profiles.first_name} {assignment.staff_profiles.last_name}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {assignment.shift_date}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Shift: {assignment.shift_code} | Hours: {assignment.hours} | Cost: £{assignment.cost}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className="p-2 border bg-gray-100">Staff</th>
+            {weekDates.map((date) => (
+              <th key={date.toISOString()} className="p-2 border bg-gray-100 min-w-[100px]">
+                {date.toLocaleDateString('en-US', { weekday: 'short' })}<br/>
+                {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {staff.map((staffMember) => (
+            <tr key={staffMember.id}>
+              <td className="p-2 border font-medium">
+                {staffMember.name}
+                <div className="text-xs text-gray-500">{staffMember.role}</div>
+              </td>
+              {weekDates.map((date) => {
+                const dateKey = date.toISOString().split('T')[0];
+                const dayAssignments = dayMap.get(dateKey) || [];
+                const staffAssignment = dayAssignments.find(a => a.staffId === staffMember.id);
+                
+                return (
+                  <td key={`${staffMember.id}-${dateKey}`} className="p-2 border text-center">
+                    {staffAssignment ? (
+                      <div className={`p-1 rounded ${getShiftColor(staffAssignment.shiftCode)}`}>
+                        <div className="font-medium">{staffAssignment.shiftCode}</div>
+                        <div className="text-xs">{staffAssignment.shiftHours}h</div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-400">-</div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
+}
+
+function getShiftColor(shiftCode: string): string {
+  switch (shiftCode) {
+    case 'D': return 'bg-blue-100 text-blue-800';
+    case 'E': return 'bg-purple-100 text-purple-800';
+    case 'N': return 'bg-indigo-100 text-indigo-800';
+    case 'R': return 'bg-gray-100 text-gray-800';
+    case 'S': return 'bg-red-100 text-red-800';
+    case 'L': return 'bg-green-100 text-green-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
 }
