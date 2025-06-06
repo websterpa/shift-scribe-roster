@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, Loader2, Users, Calendar } from 'lucide-react';
+import { Settings, Loader2, Users, Calendar, RefreshCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ConfigItem } from '@/types/roster';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface RosterGenerationSettingsProps {
   configs: ConfigItem[];
@@ -16,9 +17,16 @@ interface RosterGenerationSettingsProps {
   rosterName: string;
   staffCount: number;
   isGenerating: boolean;
+  errors?: {
+    configs?: string;
+    name?: string;
+    staff?: string;
+    general?: string;
+  };
   onSelectConfig: (configId: string) => void;
   onRosterNameChange: (name: string) => void;
   onGenerateRoster: () => void;
+  onRefresh?: () => void;
 }
 
 export const RosterGenerationSettings = ({
@@ -28,25 +36,51 @@ export const RosterGenerationSettings = ({
   rosterName,
   staffCount,
   isGenerating,
+  errors = {},
   onSelectConfig,
   onRosterNameChange,
-  onGenerateRoster
+  onGenerateRoster,
+  onRefresh
 }: RosterGenerationSettingsProps) => {
   const navigate = useNavigate();
   
   return (
-    <Card>
+    <Card className="relative">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          Generation Settings
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Generation Settings
+          </div>
+          {onRefresh && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0" 
+              onClick={onRefresh}
+              title="Refresh data"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {errors.general && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{errors.general}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
-          <Label htmlFor="config">Select Configuration:</Label>
-          <Select value={selectedConfigId} onValueChange={onSelectConfig}>
-            <SelectTrigger>
+          <Label htmlFor="config" className={errors.configs ? "text-destructive" : ""}>
+            Select Configuration:
+          </Label>
+          <Select 
+            value={selectedConfigId} 
+            onValueChange={onSelectConfig}
+          >
+            <SelectTrigger className={errors.configs ? "border-destructive" : ""}>
               <SelectValue placeholder="Choose a configuration..." />
             </SelectTrigger>
             <SelectContent>
@@ -57,6 +91,9 @@ export const RosterGenerationSettings = ({
               ))}
             </SelectContent>
           </Select>
+          {errors.configs && (
+            <p className="text-sm text-destructive">{errors.configs}</p>
+          )}
           {configs.length === 0 && (
             <p className="text-sm text-gray-500">
               No configurations found. <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/roster-config')}>Create one first</Button>
@@ -77,24 +114,35 @@ export const RosterGenerationSettings = ({
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="rosterName">Roster Name:</Label>
+          <Label htmlFor="rosterName" className={errors.name ? "text-destructive" : ""}>
+            Roster Name:
+          </Label>
           <Input
             id="rosterName"
             type="text"
             value={rosterName}
             onChange={(e) => onRosterNameChange(e.target.value)}
             placeholder="e.g. June 2025 Month 1"
+            className={errors.name ? "border-destructive" : ""}
           />
+          {errors.name && (
+            <p className="text-sm text-destructive">{errors.name}</p>
+          )}
         </div>
 
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Users className="h-4 w-4" />
-          <span>{staffCount} staff members available</span>
+          <span className={errors.staff ? "text-destructive" : ""}>
+            {staffCount} staff members available
+          </span>
+          {errors.staff && (
+            <p className="text-sm text-destructive">{errors.staff}</p>
+          )}
         </div>
 
         <Button 
           onClick={onGenerateRoster}
-          disabled={!selectedConfig || !rosterName.trim() || isGenerating}
+          disabled={!selectedConfig || !rosterName.trim() || isGenerating || staffCount === 0}
           className="w-full"
         >
           {isGenerating ? (

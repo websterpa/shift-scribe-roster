@@ -8,11 +8,14 @@ import { RosterGenerationSettings } from '@/components/roster/RosterGenerationSe
 import { MultiWeekRoster } from '@/components/roster/MultiWeekRoster';
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 import { LoadingState } from '@/components/ui/loading-state';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const GenerateRoster = () => {
+  console.log('Rendering GenerateRoster page');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const configIdFromUrl = searchParams.get('configId');
+  console.log('Config ID from URL:', configIdFromUrl);
   
   const {
     configs,
@@ -22,12 +25,15 @@ const GenerateRoster = () => {
     staffList,
     isGenerating,
     isLoading,
+    errors,
     setSelectedConfigId,
     setRosterName,
-    handleGenerateRoster
+    handleGenerateRoster,
+    refreshData
   } = useRosterGeneration(configIdFromUrl);
 
   if (isLoading) {
+    console.log('GenerateRoster is in loading state');
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-gray-900">Generate Roster</h1>
@@ -35,6 +41,13 @@ const GenerateRoster = () => {
       </div>
     );
   }
+
+  console.log('GenerateRoster loaded', { 
+    configsCount: configs.length,
+    selectedConfig: selectedConfig?.config_name,
+    staffCount: staffList.length,
+    hasErrors: Object.keys(errors || {}).length > 0
+  });
 
   return (
     <div className="space-y-6">
@@ -52,6 +65,12 @@ const GenerateRoster = () => {
         </div>
       </div>
 
+      {errors?.general && (
+        <Alert variant="destructive">
+          <AlertDescription>{errors.general}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <RosterGenerationSettings
@@ -61,19 +80,25 @@ const GenerateRoster = () => {
             rosterName={rosterName}
             staffCount={staffList.length}
             isGenerating={isGenerating}
+            errors={errors}
             onSelectConfig={setSelectedConfigId}
             onRosterNameChange={setRosterName}
             onGenerateRoster={handleGenerateRoster}
+            onRefresh={refreshData}
           />
         </div>
 
         <div className="lg:col-span-2">
-          {selectedConfig && (
+          {selectedConfig ? (
             <MultiWeekRoster 
               staffList={staffList}
               config={selectedConfig}
               showWeeks={selectedConfig.cycle_length_weeks || 4}
             />
+          ) : (
+            <Card className="h-full flex items-center justify-center p-6 bg-gray-50">
+              <p className="text-gray-500">Select a configuration to preview the roster</p>
+            </Card>
           )}
         </div>
       </div>
