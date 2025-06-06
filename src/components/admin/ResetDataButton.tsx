@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { RotateCcw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 export const ResetDataButton = () => {
   const [isResetting, setIsResetting] = useState(false);
@@ -26,31 +26,75 @@ export const ResetDataButton = () => {
 
     try {
       // Clear data in the correct order to respect foreign key constraints
-      const tablesToClear = [
-        'roster_assignments',
-        'roster_versions', 
-        'leave_requests',
-        'staff_profiles',
-        'roster_config',
-        'roles',
-        'staff_counts',
-        'schedule_templates',
-        'shift_configurations',
-        'admin_settings'
-      ];
+      console.log('Clearing table: roster_assignments');
+      const { error: error1 } = await supabase
+        .from('roster_assignments')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error1) throw error1;
 
-      for (const table of tablesToClear) {
-        console.log(`Clearing table: ${table}`);
-        const { error } = await supabase
-          .from(table)
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
-        
-        if (error) {
-          console.error(`Error clearing ${table}:`, error);
-          throw error;
-        }
-      }
+      console.log('Clearing table: roster_versions');
+      const { error: error2 } = await supabase
+        .from('roster_versions')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error2) throw error2;
+
+      console.log('Clearing table: leave_requests');
+      const { error: error3 } = await supabase
+        .from('leave_requests')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error3) throw error3;
+
+      console.log('Clearing table: staff_profiles');
+      const { error: error4 } = await supabase
+        .from('staff_profiles')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error4) throw error4;
+
+      console.log('Clearing table: roster_config');
+      const { error: error5 } = await supabase
+        .from('roster_config')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error5) throw error5;
+
+      console.log('Clearing table: roles');
+      const { error: error6 } = await supabase
+        .from('roles')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error6) throw error6;
+
+      console.log('Clearing table: staff_counts');
+      const { error: error7 } = await supabase
+        .from('staff_counts')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error7) throw error7;
+
+      console.log('Clearing table: schedule_templates');
+      const { error: error8 } = await supabase
+        .from('schedule_templates')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error8) throw error8;
+
+      console.log('Clearing table: shift_configurations');
+      const { error: error9 } = await supabase
+        .from('shift_configurations')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error9) throw error9;
+
+      console.log('Clearing table: admin_settings');
+      const { error: error10 } = await supabase
+        .from('admin_settings')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error10) throw error10;
 
       console.log('Data reset completed successfully');
       toast({
