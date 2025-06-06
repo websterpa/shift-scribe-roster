@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,15 @@ interface StaffDialogProps {
 
 const AVAILABLE_SHIFTS = ['Early', 'Late', 'Night', 'Day'];
 const AVAILABLE_ROLES = ['CCTV Operator', 'Senior Operator', 'Supervisor', 'Manager'];
+
+// Generate a demo UUID for this session
+const generateDemoUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 export const StaffDialog: React.FC<StaffDialogProps> = ({
   open,
@@ -131,7 +141,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         max_hours_per_week: formData.max_hours_per_week,
         eligible_shifts: formData.eligible_shifts,
         is_shift_worker: formData.is_shift_worker,
-        user_id: 'demo-user-id' // For demo purposes
+        user_id: generateDemoUUID() // Generate a proper UUID format for demo purposes
       };
 
       let result;
