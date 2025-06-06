@@ -26,9 +26,10 @@ export async function generateAndSaveRoster(
     operational_hours_per_day: number;
     handshake_minutes: number;
     start_date: string;
-  }
+  },
+  versionName?: string
 ) {
-  console.log('Starting roster generation...', { staffCount: staffList.length, config });
+  console.log('Starting roster generation...', { staffCount: staffList.length, config, versionName });
 
   // 1. Build cycle assignments
   const cycle = buildRosterCycle(
@@ -69,13 +70,31 @@ export async function generateAndSaveRoster(
 
   console.log('Past weeks data prepared');
 
-  // 4. Create new roster version
+  // 4. Get next version number for this config
+  const { data: existingVersions } = await supabase
+    .from("roster_versions")
+    .select("version_number")
+    .eq("config_id", config.id)
+    .order("version_number", { ascending: false })
+    .limit(1);
+    
+  const nextVersionNumber = existingVersions && existingVersions.length > 0 
+    ? existingVersions[0].version_number + 1 
+    : 1;
+
+  // 5. Create new roster version
+  const versionData: any = {
+    config_id: config.id,
+    version_number: nextVersionNumber
+  };
+  
+  if (versionName) {
+    versionData.version_name = versionName;
+  }
+  
   const { data: rv, error: versionError } = await supabase
     .from("roster_versions")
-    .insert({ 
-      config_id: config.id,
-      version_number: 1 // This should be calculated based on existing versions
-    })
+    .insert(versionData)
     .select("id")
     .single();
     
@@ -85,9 +104,9 @@ export async function generateAndSaveRoster(
   }
   
   const versionId = rv.id;
-  console.log('Created roster version:', versionId);
+  console.log('Created roster version:', versionId, versionName ? `with name: ${versionName}` : '');
 
-  // 5. Iterate each week/day and insert into roster_assignments
+  // 6. Iterate each week/day and insert into roster_assignments
   const assignments = [];
   
   for (let w = 0; w < config.cycle_length_weeks; w++) {

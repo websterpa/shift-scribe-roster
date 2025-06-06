@@ -11,6 +11,9 @@ import Staff from "./pages/Staff";
 import LeaveRequests from "./pages/LeaveRequests";
 import RosterConfig from "./pages/RosterConfig";
 import ManageLeave from "./pages/ManageLeave";
+import MyConfigurations from "./pages/MyConfigurations";
+import MyRosters from "./pages/MyRosters";
+import GenerateRoster from "./pages/GenerateRoster";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +29,9 @@ const AppContent = () => {
           <Route path="/leave-requests" element={<LeaveRequests />} />
           <Route path="/roster-config" element={<RosterConfig />} />
           <Route path="/manage-leave" element={<ManageLeave />} />
+          <Route path="/my-configurations" element={<MyConfigurations />} />
+          <Route path="/my-rosters" element={<MyRosters />} />
+          <Route path="/generate-roster" element={<GenerateRoster />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

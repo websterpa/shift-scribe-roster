@@ -1,10 +1,13 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { saveConfig, updateConfig, fetchConfigById, ConfigData } from "@/utils/configHelpers";
+import { toast } from "@/hooks/use-toast";
+import { useSearchParams } from "react-router-dom";
 
 interface Config {
   cycle_length_weeks: number;
@@ -15,7 +18,7 @@ interface Config {
 }
 
 interface Props {
-  onSaveConfig: (config: Config) => void;
+  onSaveConfig: (config: Config & { id?: string }) => void;
   defaultCycle?: number;
   defaultShift?: "8h" | "12h";
   defaultOpsHours?: number;
@@ -29,6 +32,10 @@ export default function RosterSettings({
   defaultOpsHours = 16,
   defaultHandshake = 0
 }: Props) {
+  const [searchParams] = useSearchParams();
+  const configId = searchParams.get('configId');
+  
+  const [configName, setConfigName] = useState("");
   const [cycle, setCycle] = useState(defaultCycle);
   const [shiftType, setShiftType] = useState(defaultShift);
   const [opsHours, setOpsHours] = useState(defaultOpsHours);
@@ -40,23 +47,149 @@ export default function RosterSettings({
     d.setDate(d.getDate() + diff);
     return d.toISOString().split("T")[0];
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSave = () => {
-    onSaveConfig({
-      cycle_length_weeks: cycle,
-      shift_type: shiftType,
-      operational_hours_per_day: opsHours,
-      handshake_minutes: handshake,
-      start_date: startDate
-    });
+  useEffect(() => {
+    if (configId) {
+      loadConfiguration(configId);
+    }
+  }, [configId]);
+
+  const loadConfiguration = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const config = await fetchConfigById(id);
+      
+      setConfigName(config.config_name);
+      setCycle(config.cycle_length_weeks);
+      setShiftType(config.shift_type as "8h" | "12h");
+      setOpsHours(config.operational_hours_per_day);
+      setHandshake(config.handshake_minutes);
+      setStartDate(config.start_date);
+      
+      toast({
+        title: "Configuration loaded",
+        description: `Loaded configuration: ${config.config_name}`,
+      });
+    } catch (error) {
+      console.error('Error loading configuration:', error);
+      toast({
+        title: "Error loading configuration",
+        description: "Failed to load the selected configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    if (!configName.trim()) {
+      toast({
+        title: "Configuration name required",
+        description: "Please enter a name for this configuration",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      
+      const configData: ConfigData = {
+        configName: configName.trim(),
+        cycle_length_weeks: cycle,
+        shift_type: shiftType,
+        operational_hours_per_day: opsHours,
+        handshake_minutes: handshake,
+        start_date: startDate
+      };
+
+      let savedConfigId: string;
+
+      if (configId) {
+        // Update existing configuration
+        await updateConfig(configId, {
+          config_name: configData.configName,
+          cycle_length_weeks: configData.cycle_length_weeks,
+          shift_type: configData.shift_type,
+          operational_hours_per_day: configData.operational_hours_per_day,
+          handshake_minutes: configData.handshake_minutes,
+          start_date: configData.start_date
+        });
+        savedConfigId = configId;
+        
+        toast({
+          title: "Configuration updated",
+          description: `Successfully updated: ${configData.configName}`,
+        });
+      } else {
+        // Save new configuration
+        savedConfigId = await saveConfig(configData);
+        
+        toast({
+          title: "Configuration saved",
+          description: `Successfully saved: ${configData.configName}`,
+        });
+      }
+
+      // Call the parent callback
+      onSaveConfig({
+        id: savedConfigId,
+        cycle_length_weeks: cycle,
+        shift_type: shiftType,
+        operational_hours_per_day: opsHours,
+        handshake_minutes: handshake,
+        start_date: startDate
+      });
+
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save configuration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="max-w-md mx-auto">
+        <CardContent className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p>Loading configuration...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Roster Settings</CardTitle>
+        <CardTitle>
+          {configId ? 'Edit Configuration' : 'Roster Settings'}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="configName">Configuration Name:</Label>
+          <Input
+            id="configName"
+            type="text"
+            value={configName}
+            onChange={(e) => setConfigName(e.target.value)}
+            placeholder="e.g. Summer 2025 Cycle"
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">Give this configuration a memorable name</p>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="cycle">Averaging Period (weeks):</Label>
           <Input
@@ -120,8 +253,19 @@ export default function RosterSettings({
           />
         </div>
 
-        <Button onClick={handleSave} className="w-full">
-          Save Configuration
+        <Button 
+          onClick={handleSave} 
+          className="w-full"
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              {configId ? 'Updating...' : 'Saving...'}
+            </div>
+          ) : (
+            configId ? 'Update Configuration' : 'Save Configuration'
+          )}
         </Button>
       </CardContent>
     </Card>

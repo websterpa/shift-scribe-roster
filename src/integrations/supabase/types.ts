@@ -301,18 +301,21 @@ export type Database = {
           config_id: string
           generated_at: string | null
           id: string
+          version_name: string | null
           version_number: number
         }
         Insert: {
           config_id: string
           generated_at?: string | null
           id?: string
+          version_name?: string | null
           version_number: number
         }
         Update: {
           config_id?: string
           generated_at?: string | null
           id?: string
+          version_name?: string | null
           version_number?: number
         }
         Relationships: [
