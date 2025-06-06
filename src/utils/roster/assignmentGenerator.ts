@@ -26,10 +26,15 @@ export function generateAssignments(
   logger.info('Generating assignments', { 
     staffCount: staffList.length,
     cycleWeeks: config.cycle_length_weeks,
-    shiftType: config.shift_type
+    shiftType: config.shift_type,
+    handshakeMinutes: config.handshake_minutes
   });
 
   const assignments: Assignment[] = [];
+  
+  // Calculate shift details based on configuration
+  const shiftDetails = calculateShiftDetails(config);
+  logger.info('Calculated shift details:', shiftDetails);
   
   for (let w = 0; w < config.cycle_length_weeks; w++) {
     for (let d = 0; d < 7; d++) {
@@ -38,60 +43,185 @@ export function generateAssignments(
       const dateKey = dateObj.toDateString();
 
       for (const staff of staffList) {
-        let code = cycle[w][d][staff.id];
+        if (!staff?.id) continue;
+        
+        let code = cycle[w]?.[d]?.[staff.id] || 'R';
 
         // Override if on leave/sick
         const leaveEntries = leaveMap[staff.id] || [];
         const leave = leaveEntries.find((e) => e.date === dateKey);
-        if (leave) code = leave.type === "sick" ? "S" : "R";
-
-        // Determine hours
-        let hours = 0;
-        if (["D", "E", "L", "N"].includes(code)) {
-          hours = config.shift_type === "12h" ? 12 : 8;
+        if (leave) {
+          code = leave.type; // 'S' for sick, 'R' for annual leave
         }
 
-        // Check weekly & rolling WTD
-        const weekIndex = w;
-        const prevHours = pastWeeksMap[staff.id][weekIndex] || 0;
-        const thisWeek = prevHours + hours;
-        const wtdOK = withinWeeklyHours(thisWeek, staff.max_hours_per_week, staff.opted_out_wtd);
-        const rollingOK = withinRollingAverage(pastWeeksMap[staff.id], thisWeek, 48);
+        // Determine hours and shift times
+        const shiftInfo = calculateShiftInfo(code, config, shiftDetails, dateObj);
         
-        if (!wtdOK || !rollingOK) {
+        // Check WTD compliance
+        const weeklyHours = calculateWeeklyHours(assignments, staff.id, w, dateObj, shiftInfo.hours);
+        const wtdCompliant = checkWTDCompliance(staff, weeklyHours, pastWeeksMap[staff.id]);
+        
+        if (!wtdCompliant && ['D', 'E', 'L', 'N'].includes(code)) {
           logger.debug('WTD compliance issue - changing to rest day', { 
             staffId: staff.id, 
-            thisWeek, 
+            weeklyHours, 
             maxHours: staff.max_hours_per_week
           });
-          code = "R"; 
-          hours = 0;
+          code = 'R';
+          shiftInfo.hours = 0;
+          shiftInfo.shiftStart = null;
+          shiftInfo.shiftEnd = null;
         }
 
-        // Compute shift_start & shift_end (simplified for now)
-        const shiftStart = null;
-        const shiftEnd = null;
-
-        // Compute cost including public holiday multiplier
-        const cost = isPublicHoliday(dateObj) && ["D","E","L","N"].includes(code)
-          ? staff.hourly_rate * hours * staff.holiday_multiplier
-          : staff.hourly_rate * hours;
+        // Calculate cost including public holiday multiplier
+        const cost = calculateCost(staff, shiftInfo.hours, dateObj, code);
 
         assignments.push({
           version_id: '', // Will be filled by generateAndSaveRoster
           date: dateObj.toISOString().split("T")[0],
           staff_id: staff.id,
           shift_code: code,
-          shift_start: shiftStart,
-          shift_end: shiftEnd,
-          hours,
+          shift_start: shiftInfo.shiftStart,
+          shift_end: shiftInfo.shiftEnd,
+          hours: shiftInfo.hours,
           cost
         });
       }
     }
   }
 
+  logger.info('Assignment generation completed', { totalAssignments: assignments.length });
   return assignments;
+}
+
+/**
+ * Calculate shift details based on configuration
+ */
+function calculateShiftDetails(config: {
+  shift_type: "8h" | "12h";
+  operational_hours_per_day: number;
+  handshake_minutes: number;
+}) {
+  const baseShiftHours = config.shift_type === "12h" ? 12 : 8;
+  const handshakeHours = config.handshake_minutes / 60;
+  const actualShiftHours = baseShiftHours + handshakeHours;
+  
+  if (config.shift_type === "12h") {
+    return {
+      D: { start: "06:00", duration: actualShiftHours, label: "Day" },
+      N: { start: "18:00", duration: actualShiftHours, label: "Night" }
+    };
+  } else {
+    return {
+      E: { start: "06:00", duration: actualShiftHours, label: "Early" },
+      L: { start: "14:00", duration: actualShiftHours, label: "Late" },
+      N: { start: "22:00", duration: actualShiftHours, label: "Night" },
+      D: { start: "06:00", duration: actualShiftHours, label: "Day" } // For supervisors
+    };
+  }
+}
+
+/**
+ * Calculate shift information for a given shift code
+ */
+function calculateShiftInfo(
+  code: string, 
+  config: any, 
+  shiftDetails: any, 
+  date: Date
+): { hours: number; shiftStart: string | null; shiftEnd: string | null } {
+  if (!['D', 'E', 'L', 'N'].includes(code)) {
+    return { hours: 0, shiftStart: null, shiftEnd: null };
+  }
+
+  const shift = shiftDetails[code];
+  if (!shift) {
+    return { hours: 0, shiftStart: null, shiftEnd: null };
+  }
+
+  const [startHour, startMinute] = shift.start.split(':').map(Number);
+  const shiftStart = new Date(date);
+  shiftStart.setHours(startHour, startMinute, 0, 0);
+  
+  const shiftEnd = new Date(shiftStart);
+  shiftEnd.setHours(shiftEnd.getHours() + Math.floor(shift.duration));
+  shiftEnd.setMinutes(shiftEnd.getMinutes() + Math.round((shift.duration % 1) * 60));
+
+  return {
+    hours: Math.round(shift.duration),
+    shiftStart: shiftStart.toISOString(),
+    shiftEnd: shiftEnd.toISOString()
+  };
+}
+
+/**
+ * Calculate weekly hours for a staff member
+ */
+function calculateWeeklyHours(
+  assignments: Assignment[], 
+  staffId: string, 
+  currentWeek: number, 
+  currentDate: Date, 
+  additionalHours: number
+): number {
+  const weekStart = new Date(currentDate);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
+  const weeklyHours = assignments
+    .filter(a => 
+      a.staff_id === staffId && 
+      new Date(a.date) >= weekStart && 
+      new Date(a.date) <= weekEnd
+    )
+    .reduce((total, a) => total + (a.hours || 0), 0);
+
+  return weeklyHours + additionalHours;
+}
+
+/**
+ * Check WTD compliance for a staff member
+ */
+function checkWTDCompliance(
+  staff: StaffMember, 
+  weeklyHours: number, 
+  pastHours: number[] = []
+): boolean {
+  const maxWeeklyHours = staff.max_hours_per_week || 48;
+  
+  if (!withinWeeklyHours(weeklyHours, maxWeeklyHours, staff.opted_out_wtd)) {
+    return false;
+  }
+
+  if (!staff.opted_out_wtd && pastHours.length > 0) {
+    return withinRollingAverage(pastHours, weeklyHours, 48);
+  }
+
+  return true;
+}
+
+/**
+ * Calculate cost for a shift including public holiday multipliers
+ */
+function calculateCost(
+  staff: StaffMember, 
+  hours: number, 
+  date: Date, 
+  shiftCode: string
+): number {
+  if (!['D', 'E', 'L', 'N'].includes(shiftCode) || hours === 0) {
+    return 0;
+  }
+
+  const baseRate = staff.hourly_rate || 0;
+  const holidayMultiplier = staff.holiday_multiplier || 1;
+  
+  if (isPublicHoliday(date)) {
+    return baseRate * hours * holidayMultiplier;
+  }
+  
+  return baseRate * hours;
 }
 
 // Export the function under both names for compatibility

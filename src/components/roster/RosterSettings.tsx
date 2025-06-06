@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { saveConfig, updateConfig, fetchConfigById, ConfigData } from "@/utils/configHelpers";
 import { toast } from "@/hooks/use-toast";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Config {
   cycle_length_weeks: number;
@@ -33,6 +36,7 @@ export default function RosterSettings({
   defaultHandshake = 0
 }: Props) {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const configId = searchParams.get('configId');
   
   const [configName, setConfigName] = useState("");
@@ -49,6 +53,8 @@ export default function RosterSettings({
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (configId) {
@@ -59,14 +65,15 @@ export default function RosterSettings({
   const loadConfiguration = async (id: string) => {
     try {
       setIsLoading(true);
+      setValidationErrors({});
       const config = await fetchConfigById(id);
       
-      setConfigName(config.config_name);
-      setCycle(config.cycle_length_weeks);
-      setShiftType(config.shift_type as "8h" | "12h");
-      setOpsHours(config.operational_hours_per_day);
-      setHandshake(config.handshake_minutes);
-      setStartDate(config.start_date);
+      setConfigName(config.config_name || "");
+      setCycle(config.cycle_length_weeks || defaultCycle);
+      setShiftType((config.shift_type as "8h" | "12h") || defaultShift);
+      setOpsHours(config.operational_hours_per_day || defaultOpsHours);
+      setHandshake(config.handshake_minutes || defaultHandshake);
+      setStartDate(config.start_date || startDate);
       
       toast({
         title: "Configuration loaded",
@@ -84,11 +91,44 @@ export default function RosterSettings({
     }
   };
 
-  const handleSave = async () => {
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
     if (!configName.trim()) {
+      errors.configName = "Configuration name is required";
+    }
+
+    if (cycle < 1 || cycle > 52) {
+      errors.cycle = "Cycle length must be between 1 and 52 weeks";
+    }
+
+    if (opsHours < 8 || opsHours > 24) {
+      errors.opsHours = "Operational hours must be between 8 and 24";
+    }
+
+    if (handshake < 0 || handshake > 60) {
+      errors.handshake = "Handover time must be between 0 and 60 minutes";
+    }
+
+    if (!startDate) {
+      errors.startDate = "Start date is required";
+    } else {
+      const selectedDate = new Date(startDate);
+      const dayOfWeek = selectedDate.getDay();
+      if (dayOfWeek !== 1) { // Monday = 1
+        errors.startDate = "Start date must be a Monday";
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) {
       toast({
-        title: "Configuration name required",
-        description: "Please enter a name for this configuration",
+        title: "Validation Error",
+        description: "Please fix the errors before saving",
         variant: "destructive",
       });
       return;
@@ -156,6 +196,39 @@ export default function RosterSettings({
     }
   };
 
+  const handleDelete = async () => {
+    if (!configId) return;
+
+    try {
+      setIsDeleting(true);
+      
+      const { error } = await supabase
+        .from("roster_config")
+        .delete()
+        .eq("id", configId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Configuration deleted",
+        description: "Configuration has been permanently deleted",
+      });
+      
+      navigate('/my-configurations');
+    } catch (error) {
+      console.error('Error deleting configuration:', error);
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete configuration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="max-w-md mx-auto">
@@ -172,9 +245,38 @@ export default function RosterSettings({
   return (
     <Card className="max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>
-          {configId ? 'Edit Configuration' : 'Roster Settings'}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>
+            {configId ? 'Edit Configuration' : 'Roster Settings'}
+          </CardTitle>
+          {configId && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Configuration</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this configuration? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -185,8 +287,11 @@ export default function RosterSettings({
             value={configName}
             onChange={(e) => setConfigName(e.target.value)}
             placeholder="e.g. Summer 2025 Cycle"
-            className="w-full"
+            className={validationErrors.configName ? "border-red-500" : ""}
           />
+          {validationErrors.configName && (
+            <p className="text-sm text-red-500">{validationErrors.configName}</p>
+          )}
           <p className="text-xs text-muted-foreground">Give this configuration a memorable name</p>
         </div>
 
@@ -195,13 +300,17 @@ export default function RosterSettings({
           <Input
             id="cycle"
             type="number"
-            min={4}
+            min={1}
             max={52}
             step={1}
             value={cycle}
             onChange={(e) => setCycle(Number(e.target.value))}
+            className={validationErrors.cycle ? "border-red-500" : ""}
           />
-          <p className="text-xs text-muted-foreground">8 or 17 or custom</p>
+          {validationErrors.cycle && (
+            <p className="text-sm text-red-500">{validationErrors.cycle}</p>
+          )}
+          <p className="text-xs text-muted-foreground">4, 8, 17 weeks or custom</p>
         </div>
 
         <div className="space-y-2">
@@ -227,7 +336,11 @@ export default function RosterSettings({
             step={1}
             value={opsHours}
             onChange={(e) => setOpsHours(Number(e.target.value))}
+            className={validationErrors.opsHours ? "border-red-500" : ""}
           />
+          {validationErrors.opsHours && (
+            <p className="text-sm text-red-500">{validationErrors.opsHours}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -236,11 +349,15 @@ export default function RosterSettings({
             id="handshake"
             type="number"
             min={0}
-            max={15}
+            max={60}
             step={15}
             value={handshake}
             onChange={(e) => setHandshake(Number(e.target.value))}
+            className={validationErrors.handshake ? "border-red-500" : ""}
           />
+          {validationErrors.handshake && (
+            <p className="text-sm text-red-500">{validationErrors.handshake}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -250,7 +367,11 @@ export default function RosterSettings({
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className={validationErrors.startDate ? "border-red-500" : ""}
           />
+          {validationErrors.startDate && (
+            <p className="text-sm text-red-500">{validationErrors.startDate}</p>
+          )}
         </div>
 
         <Button 
