@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { addWeeks, format, startOfWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight, Filter, Search, X } from 'lucide-react';
@@ -102,11 +101,11 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
       // For each week, create dummy roster data
       const weekMap = new Map<string, RosterAssignment[]>();
       
-      // Calculate weeks to show based on visibleWeeks and config cycle length
-      const weeksToShow = Math.min(visibleWeeks, config.cycle_length_weeks || showWeeks);
+      // Calculate max weeks available from config
+      const maxWeeksFromConfig = config.cycle_length_weeks || showWeeks;
       
-      // Generate for the specified number of weeks
-      for (let week = 0; week < weeksToShow; week++) {
+      // Generate for all available weeks initially
+      for (let week = 0; week < maxWeeksFromConfig; week++) {
         const weekStartDate = addWeeks(startDate, week);
         const weekKey = format(weekStartDate, 'yyyy-MM-dd');
         
@@ -162,7 +161,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
       setGenerating(false);
       setLoading(false);
     }
-  }, [config, staffList, showWeeks, visibleWeeks]);
+  }, [config, staffList, showWeeks]);
   
   // Filter staff based on search and role
   const filteredStaff = demoStaff.filter(staff => {
@@ -179,7 +178,34 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
   }));
 
   const maxWeeks = config?.cycle_length_weeks || showWeeks;
-  const weeksToShow = Math.min(visibleWeeks, maxWeeks);
+  const canShowMoreWeeks = visibleWeeks < maxWeeks;
+  const remainingWeeks = Math.max(0, maxWeeks - visibleWeeks);
+  const weeksToAdd = Math.min(4, remainingWeeks);
+  
+  const canNavigatePrevious = currentWeekOffset > 0;
+  const canNavigateNext = currentWeekOffset < Math.min(visibleWeeks, weeks.length) - 1;
+  
+  const handlePreviousWeek = () => {
+    if (canNavigatePrevious) {
+      setCurrentWeekOffset(prev => prev - 1);
+    }
+  };
+  
+  const handleNextWeek = () => {
+    if (canNavigateNext) {
+      setCurrentWeekOffset(prev => prev + 1);
+    }
+  };
+  
+  const handleShowMoreWeeks = () => {
+    if (canShowMoreWeeks) {
+      setVisibleWeeks(prev => Math.min(prev + weeksToAdd, maxWeeks));
+    }
+  };
+  
+  const handleShowAllWeeks = () => {
+    setVisibleWeeks(maxWeeks);
+  };
   
   return (
     <Card className="h-full">
@@ -190,26 +216,27 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => setCurrentWeekOffset(prev => Math.max(0, prev - 1))}
-              disabled={currentWeekOffset === 0}
+              onClick={handlePreviousWeek}
+              disabled={!canNavigatePrevious}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-normal">
-              Week {currentWeekOffset + 1} of {weeksToShow}
+            <span className="text-sm font-normal min-w-[120px] text-center">
+              Week {currentWeekOffset + 1} of {Math.min(visibleWeeks, weeks.length)}
             </span>
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => setCurrentWeekOffset(prev => Math.min(weeksToShow - 1, prev + 1))}
-              disabled={currentWeekOffset === weeksToShow - 1}
+              onClick={handleNextWeek}
+              disabled={!canNavigateNext}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </CardTitle>
         
-        <div className="flex items-center space-x-2 pt-2">
+        {/* Enhanced mobile-responsive search and filter */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 pt-2">
           <div className="relative flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -229,10 +256,10 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
               </Button>
             )}
           </div>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <select 
-              className="h-10 rounded-md border border-input bg-background pl-8 pr-8 text-sm"
+              className="h-10 w-full sm:w-40 rounded-md border border-input bg-background pl-8 pr-8 text-sm"
               value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
             >
@@ -256,25 +283,41 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
           </div>
         ) : weeks.length > 0 && currentWeekOffset < weeks.length ? (
           <>
-            <RosterCalendar 
-              week={weeks[currentWeekOffset]} 
-              staff={displayStaff}
-            />
-            {config && maxWeeks > visibleWeeks && (
-              <div className="mt-4 text-center space-x-2">
-                <Button 
-                  onClick={() => setVisibleWeeks(prev => Math.min(prev + 4, maxWeeks))}
-                  disabled={visibleWeeks >= maxWeeks}
-                >
-                  Show Next {Math.min(4, maxWeeks - visibleWeeks)} Weeks
-                </Button>
-                {visibleWeeks < maxWeeks && (
+            {/* Mobile-responsive roster display */}
+            <div className="overflow-x-auto">
+              <RosterCalendar 
+                week={weeks[currentWeekOffset]} 
+                staff={displayStaff}
+              />
+            </div>
+            
+            {/* Enhanced week expansion controls */}
+            {config && (
+              <div className="mt-4 flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2">
+                {canShowMoreWeeks && (
+                  <Button 
+                    onClick={handleShowMoreWeeks}
+                    disabled={generating}
+                    className="w-full sm:w-auto"
+                  >
+                    Show Next {weeksToAdd} Week{weeksToAdd !== 1 ? 's' : ''}
+                    {remainingWeeks > 0 && ` (${remainingWeeks} remaining)`}
+                  </Button>
+                )}
+                {canShowMoreWeeks && remainingWeeks > weeksToAdd && (
                   <Button 
                     variant="secondary" 
-                    onClick={() => setVisibleWeeks(maxWeeks)}
+                    onClick={handleShowAllWeeks}
+                    disabled={generating}
+                    className="w-full sm:w-auto"
                   >
-                    Show All Weeks
+                    Show All {maxWeeks} Weeks
                   </Button>
+                )}
+                {!canShowMoreWeeks && maxWeeks > 4 && (
+                  <p className="text-sm text-gray-500 text-center">
+                    Showing all {maxWeeks} weeks
+                  </p>
                 )}
               </div>
             )}
