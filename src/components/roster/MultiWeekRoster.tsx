@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
-import { addWeeks, format, startOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Filter, Search, X } from 'lucide-react';
+import { addWeeks, format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { RosterCalendar } from '@/components/roster/RosterCalendar';
-import { Input } from '@/components/ui/input';
+import { RosterSearchFilters } from '@/components/roster/RosterSearchFilters';
+import { WeekNavigationControls } from '@/components/roster/WeekNavigationControls';
+import { RosterDisplayContainer } from '@/components/roster/RosterDisplayContainer';
 import { ConfigItem, StaffMember } from '@/types/roster';
 
 // Define internal week data structure
@@ -212,120 +212,58 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div>Roster Preview</div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handlePreviousWeek}
-              disabled={!canNavigatePrevious}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-normal min-w-[120px] text-center">
-              Week {currentWeekOffset + 1} of {Math.min(visibleWeeks, weeks.length)}
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleNextWeek}
-              disabled={!canNavigateNext}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          <WeekNavigationControls
+            currentWeekOffset={currentWeekOffset}
+            maxWeeks={maxWeeks}
+            visibleWeeks={visibleWeeks}
+            weeksLength={weeks.length}
+            generating={generating}
+            canNavigatePrevious={canNavigatePrevious}
+            canNavigateNext={canNavigateNext}
+            canShowMoreWeeks={canShowMoreWeeks}
+            remainingWeeks={remainingWeeks}
+            weeksToAdd={weeksToAdd}
+            onPreviousWeek={handlePreviousWeek}
+            onNextWeek={handleNextWeek}
+            onShowMoreWeeks={handleShowMoreWeeks}
+            onShowAllWeeks={handleShowAllWeeks}
+          />
         </CardTitle>
         
-        {/* Enhanced mobile-responsive search and filter */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 pt-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search staff..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1.5 h-7 w-7 p-0"
-                onClick={() => setSearchTerm("")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          <div className="relative w-full sm:w-auto">
-            <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <select 
-              className="h-10 w-full sm:w-40 rounded-md border border-input bg-background pl-8 pr-8 text-sm"
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-            >
-              {availableRoles.map(role => (
-                <option key={role} value={role}>
-                  {role === 'all' ? 'All roles' : role}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <RosterSearchFilters
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterRole={filterRole}
+          setFilterRole={setFilterRole}
+          availableRoles={availableRoles}
+        />
       </CardHeader>
       
       <CardContent>
-        {loading ? (
-          <div className="flex h-64 items-center justify-center">
-            <div className="text-center">
-              <div className="mb-2 h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-primary mx-auto"></div>
-              <p className="text-sm text-gray-500">Loading roster preview...</p>
-            </div>
-          </div>
-        ) : weeks.length > 0 && currentWeekOffset < weeks.length ? (
-          <>
-            {/* Mobile-responsive roster display */}
-            <div className="overflow-x-auto">
-              <RosterCalendar 
-                week={weeks[currentWeekOffset]} 
-                staff={displayStaff}
-              />
-            </div>
-            
-            {/* Enhanced week expansion controls */}
-            {config && (
-              <div className="mt-4 flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2">
-                {canShowMoreWeeks && (
-                  <Button 
-                    onClick={handleShowMoreWeeks}
-                    disabled={generating}
-                    className="w-full sm:w-auto"
-                  >
-                    Show Next {weeksToAdd} Week{weeksToAdd !== 1 ? 's' : ''}
-                    {remainingWeeks > 0 && ` (${remainingWeeks} remaining)`}
-                  </Button>
-                )}
-                {canShowMoreWeeks && remainingWeeks > weeksToAdd && (
-                  <Button 
-                    variant="secondary" 
-                    onClick={handleShowAllWeeks}
-                    disabled={generating}
-                    className="w-full sm:w-auto"
-                  >
-                    Show All {maxWeeks} Weeks
-                  </Button>
-                )}
-                {!canShowMoreWeeks && maxWeeks > 4 && (
-                  <p className="text-sm text-gray-500 text-center">
-                    Showing all {maxWeeks} weeks
-                  </p>
-                )}
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex h-64 items-center justify-center">
-            <p className="text-gray-500">No roster data available</p>
-          </div>
+        <RosterDisplayContainer
+          loading={loading}
+          weeks={weeks}
+          currentWeekOffset={currentWeekOffset}
+          displayStaff={displayStaff}
+        />
+        
+        {weeks.length > 0 && currentWeekOffset < weeks.length && config && (
+          <WeekNavigationControls
+            currentWeekOffset={currentWeekOffset}
+            maxWeeks={maxWeeks}
+            visibleWeeks={visibleWeeks}
+            weeksLength={weeks.length}
+            generating={generating}
+            canNavigatePrevious={canNavigatePrevious}
+            canNavigateNext={canNavigateNext}
+            canShowMoreWeeks={canShowMoreWeeks}
+            remainingWeeks={remainingWeeks}
+            weeksToAdd={weeksToAdd}
+            onPreviousWeek={handlePreviousWeek}
+            onNextWeek={handleNextWeek}
+            onShowMoreWeeks={handleShowMoreWeeks}
+            onShowAllWeeks={handleShowAllWeeks}
+          />
         )}
       </CardContent>
     </Card>
