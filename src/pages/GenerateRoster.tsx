@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,7 @@ interface ConfigItem {
   id: string;
   config_name: string;
   cycle_length_weeks: number;
-  shift_type: string;
+  shift_type: "8h" | "12h";
   operational_hours_per_day: number;
   handshake_minutes: number;
   start_date: string;
@@ -76,7 +75,12 @@ const GenerateRoster = () => {
   const loadSelectedConfig = async (configId: string) => {
     try {
       const config = await fetchConfigById(configId);
-      setSelectedConfig(config);
+      // Ensure shift_type is properly typed
+      const typedConfig: ConfigItem = {
+        ...config,
+        shift_type: config.shift_type as "8h" | "12h"
+      };
+      setSelectedConfig(typedConfig);
       
       // Auto-generate a roster name based on config and current date
       const today = new Date();
