@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,14 @@ import { LeaveSummary } from "@/components/leave/LeaveSummary";
 import { useStaffData } from "@/hooks/useStaffData";
 import { calculateDaysBetween } from "@/utils/leaveCalculations";
 
+interface StaffOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+  leave_allowance_days?: number;
+  leave_taken_monthly: Record<string, number>;
+}
+
 export default function ManageLeave() {
   const { staffList, loading, refetchStaffList } = useStaffData();
   const [selectedStaff, setSelectedStaff] = useState<string>("");
@@ -20,7 +28,7 @@ export default function ManageLeave() {
   const [submitting, setSubmitting] = useState(false);
 
   // Set first staff member as selected when data loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (staffList.length > 0 && !selectedStaff) {
       setSelectedStaff(staffList[0].id);
     }
@@ -42,12 +50,16 @@ export default function ManageLeave() {
     try {
       const daysRequested = calculateDaysBetween(startDate, endDate);
       
+      // Get current user for requested_by field
+      const { data: { user } } = await supabase.auth.getUser();
+      
       console.log('Submitting leave request:', {
         staff_id: selectedStaff,
         start_date: startDate,
         end_date: endDate,
         leave_type: type,
-        days_requested: daysRequested
+        days_requested: daysRequested,
+        requested_by: user?.id
       });
 
       const { error } = await supabase.from("leave_requests").insert({
@@ -57,7 +69,8 @@ export default function ManageLeave() {
         leave_type: type,
         days_requested: daysRequested,
         status: "pending",
-        reason: `${type === "annual-leave" ? "Annual leave" : "Sick leave"} request`
+        reason: `${type === "annual-leave" ? "Annual leave" : "Sick leave"} request`,
+        requested_by: user?.id
       });
 
       if (error) {
