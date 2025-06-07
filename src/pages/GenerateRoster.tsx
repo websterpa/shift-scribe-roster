@@ -8,9 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LoadingState } from '@/components/ui/loading-state';
 import { Settings, Calendar, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
+import { useSearchParams } from 'react-router-dom';
 
 const GenerateRoster = () => {
   console.log('🔄 GenerateRoster component rendered');
+  
+  const [searchParams] = useSearchParams();
+  const configIdFromUrl = searchParams.get('configId');
+  console.log('📊 URL params:', { configIdFromUrl });
   
   const {
     configs,
@@ -26,7 +31,7 @@ const GenerateRoster = () => {
     setRosterName,
     handleGenerateRoster,
     refreshData
-  } = useRosterGeneration(null);
+  } = useRosterGeneration(configIdFromUrl);
 
   console.log('📊 GenerateRoster state:', {
     configsCount: configs.length,
@@ -57,12 +62,30 @@ const GenerateRoster = () => {
     }
   };
 
+  const handleRefreshClick = () => {
+    console.log('🔄 Refresh button clicked');
+    refreshData();
+  };
+
+  const handleConfigChange = (configId: string) => {
+    console.log('⚙️ Config selection changed to:', configId);
+    setSelectedConfigId(configId);
+  };
+
+  const handleRosterNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    console.log('📝 Roster name changed to:', newName);
+    setRosterName(newName);
+  };
+
   if (isLoading) {
+    console.log('⏳ GenerateRoster showing loading state');
     return <LoadingState message="Loading roster configuration data..." />;
   }
 
   // Safe check for canGenerate
   const canGenerate = Boolean(selectedConfig && rosterName && rosterName.trim() && staffList.length > 0 && !isGenerating);
+  console.log('✅ Can generate roster:', canGenerate);
 
   return (
     <div className="space-y-6">
@@ -81,7 +104,7 @@ const GenerateRoster = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={refreshData}
+              onClick={handleRefreshClick}
               disabled={isLoading}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -110,7 +133,7 @@ const GenerateRoster = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="config">Select Configuration:</Label>
-            <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
+            <Select value={selectedConfigId} onValueChange={handleConfigChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a configuration..." />
               </SelectTrigger>
@@ -144,7 +167,7 @@ const GenerateRoster = () => {
               type="text"
               placeholder="e.g. June 2025 Month 1"
               value={rosterName}
-              onChange={(e) => setRosterName(e.target.value)}
+              onChange={handleRosterNameChange}
               required
             />
             <p className="text-xs text-gray-500">This name will be saved with your roster version</p>

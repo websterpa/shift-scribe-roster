@@ -6,10 +6,13 @@ import { fetchAllConfigs, fetchConfigById } from '@/utils/configHelpers';
 import { fetchStaffMembers, generateAndSaveRoster } from '@/utils/roster/rosterGeneration';
 import { ConfigItem, StaffMember } from '@/types/roster';
 import { createLogger } from '@/utils/errorLogger';
+import { useSearchParams } from 'react-router-dom';
 
 const logger = createLogger('useRosterGeneration');
 
 export const useRosterGeneration = (configIdFromUrl: string | null) => {
+  console.log('🔄 useRosterGeneration hook initialized with configId:', configIdFromUrl);
+  
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [selectedConfigId, setSelectedConfigId] = useState<string>(configIdFromUrl || '');
   const [selectedConfig, setSelectedConfig] = useState<ConfigItem | null>(null);
@@ -26,32 +29,33 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   }>({});
 
   useEffect(() => {
-    console.log('🔄 useRosterGeneration hook initialized');
+    console.log('🔄 useRosterGeneration: Initial data load effect triggered');
     loadInitialData();
   }, []);
 
   useEffect(() => {
     if (selectedConfigId) {
-      console.log('🔄 Selected config ID changed:', selectedConfigId);
+      console.log('🔄 useRosterGeneration: Selected config ID changed to:', selectedConfigId);
       loadSelectedConfig(selectedConfigId);
     } else {
+      console.log('🔄 useRosterGeneration: No config selected, clearing selection');
       setSelectedConfig(null);
     }
   }, [selectedConfigId]);
 
   const loadInitialData = async () => {
-    console.log('📊 Loading initial data for roster generation...');
+    console.log('📊 useRosterGeneration: Loading initial data...');
     try {
       setIsLoading(true);
       setErrors({});
       
-      console.log('📊 Fetching configs and staff...');
+      console.log('📊 Fetching configs and staff in parallel...');
       const [configsData, staffData] = await Promise.all([
         fetchAllConfigs(),
         fetchStaffMembers()
       ]);
       
-      console.log('✅ Loaded data:', {
+      console.log('✅ useRosterGeneration: Loaded data:', {
         configs: configsData.length,
         staff: staffData.length
       });
@@ -65,10 +69,11 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       setStaffList(staffData);
       
       if (configIdFromUrl && typedConfigs.find(c => c.id === configIdFromUrl)) {
+        console.log('✅ useRosterGeneration: Setting config from URL:', configIdFromUrl);
         setSelectedConfigId(configIdFromUrl);
       }
     } catch (error: any) {
-      console.error('❌ Error loading initial data:', error);
+      console.error('❌ useRosterGeneration: Error loading initial data:', error);
       setErrors(prev => ({
         ...prev,
         general: 'Failed to load roster data'
@@ -84,10 +89,10 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   };
 
   const loadSelectedConfig = async (configId: string) => {
-    console.log('📊 Loading selected config:', configId);
+    console.log('📊 useRosterGeneration: Loading selected config:', configId);
     try {
       const config = await fetchConfigById(configId);
-      console.log('✅ Loaded config:', config);
+      console.log('✅ useRosterGeneration: Loaded config:', config.config_name);
       
       const typedConfig: ConfigItem = {
         ...config,
@@ -101,9 +106,9 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       const year = today.getFullYear();
       const generatedName = `${config.config_name} - ${monthName} ${year}`;
       setRosterName(generatedName);
-      console.log('✅ Generated roster name:', generatedName);
+      console.log('✅ useRosterGeneration: Generated roster name:', generatedName);
     } catch (error: any) {
-      console.error('❌ Error loading config:', error);
+      console.error('❌ useRosterGeneration: Error loading config:', error);
       setErrors(prev => ({
         ...prev,
         configs: 'Failed to load the selected configuration'
@@ -112,7 +117,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   };
 
   const handleGenerateRoster = async () => {
-    console.log('🚀 handleGenerateRoster called');
+    console.log('🚀 useRosterGeneration: handleGenerateRoster called');
     console.log('📊 Current state:', {
       selectedConfig: selectedConfig?.config_name,
       rosterName,
@@ -122,7 +127,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     // Validation
     if (!selectedConfig) {
       const error = "Please select a configuration first";
-      console.warn('⚠️ Validation failed:', error);
+      console.warn('⚠️ useRosterGeneration: Validation failed:', error);
       toast({
         title: "Cannot generate roster",
         description: error,
@@ -133,7 +138,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
 
     if (!rosterName.trim()) {
       const error = "Roster name is required";
-      console.warn('⚠️ Validation failed:', error);
+      console.warn('⚠️ useRosterGeneration: Validation failed:', error);
       toast({
         title: "Cannot generate roster",
         description: error,
@@ -144,7 +149,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
 
     if (staffList.length === 0) {
       const error = "No staff members available";
-      console.warn('⚠️ Validation failed:', error);
+      console.warn('⚠️ useRosterGeneration: Validation failed:', error);
       toast({
         title: "Cannot generate roster",
         description: error,
@@ -154,7 +159,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     }
 
     try {
-      console.log('🚀 Starting roster generation...');
+      console.log('🚀 useRosterGeneration: Starting roster generation...');
       setIsGenerating(true);
       setErrors({});
       
@@ -167,8 +172,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
         start_date: selectedConfig.start_date
       };
 
-      console.log('📊 Config for generation:', configForGeneration);
-      console.log('📊 Staff list:', staffList.map(s => ({ id: s.id, name: s.name })));
+      console.log('📊 useRosterGeneration: Config for generation:', configForGeneration);
+      console.log('📊 useRosterGeneration: Staff list:', staffList.map(s => ({ id: s.id, name: s.name })));
 
       const versionId = await generateAndSaveRoster(
         staffList,
@@ -176,7 +181,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
         rosterName.trim()
       );
       
-      console.log('✅ Roster generated successfully, version ID:', versionId);
+      console.log('✅ useRosterGeneration: Roster generated successfully, version ID:', versionId);
       setGeneratedVersionId(versionId);
       
       toast({
@@ -185,7 +190,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       });
       
     } catch (error: any) {
-      console.error('❌ Error generating roster:', error);
+      console.error('❌ useRosterGeneration: Error generating roster:', error);
       setErrors(prev => ({
         ...prev,
         general: error?.message || 'Failed to generate roster'
@@ -201,7 +206,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   };
 
   const refreshData = async () => {
-    console.log('🔄 Refreshing data...');
+    console.log('🔄 useRosterGeneration: Refreshing data...');
     await loadInitialData();
     toast({
       title: "Data refreshed",

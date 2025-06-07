@@ -20,23 +20,27 @@ interface ConfigItem {
 }
 
 const MyConfigurations = () => {
+  console.log('🔄 MyConfigurations component rendered');
+  
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('🔄 MyConfigurations: useEffect triggered');
     loadConfigurations();
   }, []);
 
   const loadConfigurations = async () => {
     try {
+      console.log('📥 MyConfigurations: Loading configurations...');
       setLoading(true);
       const data = await fetchAllConfigs();
       setConfigs(data);
-      console.log('Loaded configurations:', data.length);
+      console.log('✅ MyConfigurations: Loaded configurations:', data.length);
     } catch (error) {
-      console.error('Error loading configurations:', error);
+      console.error('❌ MyConfigurations: Error loading configurations:', error);
       toast({
         title: "Error loading configurations",
         description: "Failed to load saved configurations",
@@ -48,22 +52,39 @@ const MyConfigurations = () => {
   };
 
   const handleLoadConfig = (configId: string) => {
+    console.log('📂 MyConfigurations: Loading config for editing:', configId);
     navigate(`/roster-config?configId=${configId}`);
   };
 
   const handleEditConfig = (configId: string) => {
+    console.log('✏️ MyConfigurations: Editing config:', configId);
     navigate(`/roster-config?configId=${configId}`);
   };
 
   const handleGenerateWithConfig = (configId: string) => {
-    navigate(`/roster-config?configId=${configId}&action=generate`);
+    console.log('🚀 MyConfigurations: Generating roster with config:', configId);
+    navigate(`/generate-roster?configId=${configId}`);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    console.log('🔍 MyConfigurations: Search term changed:', value);
+    setSearchTerm(value);
+  };
+
+  const handleCreateNew = () => {
+    console.log('➕ MyConfigurations: Creating new configuration');
+    navigate('/roster-config');
   };
 
   const filteredConfigs = configs.filter(config =>
     config.config_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  console.log('📊 MyConfigurations: Filtered configs:', filteredConfigs.length, 'of', configs.length);
+
   if (loading) {
+    console.log('⏳ MyConfigurations: Showing loading state');
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -85,7 +106,7 @@ const MyConfigurations = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">My Configurations</h1>
-        <Button onClick={() => navigate('/roster-config')}>
+        <Button onClick={handleCreateNew}>
           <Settings className="h-4 w-4 mr-2" />
           Create New Configuration
         </Button>
@@ -102,7 +123,7 @@ const MyConfigurations = () => {
             <Input
               placeholder="Search configurations..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               className="max-w-sm"
             />
           </div>
@@ -114,7 +135,7 @@ const MyConfigurations = () => {
               <p className="text-gray-500 mb-4">
                 {searchTerm ? 'No configurations match your search' : 'No saved configurations found'}
               </p>
-              <Button onClick={() => navigate('/roster-config')}>
+              <Button onClick={handleCreateNew}>
                 Create Your First Configuration
               </Button>
             </div>
@@ -154,14 +175,20 @@ const MyConfigurations = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditConfig(config.id)}
+                            onClick={() => {
+                              console.log('✏️ Edit button clicked for config:', config.id);
+                              handleEditConfig(config.id);
+                            }}
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => handleGenerateWithConfig(config.id)}
+                            onClick={() => {
+                              console.log('🚀 Generate Roster button clicked for config:', config.id);
+                              handleGenerateWithConfig(config.id);
+                            }}
                           >
                             <Calendar className="h-4 w-4 mr-1" />
                             Generate Roster

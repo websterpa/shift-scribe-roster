@@ -5,13 +5,15 @@ import { toast } from "@/hooks/use-toast";
 import { StaffMember } from "@/types/roster";
 
 export function useStaffData() {
+  console.log('🔄 useStaffData hook initialized');
+  
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStaffList = async () => {
     try {
-      console.log('Fetching staff list...');
+      console.log('📥 useStaffData: Fetching staff list...');
       setError(null);
       const { data, error } = await supabase
         .from("staff_profiles")
@@ -19,28 +21,36 @@ export function useStaffData() {
         .eq("is_active", true);
 
       if (error) {
-        console.error('Error fetching staff:', error);
+        console.error('❌ useStaffData: Error fetching staff:', error);
         setError(error.message);
         toast({ title: "Error fetching staff", description: error.message, variant: "destructive" });
         return;
       }
 
-      console.log('Staff data:', data);
+      console.log('📊 useStaffData: Raw staff data from database:', data?.length || 0, 'records');
 
       const enriched = await Promise.all(
         data?.map(async (s) => {
+          console.log('👤 Processing staff member:', s.first_name, s.last_name);
+          
           // Count monthly leave requests for this staff member
-          const { data: leaveData } = await supabase
+          const { data: leaveData, error: leaveError } = await supabase
             .from("leave_requests")
             .select("start_date, leave_type")
             .eq("staff_id", s.id)
             .eq("status", "approved");
+
+          if (leaveError) {
+            console.warn('⚠️ Error fetching leave data for staff:', s.id, leaveError);
+          }
 
           const monthlyCounts: Record<string, number> = {};
           leaveData?.forEach((lr: any) => {
             const monthKey = lr.start_date.slice(0, 7); // "YYYY-MM"
             monthlyCounts[monthKey] = (monthlyCounts[monthKey] || 0) + 1;
           });
+
+          console.log('📊 Leave counts for', s.first_name, ':', monthlyCounts);
 
           return { 
             id: s.id,
@@ -67,9 +77,10 @@ export function useStaffData() {
         }) || []
       );
 
+      console.log('✅ useStaffData: Processed staff list:', enriched.length, 'members');
       setStaffList(enriched);
     } catch (error) {
-      console.error('Error in fetchStaffList:', error);
+      console.error('❌ useStaffData: Exception in fetchStaffList:', error);
       const errorMessage = "Failed to load staff data";
       setError(errorMessage);
       toast({ title: "Error loading staff", variant: "destructive" });
@@ -79,6 +90,7 @@ export function useStaffData() {
   };
 
   useEffect(() => {
+    console.log('🔄 useStaffData: useEffect triggered');
     fetchStaffList();
   }, []);
 
