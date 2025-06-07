@@ -1,17 +1,11 @@
 
 import React from "react";
-
-interface StaffOption {
-  id: string;
-  first_name: string;
-  last_name: string;
-  leave_taken_monthly: Record<string, number>;
-}
+import { StaffMember } from "@/types/roster";
 
 interface LeaveSummaryProps {
   startDate: string;
   endDate: string;
-  selectedStaffData?: StaffOption;
+  selectedStaffData?: StaffMember;
   calculateDaysBetween: (start: string, end: string) => number;
 }
 
@@ -30,7 +24,7 @@ export function LeaveSummary({
       </p>
       {selectedStaffData && (
         <p className="text-sm text-gray-600">
-          Current month leave taken: {selectedStaffData.leave_taken_monthly[new Date().toISOString().slice(0, 7)] || 0} days
+          Current month leave taken: {selectedStaffData.leave_taken_monthly?.[new Date().toISOString().slice(0, 7)] || 0} days
         </p>
       )}
     </div>
