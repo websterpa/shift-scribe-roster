@@ -5,9 +5,69 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, Calendar } from 'lucide-react';
+import { LoadingState } from '@/components/ui/loading-state';
+import { Settings, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
+import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 
 const GenerateRoster = () => {
+  console.log('🔄 GenerateRoster component rendered');
+  
+  const {
+    configs,
+    selectedConfigId,
+    selectedConfig,
+    rosterName,
+    staffList,
+    isGenerating,
+    isLoading,
+    generatedVersionId,
+    errors,
+    setSelectedConfigId,
+    setRosterName,
+    handleGenerateRoster,
+    refreshData
+  } = useRosterGeneration(null);
+
+  console.log('📊 GenerateRoster state:', {
+    configsCount: configs.length,
+    selectedConfigId,
+    selectedConfig: selectedConfig?.config_name,
+    rosterName,
+    staffCount: staffList.length,
+    isGenerating,
+    isLoading,
+    generatedVersionId,
+    errors
+  });
+
+  const handleButtonClick = async () => {
+    console.log('🚀 Generate Roster button clicked!');
+    console.log('🛠️ GenerateRoster click, config:', selectedConfig, 'versionName:', rosterName);
+    console.log('📋 Staff list:', staffList.length, 'members');
+    
+    if (!selectedConfig) {
+      console.warn('⚠️ No config selected');
+      return;
+    }
+    
+    if (!rosterName.trim()) {
+      console.warn('⚠️ No roster name provided');
+      return;
+    }
+    
+    try {
+      console.log('📞 Calling handleGenerateRoster...');
+      await handleGenerateRoster();
+      console.log('✅ handleGenerateRoster completed successfully');
+    } catch (error) {
+      console.error('❌ Error in handleButtonClick:', error);
+    }
+  };
+
+  if (isLoading) {
+    return <LoadingState message="Loading roster configuration data..." />;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -16,6 +76,21 @@ const GenerateRoster = () => {
           Create optimized shift schedules based on your configuration and staff availability.
         </p>
       </div>
+      
+      {/* Debug Information */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardHeader>
+          <CardTitle className="text-blue-800 text-sm">Debug Information</CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-blue-700">
+          <div>Configs loaded: {configs.length}</div>
+          <div>Staff members: {staffList.length}</div>
+          <div>Selected config: {selectedConfig?.config_name || 'None'}</div>
+          <div>Roster name: {rosterName || 'Empty'}</div>
+          <div>Is generating: {isGenerating.toString()}</div>
+          {generatedVersionId && <div>Generated version ID: {generatedVersionId}</div>}
+        </CardContent>
+      </Card>
       
       <Card>
         <CardHeader>
@@ -27,17 +102,35 @@ const GenerateRoster = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="config">Select Configuration:</Label>
-            <Select>
+            <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a configuration..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">Default Configuration</SelectItem>
+                {configs.length === 0 ? (
+                  <SelectItem value="no-configs" disabled>
+                    No configurations available
+                  </SelectItem>
+                ) : (
+                  configs.map((config) => (
+                    <SelectItem key={config.id} value={config.id}>
+                      {config.config_name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
-            <p className="text-sm text-gray-500">
-              No configurations found. Create one in Roster Config first.
-            </p>
+            {configs.length === 0 && (
+              <p className="text-sm text-gray-500">
+                No configurations found. Create one in Roster Config first.
+              </p>
+            )}
+            {errors.configs && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {errors.configs}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -48,15 +141,82 @@ const GenerateRoster = () => {
               id="rosterName"
               type="text"
               placeholder="e.g. June 2025 Month 1"
+              value={rosterName}
+              onChange={(e) => setRosterName(e.target.value)}
               required
             />
             <p className="text-xs text-gray-500">This name will be saved with your roster version</p>
+            {errors.name && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {errors.name}
+              </p>
+            )}
           </div>
 
-          <Button className="w-full">
-            <Calendar className="h-4 w-4 mr-2" />
-            Generate Roster
+          {staffList.length === 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+              <p className="text-sm text-yellow-800 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                No staff members found. Add staff members first.
+              </p>
+            </div>
+          )}
+
+          {errors.staff && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {errors.staff}
+              </p>
+            </div>
+          )}
+
+          {errors.general && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {errors.general}
+              </p>
+            </div>
+          )}
+
+          {generatedVersionId && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+              <p className="text-sm text-green-800 flex items-center gap-1">
+                <CheckCircle className="h-4 w-4" />
+                Roster generated successfully! Version ID: {generatedVersionId}
+              </p>
+            </div>
+          )}
+
+          <Button 
+            className="w-full" 
+            onClick={handleButtonClick}
+            disabled={isGenerating || !selectedConfig || !rosterName.trim() || staffList.length === 0}
+            type="button"
+          >
+            {isGenerating ? (
+              <>
+                <LoadingState size="sm" spinnerOnly className="mr-2" />
+                Generating Roster...
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4 mr-2" />
+                Generate Roster
+              </>
+            )}
           </Button>
+
+          {(isGenerating || !selectedConfig || !rosterName.trim() || staffList.length === 0) && (
+            <div className="text-xs text-gray-500">
+              {isGenerating && "Please wait while the roster is being generated..."}
+              {!isGenerating && !selectedConfig && "Please select a configuration first."}
+              {!isGenerating && selectedConfig && !rosterName.trim() && "Please enter a roster name."}
+              {!isGenerating && selectedConfig && rosterName.trim() && staffList.length === 0 && "No staff members available for roster generation."}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

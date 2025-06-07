@@ -24,21 +24,34 @@ export async function generateAndSaveRoster(
   versionName?: string
 ) {
   try {
+    console.log('🚀 generateAndSaveRoster started');
+    console.log('📊 Input parameters:', { 
+      staffCount: staffList.length, 
+      config, 
+      versionName 
+    });
+    
     logger.info('Starting roster generation...', { staffCount: staffList.length, config, versionName });
 
     // Enhanced validation
     if (!staffList || staffList.length === 0) {
-      throw new Error('No staff members provided for roster generation');
+      const error = 'No staff members provided for roster generation';
+      console.error('❌ Validation failed:', error);
+      throw new Error(error);
     }
 
     if (!config || !config.id) {
-      throw new Error('Invalid configuration provided for roster generation');
+      const error = 'Invalid configuration provided for roster generation';
+      console.error('❌ Validation failed:', error);
+      throw new Error(error);
     }
 
     // Validate minimum staff requirements
     const minStaffRequired = calculateMinimumStaffRequired(config);
     if (staffList.length < minStaffRequired) {
-      throw new Error(`Insufficient staff: need at least ${minStaffRequired} staff members, but only ${staffList.length} available`);
+      const error = `Insufficient staff: need at least ${minStaffRequired} staff members, but only ${staffList.length} available`;
+      console.error('❌ Validation failed:', error);
+      throw new Error(error);
     }
 
     // Validate shift eligibility
@@ -46,12 +59,16 @@ export async function generateAndSaveRoster(
       staff.eligible_shifts && staff.eligible_shifts.length > 0
     );
     if (eligibleStaff.length === 0) {
-      throw new Error('No staff members have eligible shifts configured');
+      const error = 'No staff members have eligible shifts configured';
+      console.error('❌ Validation failed:', error);
+      throw new Error(error);
     }
 
+    console.log('✅ Validation passed', { eligibleStaff: eligibleStaff.length, minRequired: minStaffRequired });
     logger.info('Validation passed', { eligibleStaff: eligibleStaff.length, minRequired: minStaffRequired });
 
     // 1. Build cycle assignments with enhanced logic
+    console.log('📋 Building roster cycle...');
     const cycle = buildRosterCycle(
       staffList,
       config.cycle_length_weeks,
@@ -60,40 +77,57 @@ export async function generateAndSaveRoster(
       config.handshake_minutes
     );
 
+    console.log('✅ Cycle assignments built successfully');
     logger.info('Cycle assignments built successfully');
 
     // 2. Fetch approved leave requests with better error handling
+    console.log('📅 Fetching leave requests...');
     const leaveMap = await fetchLeaveRequests();
+    console.log('✅ Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
     logger.info('Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
 
     // 3. Fetch past weeks for rolling average
+    console.log('📈 Preparing past weeks data...');
     const pastWeeksMap = await fetchPastWeeks(staffList, config.cycle_length_weeks);
+    console.log('✅ Past weeks data prepared');
     logger.info('Past weeks data prepared');
 
     // 4. Create roster version with proper parameter passing
+    console.log('📄 Creating roster version...');
+    console.log('Calling supabase for roster version creation...');
     const versionId = await createRosterVersion(
       config.id, 
       versionName || `Generated ${new Date().toLocaleDateString()}`, 
       config.start_date, 
       config.cycle_length_weeks
     );
+    console.log('✅ Created roster version:', versionId);
     logger.info('Created roster version:', versionId);
 
     // 5. Generate assignments with improved logic
+    console.log('⚙️ Generating assignments...');
     const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
     
     if (!assignments || assignments.length === 0) {
-      throw new Error('Failed to generate any assignments');
+      const error = 'Failed to generate any assignments';
+      console.error('❌ Assignment generation failed:', error);
+      throw new Error(error);
     }
     
+    console.log('✅ Generated assignments', { count: assignments.length });
     logger.info('Generated assignments', { count: assignments.length });
 
     // 6. Save assignments to database with validation
+    console.log('💾 Saving assignments to database...');
+    console.log('Calling supabase.from("roster_assignments").insert...');
     await saveAssignments(assignments, versionId);
+    console.log('✅ Successfully saved roster assignments', { count: assignments.length, versionId });
     logger.info('Successfully saved roster assignments', { count: assignments.length, versionId });
 
+    console.log('🎉 generateAndSaveRoster completed successfully, returning version ID:', versionId);
     return versionId;
   } catch (error: any) {
+    console.error('❌ generateAndSaveRoster error:', error);
     logger.error(new Error('Failed to generate and save roster'), { error });
     throw new Error(`Roster generation failed: ${error.message}`);
   }
@@ -121,18 +155,21 @@ function calculateMinimumStaffRequired(config: {
  */
 async function fetchLeaveRequests(): Promise<Record<string, { date: string; type: string }[]>> {
   try {
+    console.log('Calling supabase.from("leave_requests").select...');
     const { data: leaves, error } = await supabase
       .from("leave_requests")
       .select("staff_id, start_date, end_date, leave_type")
       .eq("status", "approved");
       
     if (error) {
+      console.error('❌ Error fetching leave requests:', error);
       logger.error(new Error('Failed to fetch leave requests'), { error });
       logger.warn('Continuing roster generation without leave data');
       return {};
     }
 
     if (!leaves || leaves.length === 0) {
+      console.log('ℹ️ No approved leave requests found');
       logger.info('No approved leave requests found');
       return {};
     }
@@ -169,12 +206,17 @@ async function fetchLeaveRequests(): Promise<Record<string, { date: string; type
       }
     });
 
+    console.log('✅ Successfully processed leave requests', { 
+      totalRequests: leaves.length, 
+      staffAffected: Object.keys(leaveMap).length 
+    });
     logger.info('Successfully processed leave requests', { 
       totalRequests: leaves.length, 
       staffAffected: Object.keys(leaveMap).length 
     });
     return leaveMap;
   } catch (error: any) {
+    console.error('❌ Error fetching leave requests:', error);
     logger.error(new Error('Error fetching leave requests'), { error });
     return {};
   }
@@ -216,6 +258,7 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
       throw new Error('Version ID is required to save assignments');
     }
 
+    console.log('📊 Preparing to save assignments', { count: assignments.length, versionId });
     logger.info('Preparing to save assignments', { count: assignments.length, versionId });
 
     // Validate and prepare assignments
@@ -242,6 +285,7 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
       throw new Error('No valid assignments to save after filtering');
     }
 
+    console.log('📊 Saving valid assignments', { validCount: validAssignments.length });
     logger.info('Saving valid assignments', { validCount: validAssignments.length });
 
     // Save in batches to avoid potential query size limits
@@ -249,20 +293,25 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
     for (let i = 0; i < validAssignments.length; i += batchSize) {
       const batch = validAssignments.slice(i, i + batchSize);
       
+      console.log(`💾 Inserting batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
       const { error } = await supabase
         .from("roster_assignments")
         .insert(batch);
         
       if (error) {
+        console.error(`❌ Error inserting assignment batch ${i / batchSize + 1}:`, error);
         logger.error(new Error(`Error inserting assignment batch ${i / batchSize + 1}`), { error });
         throw error;
       }
       
+      console.log(`✅ Saved batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
       logger.info(`Saved batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
     }
 
+    console.log('🎉 Successfully saved all assignments to database');
     logger.info('Successfully saved all assignments to database');
   } catch (error: any) {
+    console.error('❌ Error in saveAssignments:', error);
     logger.error(new Error('Error in saveAssignments'), { error });
     throw new Error(`Failed to save assignments: ${error.message}`);
   }
