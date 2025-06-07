@@ -14,10 +14,12 @@ interface StaffOption {
 export function useStaffData() {
   const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchStaffList = async () => {
     try {
       console.log('Fetching staff list...');
+      setError(null);
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("id, first_name, last_name, leave_allowance_days")
@@ -25,6 +27,7 @@ export function useStaffData() {
 
       if (error) {
         console.error('Error fetching staff:', error);
+        setError(error.message);
         toast({ title: "Error fetching staff", description: error.message, variant: "destructive" });
         return;
       }
@@ -57,6 +60,8 @@ export function useStaffData() {
       setStaffList(enriched);
     } catch (error) {
       console.error('Error in fetchStaffList:', error);
+      const errorMessage = "Failed to load staff data";
+      setError(errorMessage);
       toast({ title: "Error loading staff", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -67,5 +72,10 @@ export function useStaffData() {
     fetchStaffList();
   }, []);
 
-  return { staffList, loading, refetchStaffList: fetchStaffList };
+  return { 
+    staffMembers: staffList, 
+    loading, 
+    error, 
+    refreshStaff: fetchStaffList 
+  };
 }
