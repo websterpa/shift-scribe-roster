@@ -10,6 +10,12 @@ export interface ConfigData {
   operational_hours_per_day: number;
   handshake_minutes: number;
   start_date: string;
+  staffing_requirements?: {
+    day_shift_staff?: number;
+    night_shift_staff?: number;
+    early_shift_staff?: number;
+    late_shift_staff?: number;
+  };
 }
 
 export async function saveConfig({
@@ -18,14 +24,16 @@ export async function saveConfig({
   shift_type,
   operational_hours_per_day,
   handshake_minutes,
-  start_date
+  start_date,
+  staffing_requirements
 }: ConfigData) {
   console.log('💾 ConfigHelpers: Saving configuration:', { 
     configName, 
     cycle_length_weeks, 
     shift_type,
     operational_hours_per_day,
-    handshake_minutes
+    handshake_minutes,
+    staffing_requirements
   });
   
   // Ensure handshake_minutes is a valid value
@@ -44,7 +52,13 @@ export async function saveConfig({
         shift_type,
         operational_hours_per_day,
         handshake_minutes: validHandshake,
-        start_date
+        start_date,
+        staffing_requirements: staffing_requirements || {
+          day_shift_staff: 2,
+          night_shift_staff: 2,
+          early_shift_staff: 1,
+          late_shift_staff: 1
+        }
       })
       .select("id")
       .single();
@@ -170,7 +184,13 @@ export async function ensureDefaultConfig() {
         shift_type: "8h" as "8h" | "12h",
         operational_hours_per_day: 24,
         handshake_minutes: 15, // Valid handshake value
-        start_date: getNextMonday()
+        start_date: getNextMonday(),
+        staffing_requirements: {
+          day_shift_staff: 2,
+          night_shift_staff: 2,
+          early_shift_staff: 1,
+          late_shift_staff: 1
+        }
       };
       
       const configId = await saveConfig(defaultConfig);

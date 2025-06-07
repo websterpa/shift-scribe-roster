@@ -272,6 +272,7 @@ export type Database = {
           id: string
           operational_hours_per_day: number
           shift_type: string
+          staffing_requirements: Json | null
           start_date: string
         }
         Insert: {
@@ -282,6 +283,7 @@ export type Database = {
           id?: string
           operational_hours_per_day: number
           shift_type: string
+          staffing_requirements?: Json | null
           start_date: string
         }
         Update: {
@@ -292,6 +294,7 @@ export type Database = {
           id?: string
           operational_hours_per_day?: number
           shift_type?: string
+          staffing_requirements?: Json | null
           start_date?: string
         }
         Relationships: []
