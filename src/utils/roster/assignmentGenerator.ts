@@ -34,10 +34,24 @@ export function generateAssignments(
   // Track last shift end for daily rest compliance
   const lastShiftEnd: Record<string, Date> = {};
   
+  // Track weekly hours per staff member for minimum hours enforcement
+  const weeklyHoursTracker: Record<string, Record<number, number>> = {};
+  
   // Calculate shift details based on configuration
   const shiftDetails = calculateShiftDetails(config);
   logger.info('Calculated shift details:', shiftDetails);
   
+  // Initialize weekly hours tracker
+  staffList.forEach(staff => {
+    if (staff?.id) {
+      weeklyHoursTracker[staff.id] = {};
+      for (let w = 0; w < config.cycle_length_weeks; w++) {
+        weeklyHoursTracker[staff.id][w] = 0;
+      }
+    }
+  });
+  
+  // First pass: Generate initial assignments following cycle pattern
   for (let w = 0; w < config.cycle_length_weeks; w++) {
     for (let d = 0; d < 7; d++) {
       const dateObj = new Date(config.start_date);
@@ -96,6 +110,8 @@ export function generateAssignments(
             shiftInfo.shiftEnd = null;
           } else {
             console.log(`✅ ${staff.first_name} ${staff.last_name} assigned to ${code} shift: ${shiftInfo.hours}h`);
+            // Track weekly hours
+            weeklyHoursTracker[staff.id][w] += shiftInfo.hours;
           }
         }
 
@@ -116,6 +132,30 @@ export function generateAssignments(
     }
   }
 
+  // Second pass: Enforce minimum contracted hours
+  console.log('🔄 Second pass: Enforcing minimum contracted hours...');
+  
+  staffList.forEach(staff => {
+    if (!staff?.id || !staff.min_hours_per_week) return;
+    
+    const minWeeklyHours = staff.min_hours_per_week;
+    console.log(`📊 Checking minimum hours for ${staff.first_name} ${staff.last_name}: requires ${minWeeklyHours}h/week`);
+    
+    for (let w = 0; w < config.cycle_length_weeks; w++) {
+      const actualHours = weeklyHoursTracker[staff.id][w];
+      const shortfall = minWeeklyHours - actualHours;
+      
+      if (shortfall > 0) {
+        console.log(`⚠️ ${staff.first_name} ${staff.last_name} week ${w + 1}: ${actualHours}h scheduled vs ${minWeeklyHours}h required (shortfall: ${shortfall}h)`);
+        
+        // Try to add more shifts to meet minimum hours
+        addShiftsToMeetMinimum(assignments, staff, w, shortfall, config, shiftDetails, lastShiftEnd);
+      } else {
+        console.log(`✅ ${staff.first_name} ${staff.last_name} week ${w + 1}: ${actualHours}h meets minimum ${minWeeklyHours}h`);
+      }
+    }
+  });
+
   logger.info('Assignment generation completed', { totalAssignments: assignments.length });
   
   // Log summary of assignments by shift type
@@ -126,7 +166,133 @@ export function generateAssignments(
   
   console.log('📊 Assignment summary by shift type:', shiftSummary);
   
+  // Log minimum hours compliance summary
+  console.log('📋 Minimum hours compliance summary:');
+  staffList.forEach(staff => {
+    if (!staff?.id || !staff.min_hours_per_week) return;
+    
+    for (let w = 0; w < config.cycle_length_weeks; w++) {
+      const weekAssignments = assignments.filter(a => 
+        a.staff_id === staff.id && 
+        new Date(a.date) >= getWeekStart(config.start_date, w) &&
+        new Date(a.date) <= getWeekEnd(config.start_date, w)
+      );
+      const weekHours = weekAssignments.reduce((sum, a) => sum + (a.hours || 0), 0);
+      const compliance = weekHours >= staff.min_hours_per_week ? '✅' : '❌';
+      console.log(`${compliance} ${staff.first_name} ${staff.last_name} Week ${w + 1}: ${weekHours}h/${staff.min_hours_per_week}h`);
+    }
+  });
+  
   return assignments;
+}
+
+/**
+ * Add additional shifts to meet minimum contracted hours
+ */
+function addShiftsToMeetMinimum(
+  assignments: Assignment[],
+  staff: StaffMember,
+  weekNumber: number,
+  shortfallHours: number,
+  config: any,
+  shiftDetails: any,
+  lastShiftEnd: Record<string, Date>
+): void {
+  console.log(`🔧 Attempting to add shifts for ${staff.first_name} ${staff.last_name} to cover ${shortfallHours}h shortfall`);
+  
+  const weekStart = getWeekStart(config.start_date, weekNumber);
+  const weekEnd = getWeekEnd(config.start_date, weekNumber);
+  
+  // Find rest days in this week that could be converted to working days
+  const weekAssignments = assignments.filter(a => 
+    a.staff_id === staff.id && 
+    new Date(a.date) >= weekStart && 
+    new Date(a.date) <= weekEnd &&
+    a.shift_code === 'R'
+  );
+  
+  console.log(`📅 Found ${weekAssignments.length} rest days that could potentially be converted to shifts`);
+  
+  // Sort by date to maintain chronological order
+  weekAssignments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  let remainingShortfall = shortfallHours;
+  
+  for (const assignment of weekAssignments) {
+    if (remainingShortfall <= 0) break;
+    
+    // Determine best shift type based on eligible shifts and operational needs
+    const eligibleShifts = staff.eligible_shifts || [];
+    let bestShiftCode = 'D'; // Default to day shift
+    
+    if (config.shift_type === '12h') {
+      if (eligibleShifts.includes('Day') || eligibleShifts.includes('D')) {
+        bestShiftCode = 'D';
+      } else if (eligibleShifts.includes('Night') || eligibleShifts.includes('N')) {
+        bestShiftCode = 'N';
+      }
+    } else {
+      // 8h shifts - prefer early shift for minimum hours compliance
+      if (eligibleShifts.includes('Early') || eligibleShifts.includes('E')) {
+        bestShiftCode = 'E';
+      } else if (eligibleShifts.includes('Late') || eligibleShifts.includes('L')) {
+        bestShiftCode = 'L';
+      } else if (eligibleShifts.includes('Night') || eligibleShifts.includes('N')) {
+        bestShiftCode = 'N';
+      }
+    }
+    
+    const shiftInfo = calculateShiftInfo(bestShiftCode, config, shiftDetails, new Date(assignment.date));
+    
+    // Check daily rest compliance
+    if (shiftInfo.shiftStart) {
+      const prevEnd = lastShiftEnd[staff.id];
+      const shiftStart = new Date(shiftInfo.shiftStart);
+      
+      if (prevEnd && !hasDailyRest(prevEnd, shiftStart)) {
+        console.log(`⏰ Cannot add shift on ${assignment.date} - insufficient rest period`);
+        continue;
+      }
+    }
+    
+    // Update assignment
+    assignment.shift_code = bestShiftCode;
+    assignment.shift_start = shiftInfo.shiftStart;
+    assignment.shift_end = shiftInfo.shiftEnd;
+    assignment.hours = shiftInfo.hours;
+    assignment.cost = calculateCost(staff, shiftInfo.hours, new Date(assignment.date), bestShiftCode);
+    
+    // Update tracking
+    if (shiftInfo.shiftEnd) {
+      lastShiftEnd[staff.id] = new Date(shiftInfo.shiftEnd);
+    }
+    
+    remainingShortfall -= shiftInfo.hours;
+    
+    console.log(`✅ Added ${bestShiftCode} shift on ${assignment.date} (${shiftInfo.hours}h) - remaining shortfall: ${remainingShortfall}h`);
+  }
+  
+  if (remainingShortfall > 0) {
+    console.log(`⚠️ Could not fully meet minimum hours for ${staff.first_name} ${staff.last_name} - remaining shortfall: ${remainingShortfall}h`);
+  }
+}
+
+/**
+ * Get the start of a specific week in the cycle
+ */
+function getWeekStart(startDate: string, weekNumber: number): Date {
+  const date = new Date(startDate);
+  date.setDate(date.getDate() + weekNumber * 7);
+  return date;
+}
+
+/**
+ * Get the end of a specific week in the cycle
+ */
+function getWeekEnd(startDate: string, weekNumber: number): Date {
+  const date = getWeekStart(startDate, weekNumber);
+  date.setDate(date.getDate() + 6);
+  return date;
 }
 
 /**
