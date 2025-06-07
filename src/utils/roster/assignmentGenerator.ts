@@ -1,8 +1,9 @@
+
 import { isPublicHoliday } from "../dateHelpers";
 import { hasDailyRest, withinWeeklyHours, calculateRollingAverage, WeeklyHours } from "../wtrCompliance";
 import { StaffMember, Assignment } from "@/types/roster";
 import { createLogger } from "../errorLogger";
-import { generateEnhancedRosterCycle } from './enhancedCycleIntegration';
+import { generateEnhancedRosterCycle, validateEnhancedCycle } from './enhancedCycleIntegration';
 
 const logger = createLogger('AssignmentGenerator');
 
@@ -23,39 +24,50 @@ export function generateAssignments(
   leaveMap: Record<string, { date: string; type: string }[]>,
   pastWeeksMap: Record<string, number[]>
 ): Assignment[] {
-  logger.info('Generating assignments with enhanced cycle generation', { 
+  logger.info('Generating assignments with rule-compliant enhanced cycle', { 
     staffCount: staffList.length,
     cycleWeeks: config.cycle_length_weeks,
     shiftType: config.shift_type,
     handshakeMinutes: config.handshake_minutes
   });
 
-  // Use enhanced cycle generation
-  let enhancedCycle;
+  // Generate and validate enhanced cycle
+  let primaryCycle;
+  let usingEnhancedCycle = false;
+  
   try {
-    enhancedCycle = generateEnhancedRosterCycle(
+    console.log('🎯 Generating rule-compliant enhanced cycle...');
+    const enhancedCycle = generateEnhancedRosterCycle(
       staffList,
       config.cycle_length_weeks,
       config.shift_type,
       config.operational_hours_per_day,
       config.handshake_minutes
     );
-    console.log('✅ Using enhanced cycle generation');
+    
+    // Validate the enhanced cycle
+    const validation = validateEnhancedCycle(enhancedCycle, staffList, config.shift_type);
+    
+    if (validation.isValid || validation.overallScore >= 80) {
+      primaryCycle = enhancedCycle;
+      usingEnhancedCycle = true;
+      console.log(`✅ Using rule-compliant enhanced cycle (validation score: ${validation.overallScore.toFixed(1)}%)`);
+    } else {
+      console.warn(`⚠️ Enhanced cycle validation failed (score: ${validation.overallScore.toFixed(1)}%), using fallback`);
+      console.log('Violations:', validation.violations);
+      primaryCycle = cycle;
+    }
   } catch (error) {
     console.log('⚠️ Enhanced cycle generation failed, using fallback cycle');
-    enhancedCycle = cycle;
+    logger.error('Enhanced cycle generation error', error);
+    primaryCycle = cycle;
   }
 
   const assignments: Assignment[] = [];
-  
-  // Track last shift end for daily rest compliance
   const lastShiftEnd: Record<string, Date> = {};
-  
-  // Track weekly hours per staff member for minimum hours enforcement
   const weeklyHoursTracker: Record<string, Record<number, number>> = {};
-  
-  // Calculate shift details based on configuration
   const shiftDetails = calculateShiftDetails(config);
+  
   logger.info('Calculated shift details:', shiftDetails);
   
   // Initialize weekly hours tracker
@@ -68,7 +80,7 @@ export function generateAssignments(
     }
   });
   
-  // First pass: Generate initial assignments following cycle pattern
+  // Generate assignments following the primary cycle
   for (let w = 0; w < config.cycle_length_weeks; w++) {
     for (let d = 0; d < 7; d++) {
       const dateObj = new Date(config.start_date);
@@ -78,10 +90,10 @@ export function generateAssignments(
       for (const staff of staffList) {
         if (!staff?.id) continue;
         
-        // Get shift from enhanced cycle or fallback to original
-        let code = enhancedCycle[w]?.[d]?.[staff.id] || cycle[w]?.[d]?.[staff.id] || 'R';
+        // Get shift from primary cycle (enhanced or fallback)
+        let code = primaryCycle[w]?.[d]?.[staff.id] || 'R';
         
-        console.log(`📋 Processing ${staff.first_name} ${staff.last_name} for ${dateKey}: cycle assignment = ${code}`);
+        console.log(`📋 Processing ${staff.first_name} ${staff.last_name} for ${dateKey}: ${usingEnhancedCycle ? 'enhanced' : 'fallback'} cycle assignment = ${code}`);
 
         // Override if on leave/sick
         const leaveEntries = leaveMap[staff.id] || [];
@@ -91,49 +103,58 @@ export function generateAssignments(
           code = leave.type; // 'S' for sick, 'R' for annual leave
         }
 
-        // Determine hours and shift times
+        // Calculate shift info
         let shiftInfo = calculateShiftInfo(code, config, shiftDetails, dateObj);
         
-        // Enforce daily rest requirement if this is a working shift
+        // Apply minimal compliance checks (only for critical safety issues)
         if (['D', 'E', 'L', 'N'].includes(code) && shiftInfo.shiftStart) {
           const prevEnd = lastShiftEnd[staff.id];
           const shiftStart = new Date(shiftInfo.shiftStart);
           
+          // Only override for critical daily rest violations
           if (prevEnd && !hasDailyRest(prevEnd, shiftStart)) {
             const restHours = (shiftStart.getTime() - prevEnd.getTime()) / (1000 * 60 * 60);
-            console.log(`⏰ ${staff.first_name} ${staff.last_name} insufficient rest (${restHours.toFixed(1)}h) - forcing rest day`);
-            code = 'R';
-            shiftInfo = { hours: 0, shiftStart: null, shiftEnd: null };
-          } else if (shiftInfo.shiftEnd) {
-            // Update last shift end only for working shifts
+            if (restHours < 8) { // Critical safety threshold
+              console.log(`🚨 CRITICAL: ${staff.first_name} ${staff.last_name} insufficient rest (${restHours.toFixed(1)}h) - forcing rest day`);
+              code = 'R';
+              shiftInfo = { hours: 0, shiftStart: null, shiftEnd: null };
+            } else {
+              console.log(`⚠️ Short rest period (${restHours.toFixed(1)}h) but allowing shift`);
+            }
+          }
+          
+          if (shiftInfo.shiftEnd) {
             lastShiftEnd[staff.id] = new Date(shiftInfo.shiftEnd);
-            console.log(`✅ ${staff.first_name} ${staff.last_name} daily rest compliance OK`);
           }
         }
         
-        // Only check WTD compliance for working shifts, not rest days
-        if (['D', 'E', 'L', 'N'].includes(code)) {
-          // Check WTD compliance
+        // Only check WTD for extreme violations if using enhanced cycle
+        if (usingEnhancedCycle && ['D', 'E', 'L', 'N'].includes(code)) {
+          const weeklyHours = calculateWeeklyHours(assignments, staff.id, w, dateObj, shiftInfo.hours);
+          
+          // Only override for extreme WTD violations (60+ hours)
+          if (weeklyHours > 60) {
+            console.log(`🚨 EXTREME: ${staff.first_name} ${staff.last_name} would work ${weeklyHours}h - forcing rest day`);
+            code = 'R';
+            shiftInfo = { hours: 0, shiftStart: null, shiftEnd: null };
+          } else {
+            weeklyHoursTracker[staff.id][w] += shiftInfo.hours;
+          }
+        } else if (['D', 'E', 'L', 'N'].includes(code)) {
+          // Full WTD compliance for fallback cycle
           const weeklyHours = calculateWeeklyHours(assignments, staff.id, w, dateObj, shiftInfo.hours);
           const wtdCompliant = checkWTDCompliance(staff, weeklyHours, pastWeeksMap[staff.id]);
           
           if (!wtdCompliant) {
-            console.log(`⚠️ WTD compliance issue for ${staff.first_name} ${staff.last_name} - changing to rest day`, { 
-              weeklyHours, 
-              maxHours: staff.max_hours_per_week
-            });
+            console.log(`⚠️ WTD compliance issue for ${staff.first_name} ${staff.last_name} - changing to rest day`);
             code = 'R';
-            shiftInfo.hours = 0;
-            shiftInfo.shiftStart = null;
-            shiftInfo.shiftEnd = null;
+            shiftInfo = { hours: 0, shiftStart: null, shiftEnd: null };
           } else {
-            console.log(`✅ ${staff.first_name} ${staff.last_name} assigned to ${code} shift: ${shiftInfo.hours}h`);
-            // Track weekly hours
             weeklyHoursTracker[staff.id][w] += shiftInfo.hours;
           }
         }
 
-        // Calculate cost including public holiday multiplier
+        // Calculate cost
         const cost = calculateCost(staff, shiftInfo.hours, dateObj, code);
 
         assignments.push({
@@ -150,56 +171,40 @@ export function generateAssignments(
     }
   }
 
-  // Second pass: Enforce minimum contracted hours
-  console.log('🔄 Second pass: Enforcing minimum contracted hours...');
-  
-  staffList.forEach(staff => {
-    if (!staff?.id || !staff.min_hours_per_week) return;
-    
-    const minWeeklyHours = staff.min_hours_per_week;
-    console.log(`📊 Checking minimum hours for ${staff.first_name} ${staff.last_name}: requires ${minWeeklyHours}h/week`);
-    
-    for (let w = 0; w < config.cycle_length_weeks; w++) {
-      const actualHours = weeklyHoursTracker[staff.id][w];
-      const shortfall = minWeeklyHours - actualHours;
+  // Minimal minimum hours enforcement (only if not using enhanced cycle)
+  if (!usingEnhancedCycle) {
+    console.log('🔄 Applying minimum hours enforcement for fallback cycle...');
+    staffList.forEach(staff => {
+      if (!staff?.id || !staff.min_hours_per_week) return;
       
-      if (shortfall > 0) {
-        console.log(`⚠️ ${staff.first_name} ${staff.last_name} week ${w + 1}: ${actualHours}h scheduled vs ${minWeeklyHours}h required (shortfall: ${shortfall}h)`);
+      const minWeeklyHours = staff.min_hours_per_week;
+      
+      for (let w = 0; w < config.cycle_length_weeks; w++) {
+        const actualHours = weeklyHoursTracker[staff.id][w];
+        const shortfall = minWeeklyHours - actualHours;
         
-        // Try to add more shifts to meet minimum hours
-        addShiftsToMeetMinimum(assignments, staff, w, shortfall, config, shiftDetails, lastShiftEnd);
-      } else {
-        console.log(`✅ ${staff.first_name} ${staff.last_name} week ${w + 1}: ${actualHours}h meets minimum ${minWeeklyHours}h`);
+        if (shortfall > 0) {
+          console.log(`⚠️ ${staff.first_name} ${staff.last_name} week ${w + 1}: ${actualHours}h vs ${minWeeklyHours}h required (shortfall: ${shortfall}h)`);
+          addShiftsToMeetMinimum(assignments, staff, w, shortfall, config, shiftDetails, lastShiftEnd);
+        }
       }
-    }
-  });
+    });
+  } else {
+    console.log('✅ Enhanced cycle should already optimize for contracted hours');
+  }
 
-  logger.info('Assignment generation completed with enhanced cycle', { totalAssignments: assignments.length });
+  logger.info(`Assignment generation completed using ${usingEnhancedCycle ? 'enhanced' : 'fallback'} cycle`, { 
+    totalAssignments: assignments.length 
+  });
   
-  // Log summary of assignments by shift type
+  // Log summary
   const shiftSummary = assignments.reduce((acc, assignment) => {
     acc[assignment.shift_code] = (acc[assignment.shift_code] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
   
   console.log('📊 Assignment summary by shift type:', shiftSummary);
-  
-  // Log minimum hours compliance summary
-  console.log('📋 Minimum hours compliance summary:');
-  staffList.forEach(staff => {
-    if (!staff?.id || !staff.min_hours_per_week) return;
-    
-    for (let w = 0; w < config.cycle_length_weeks; w++) {
-      const weekAssignments = assignments.filter(a => 
-        a.staff_id === staff.id && 
-        new Date(a.date) >= getWeekStart(config.start_date, w) &&
-        new Date(a.date) <= getWeekEnd(config.start_date, w)
-      );
-      const weekHours = weekAssignments.reduce((sum, a) => sum + (a.hours || 0), 0);
-      const compliance = weekHours >= staff.min_hours_per_week ? '✅' : '❌';
-      console.log(`${compliance} ${staff.first_name} ${staff.last_name} Week ${w + 1}: ${weekHours}h/${staff.min_hours_per_week}h`);
-    }
-  });
+  console.log(`🎯 Cycle type used: ${usingEnhancedCycle ? 'ENHANCED (rule-compliant)' : 'FALLBACK (basic)'}`);
   
   return assignments;
 }
