@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
@@ -122,7 +123,8 @@ const RosterViewer = () => {
 
       console.log('✅ Loaded roster data:', {
         name: rosterData.version_name,
-        assignments: rosterData.assignments.length
+        assignments: rosterData.assignments.length,
+        assignmentDetails: rosterData.assignments.slice(0, 3) // Log first 3 assignments for debugging
       });
 
       setRosterData(rosterData);
@@ -137,6 +139,12 @@ const RosterViewer = () => {
       setLoading(false);
     }
   };
+
+  console.log('🔍 RosterViewer render state:', {
+    loading,
+    hasRosterData: !!rosterData,
+    assignmentCount: rosterData?.assignments?.length || 0
+  });
 
   if (loading) {
     return <LoadingState message="Loading roster data..." />;
