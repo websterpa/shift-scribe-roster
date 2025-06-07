@@ -44,7 +44,9 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
       days_off_per_week: staff.days_off_per_week || 2,
       hourly_rate: staff.hourly_rate || 15.50,
       holiday_multiplier: staff.holiday_multiplier || 2,
-      leave_allowance_days: staff.leave_allowance_days || 28
+      leave_allowance_days: staff.leave_allowance_days || 28,
+      // Include the new is_admin field
+      is_admin: staff.is_admin || false
     })) || [];
   } catch (error) {
     logger.error(new Error('Exception in fetchStaffMembers'), { originalError: error });

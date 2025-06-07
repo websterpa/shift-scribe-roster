@@ -416,6 +416,7 @@ export type Database = {
           hourly_rate: number | null
           id: string
           is_active: boolean
+          is_admin: boolean
           is_shift_worker: boolean | null
           last_name: string
           leave_allowance_days: number | null
@@ -443,6 +444,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           is_active?: boolean
+          is_admin?: boolean
           is_shift_worker?: boolean | null
           last_name: string
           leave_allowance_days?: number | null
@@ -470,6 +472,7 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           is_active?: boolean
+          is_admin?: boolean
           is_shift_worker?: boolean | null
           last_name?: string
           leave_allowance_days?: number | null

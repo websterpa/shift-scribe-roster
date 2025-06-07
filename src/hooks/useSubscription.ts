@@ -39,7 +39,7 @@ export function useSubscription() {
       setLoading(true);
       console.log('useSubscription: Starting fetch for user:', user?.id);
       
-      // Check if user is admin using the corrected RPC function
+      // Check admin status from staff_profiles using RPC function
       console.log('useSubscription: Checking admin status with RPC...');
       
       const { data: adminResult, error: adminError } = await supabase
@@ -51,11 +51,10 @@ export function useSubscription() {
       
       if (adminError) {
         console.error('useSubscription: Admin RPC failed:', adminError);
-        // If RPC fails, admin status remains false
         adminStatus = false;
       } else {
         adminStatus = adminResult === true;
-        console.log('useSubscription: Admin status from RPC:', adminStatus);
+        console.log('useSubscription: Admin status from staff_profiles:', adminStatus);
       }
 
       setIsAdmin(adminStatus);
@@ -103,9 +102,9 @@ export function useSubscription() {
   const hasProAccess = () => {
     console.log('useSubscription: hasProAccess check - isAdmin:', isAdmin, 'subscription:', subscription);
     
-    // Admin users ALWAYS have Pro access regardless of subscription
+    // Admin users from staff_profiles ALWAYS have Pro access regardless of subscription
     if (isAdmin) {
-      console.log('useSubscription: ADMIN ACCESS GRANTED - Pro access via admin status');
+      console.log('useSubscription: ADMIN ACCESS GRANTED - Pro access via staff_profiles admin status');
       return true;
     }
 
