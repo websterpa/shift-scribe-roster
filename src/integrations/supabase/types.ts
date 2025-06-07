@@ -505,7 +505,9 @@ export type Database = {
           paypal_subscription_id: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          subscription_end_date: string | null
           subscription_method: string | null
+          subscription_start_date: string | null
           subscription_status: string
           subscription_tier: string
           updated_at: string
@@ -521,7 +523,9 @@ export type Database = {
           paypal_subscription_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          subscription_end_date?: string | null
           subscription_method?: string | null
+          subscription_start_date?: string | null
           subscription_status: string
           subscription_tier: string
           updated_at?: string
@@ -537,7 +541,9 @@ export type Database = {
           paypal_subscription_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          subscription_end_date?: string | null
           subscription_method?: string | null
+          subscription_start_date?: string | null
           subscription_status?: string
           subscription_tier?: string
           updated_at?: string
@@ -569,7 +575,7 @@ export type Database = {
     }
     Functions: {
       is_admin: {
-        Args: { user_id?: string }
+        Args: Record<PropertyKey, never> | { user_id?: string }
         Returns: boolean
       }
     }

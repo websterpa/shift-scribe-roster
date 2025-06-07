@@ -7,6 +7,12 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { createLogger } from '@/utils/errorLogger';
 
 // Import pages
+import LandingPage from '@/pages/LandingPage';
+import AuthPage from '@/pages/AuthPage';
+import PricingPage from '@/pages/PricingPage';
+import SupportPage from '@/pages/SupportPage';
+import TermsPage from '@/pages/TermsPage';
+import PrivacyPage from '@/pages/PrivacyPage';
 import Dashboard from '@/pages/Dashboard';
 import GenerateRoster from '@/pages/GenerateRoster';
 import MyConfigurations from '@/pages/MyConfigurations';
@@ -22,11 +28,6 @@ const logger = createLogger('AppRouter');
 export const AppRouter: React.FC = () => {
   const { isAuthenticated, loading } = useSupabaseAuth();
 
-  const handleAuthSuccess = () => {
-    logger.info('Authentication successful, reloading to sync state');
-    window.location.reload(); // Simple way to ensure auth state is synced
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -38,25 +39,33 @@ export const AppRouter: React.FC = () => {
     );
   }
 
-  if (!isAuthenticated) {
-    return <SupabaseAuth onAuthSuccess={handleAuthSuccess} />;
-  }
-
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<AuthenticatedLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="generate-roster" element={<GenerateRoster />} />
-          <Route path="my-configurations" element={<MyConfigurations />} />
-          <Route path="my-rosters" element={<MyRosters />} />
-          <Route path="roster-config" element={<RosterConfig />} />
-          <Route path="staff" element={<Staff />} />
-          <Route path="leave-requests" element={<LeaveRequests />} />
-          <Route path="manage-leave" element={<ManageLeave />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
+        {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/support" element={<SupportPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        
+        {/* Protected routes */}
+        {isAuthenticated ? (
+          <Route path="/*" element={<AuthenticatedLayout />}>
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="generate-roster" element={<GenerateRoster />} />
+            <Route path="my-configurations" element={<MyConfigurations />} />
+            <Route path="my-rosters" element={<MyRosters />} />
+            <Route path="roster-config" element={<RosterConfig />} />
+            <Route path="staff" element={<Staff />} />
+            <Route path="leave-requests" element={<LeaveRequests />} />
+            <Route path="manage-leave" element={<ManageLeave />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        ) : (
+          <Route path="/*" element={<AuthPage />} />
+        )}
       </Routes>
     </Router>
   );

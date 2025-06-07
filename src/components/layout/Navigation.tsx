@@ -2,12 +2,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, Crown } from 'lucide-react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const Navigation = () => {
   const location = useLocation();
   const { user, signOut } = useSupabaseAuth();
+  const { subscription, hasProAccess } = useSubscription();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -26,6 +29,12 @@ const Navigation = () => {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <h1 className="text-xl font-bold text-gray-900">CCTV Roster</h1>
+              {hasProAccess && (
+                <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-800">
+                  <Crown className="w-3 h-3 mr-1" />
+                  Pro
+                </Badge>
+              )}
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link
@@ -49,6 +58,7 @@ const Navigation = () => {
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Generate Roster
+                {!hasProAccess && <Badge variant="outline" className="ml-1 text-xs">Pro</Badge>}
               </Link>
               <Link
                 to="/staff"
@@ -104,10 +114,19 @@ const Navigation = () => {
               >
                 <Archive className="w-4 h-4 mr-2" />
                 My Rosters
+                {!hasProAccess && <Badge variant="outline" className="ml-1 text-xs">Pro</Badge>}
               </Link>
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            {!hasProAccess && (
+              <Link to="/pricing">
+                <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+              </Link>
+            )}
             <span className="text-sm text-gray-700">{user?.email}</span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
