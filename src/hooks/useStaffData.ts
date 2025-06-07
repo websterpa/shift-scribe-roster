@@ -2,17 +2,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-
-interface StaffOption {
-  id: string;
-  first_name: string;
-  last_name: string;
-  leave_allowance_days?: number;
-  leave_taken_monthly: Record<string, number>;
-}
+import { StaffMember } from "@/types/roster";
 
 export function useStaffData() {
-  const [staffList, setStaffList] = useState<StaffOption[]>([]);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +15,7 @@ export function useStaffData() {
       setError(null);
       const { data, error } = await supabase
         .from("staff_profiles")
-        .select("id, first_name, last_name, leave_allowance_days")
+        .select("*")
         .eq("is_active", true);
 
       if (error) {
@@ -50,10 +43,27 @@ export function useStaffData() {
           });
 
           return { 
-            ...s, 
+            id: s.id,
+            employee_id: s.employee_id,
+            first_name: s.first_name,
+            last_name: s.last_name,
+            email: s.email,
+            phone: s.phone,
+            hire_date: s.hire_date,
+            is_active: s.is_active,
+            role: s.role || 'CCTV Operator',
+            eligible_shifts: s.eligible_shifts || ['Early', 'Late', 'Night'],
+            is_shift_worker: s.is_shift_worker ?? true,
+            min_hours_per_week: s.min_hours_per_week || 37,
+            max_hours_per_week: s.max_hours_per_week || 48,
+            opted_out_wtd: s.opted_out_wtd || false,
+            days_off_per_week: s.days_off_per_week || 2,
+            hourly_rate: s.hourly_rate || 15.50,
+            holiday_multiplier: s.holiday_multiplier || 2,
+            leave_allowance_days: s.leave_allowance_days || 28,
             leave_taken_monthly: monthlyCounts,
-            leave_allowance_days: s.leave_allowance_days || 25 // Use database value or default
-          };
+            name: `${s.first_name} ${s.last_name}` // Computed field for backwards compatibility
+          } as StaffMember;
         }) || []
       );
 
@@ -74,8 +84,10 @@ export function useStaffData() {
 
   return { 
     staffMembers: staffList, 
+    staffList, // Keep for backwards compatibility with ManageLeave
     loading, 
     error, 
-    refreshStaff: fetchStaffList 
+    refreshStaff: fetchStaffList,
+    refetchStaffList: fetchStaffList // Keep for backwards compatibility with ManageLeave
   };
 }

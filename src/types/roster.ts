@@ -1,4 +1,3 @@
-
 export interface ConfigItem {
   id: string;
   config_name: string;
@@ -30,6 +29,7 @@ export interface StaffMember {
   hourly_rate: number;
   holiday_multiplier: number;
   leave_allowance_days: number;
+  leave_taken_monthly?: Record<string, number>; // Added for leave management
   // Computed field for backwards compatibility
   name?: string;
   preferences?: {
