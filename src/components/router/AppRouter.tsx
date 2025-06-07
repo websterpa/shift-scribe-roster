@@ -9,7 +9,6 @@ import { createLogger } from '@/utils/errorLogger';
 // Import pages
 import LandingPage from '@/pages/LandingPage';
 import AuthPage from '@/pages/AuthPage';
-import PricingPage from '@/pages/PricingPage';
 import SupportPage from '@/pages/SupportPage';
 import TermsPage from '@/pages/TermsPage';
 import PrivacyPage from '@/pages/PrivacyPage';
@@ -45,7 +44,6 @@ export const AppRouter: React.FC = () => {
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/support" element={<SupportPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />

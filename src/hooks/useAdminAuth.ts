@@ -6,7 +6,7 @@ async function checkAdminStatus(userId: string): Promise<boolean> {
   try {
     console.log('useAdminAuth: Checking admin status for user:', userId);
     
-    // First try the new get_admin_status function
+    // Try the get_admin_status function first
     const { data: adminResult, error: adminError } = await supabase
       .rpc('get_admin_status', { check_user_id: userId });
 
@@ -15,17 +15,6 @@ async function checkAdminStatus(userId: string): Promise<boolean> {
     } else if (adminResult !== null) {
       console.log('useAdminAuth: RPC get_admin_status result:', adminResult);
       return adminResult === true;
-    }
-
-    // Fallback to original is_admin function
-    const { data: rpcResult, error: rpcError } = await supabase
-      .rpc('is_admin', { user_id: userId });
-
-    if (rpcError) {
-      console.error('useAdminAuth: RPC is_admin failed:', rpcError);
-    } else if (rpcResult !== null) {
-      console.log('useAdminAuth: RPC is_admin result:', rpcResult);
-      return rpcResult === true;
     }
 
     // Fallback to direct staff_profiles query
@@ -42,7 +31,7 @@ async function checkAdminStatus(userId: string): Promise<boolean> {
     }
 
     const adminStatus = profileData?.is_admin || false;
-    console.log('useAdminAuth: Fallback admin status:', adminStatus);
+    console.log('useAdminAuth: Admin status:', adminStatus);
     return adminStatus;
 
   } catch (error) {
