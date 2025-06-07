@@ -1,4 +1,3 @@
-
 import { isPublicHoliday } from "../dateHelpers";
 import { hasDailyRest, withinWeeklyHours, calculateRollingAverage, WeeklyHours } from "../wtrCompliance";
 import { StaffMember, Assignment } from "@/types/roster";
@@ -32,6 +31,9 @@ export function generateAssignments(
 
   const assignments: Assignment[] = [];
   
+  // Track last shift end for daily rest compliance
+  const lastShiftEnd: Record<string, Date> = {};
+  
   // Calculate shift details based on configuration
   const shiftDetails = calculateShiftDetails(config);
   logger.info('Calculated shift details:', shiftDetails);
@@ -58,7 +60,24 @@ export function generateAssignments(
         }
 
         // Determine hours and shift times
-        const shiftInfo = calculateShiftInfo(code, config, shiftDetails, dateObj);
+        let shiftInfo = calculateShiftInfo(code, config, shiftDetails, dateObj);
+        
+        // Enforce daily rest requirement if this is a working shift
+        if (['D', 'E', 'L', 'N'].includes(code) && shiftInfo.shiftStart) {
+          const prevEnd = lastShiftEnd[staff.id];
+          const shiftStart = new Date(shiftInfo.shiftStart);
+          
+          if (prevEnd && !hasDailyRest(prevEnd, shiftStart)) {
+            const restHours = (shiftStart.getTime() - prevEnd.getTime()) / (1000 * 60 * 60);
+            console.log(`⏰ ${staff.first_name} ${staff.last_name} insufficient rest (${restHours.toFixed(1)}h) - forcing rest day`);
+            code = 'R';
+            shiftInfo = { hours: 0, shiftStart: null, shiftEnd: null };
+          } else if (shiftInfo.shiftEnd) {
+            // Update last shift end only for working shifts
+            lastShiftEnd[staff.id] = new Date(shiftInfo.shiftEnd);
+            console.log(`✅ ${staff.first_name} ${staff.last_name} daily rest compliance OK`);
+          }
+        }
         
         // Only check WTD compliance for working shifts, not rest days
         if (['D', 'E', 'L', 'N'].includes(code)) {
