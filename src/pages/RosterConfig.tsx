@@ -14,6 +14,8 @@ const RosterConfig = () => {
   const { configId, formData, setFormData, loading } = useConfigForm();
   const { saving, saveConfig, handleGenerateRoster } = useConfigActions();
 
+  console.log('📊 RosterConfig form data:', formData);
+
   if (loading) {
     console.log('⏳ RosterConfig: Showing loading state');
     return (
@@ -32,21 +34,21 @@ const RosterConfig = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-4">
+        <div className="space-y-6">
           <ConfigForm formData={formData} onFormDataChange={setFormData} />
           <ConfigHandoverSettings formData={formData} onFormDataChange={setFormData} />
           <ConfigStaffingRequirements formData={formData} onFormDataChange={setFormData} />
-          <div className="p-4">
-            <ConfigActions 
-              saving={saving}
-              configId={configId}
-              onSave={() => saveConfig(formData)}
-              onGenerateRoster={() => handleGenerateRoster(formData)}
-            />
-          </div>
+          <ConfigActions 
+            saving={saving}
+            configId={configId}
+            onSave={() => saveConfig(formData)}
+            onGenerateRoster={() => handleGenerateRoster(formData)}
+          />
         </div>
         
-        <ConfigPreview formData={formData} />
+        <div className="space-y-6">
+          <ConfigPreview formData={formData} />
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchConfigById } from '@/utils/configHelpers';
@@ -11,6 +10,12 @@ export interface ConfigFormData {
   operational_hours_per_day: number;
   handshake_minutes: 0 | 15 | 30 | 45 | 60;
   start_date: string;
+  staffing_requirements?: {
+    day_shift_staff?: number;
+    night_shift_staff?: number;
+    early_shift_staff?: number;
+    late_shift_staff?: number;
+  };
 }
 
 export function useConfigForm() {
@@ -25,7 +30,13 @@ export function useConfigForm() {
     shift_type: '8h',
     operational_hours_per_day: 24,
     handshake_minutes: 0,
-    start_date: ''
+    start_date: '',
+    staffing_requirements: {
+      day_shift_staff: 2,
+      night_shift_staff: 2,
+      early_shift_staff: 1,
+      late_shift_staff: 1
+    }
   });
   const [loading, setLoading] = useState(false);
 
@@ -68,7 +79,13 @@ export function useConfigForm() {
         shift_type: data.shift_type as '8h' | '12h',
         operational_hours_per_day: data.operational_hours_per_day,
         handshake_minutes: closestValid,
-        start_date: data.start_date
+        start_date: data.start_date,
+        staffing_requirements: data.staffing_requirements || {
+          day_shift_staff: 2,
+          night_shift_staff: 2,
+          early_shift_staff: 1,
+          late_shift_staff: 1
+        }
       });
     } catch (error) {
       console.error('❌ useConfigForm: Exception loading config:', error);
