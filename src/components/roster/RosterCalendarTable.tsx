@@ -4,6 +4,7 @@ import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { WTDComplianceIndicator } from './WTDComplianceIndicator';
 
 interface RosterAssignment {
   id: string;
@@ -17,6 +18,8 @@ interface RosterAssignment {
     first_name: string;
     last_name: string;
     role: string | null;
+    max_hours_per_week?: number;
+    opted_out_wtd?: boolean;
   } | null;
 }
 
@@ -30,7 +33,7 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
 
   // Get unique staff members and dates
-  const staffMap = new Map<string, { name: string; role: string }>();
+  const staffMap = new Map<string, { name: string; role: string; maxHours: number; optedOut: boolean }>();
   const dateSet = new Set<string>();
 
   assignments.forEach(assignment => {
@@ -38,7 +41,9 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
       const staffKey = `${assignment.staff_profiles.first_name} ${assignment.staff_profiles.last_name}`;
       staffMap.set(staffKey, {
         name: staffKey,
-        role: assignment.staff_profiles.role || 'Staff'
+        role: assignment.staff_profiles.role || 'Staff',
+        maxHours: assignment.staff_profiles.max_hours_per_week || 48,
+        optedOut: assignment.staff_profiles.opted_out_wtd || false
       });
     }
     dateSet.add(assignment.date);
@@ -162,7 +167,7 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
               <TableRow>
                 <TableHead className="sticky left-0 bg-white border-r-2 min-w-[200px]">
                   <div className="font-semibold">Staff Member</div>
-                  <div className="text-xs text-gray-500">Role</div>
+                  <div className="text-xs text-gray-500">Role • WTD Status</div>
                 </TableHead>
                 {currentWeekDates.map((date) => {
                   const { day, weekday } = formatDate(date);
@@ -198,8 +203,16 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                 return (
                   <TableRow key={staffMember.name} className="hover:bg-gray-50">
                     <TableCell className="sticky left-0 bg-white border-r-2">
-                      <div className="font-medium">{staffMember.name}</div>
-                      <div className="text-xs text-gray-500">{staffMember.role}</div>
+                      <div className="space-y-1">
+                        <div className="font-medium">{staffMember.name}</div>
+                        <div className="text-xs text-gray-500">{staffMember.role}</div>
+                        <WTDComplianceIndicator
+                          weeklyHours={weekHours}
+                          maxHours={staffMember.maxHours}
+                          optedOut={staffMember.optedOut}
+                          className="mt-1"
+                        />
+                      </div>
                     </TableCell>
                     {currentWeekDates.map((date) => {
                       const assignment = staffAssignments?.get(date);
