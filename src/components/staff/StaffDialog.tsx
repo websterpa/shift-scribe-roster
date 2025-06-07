@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ interface StaffDialogProps {
 }
 
 const AVAILABLE_SHIFTS = ['Early', 'Late', 'Night', 'Day'];
-const AVAILABLE_ROLES = ['Security Officer', 'Senior Officer', 'Supervisor', 'Manager'];
+const AVAILABLE_ROLES = ['CCTV Operator', 'Senior Operator', 'Supervisor', 'Manager'];
 
 export const StaffDialog: React.FC<StaffDialogProps> = ({
   open,
@@ -53,7 +54,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
     phone: '',
     hire_date: new Date().toISOString().split('T')[0],
     is_active: true,
-    role: 'Security Officer',
+    role: 'CCTV Operator',
     hourly_rate: 15.50,
     min_hours_per_week: 37,
     max_hours_per_week: 48,
@@ -78,7 +79,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         phone: '',
         hire_date: new Date().toISOString().split('T')[0],
         is_active: true,
-        role: 'Security Officer',
+        role: 'CCTV Operator',
         hourly_rate: 15.50,
         min_hours_per_week: 37,
         max_hours_per_week: 48,
