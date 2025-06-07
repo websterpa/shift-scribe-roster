@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { ArrowLeft, Calendar, Users, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { RosterViewerHeader } from '@/components/roster/RosterViewerHeader';
-import { RosterViewerTable } from '@/components/roster/RosterViewerTable';
+import { RosterCalendarTable } from '@/components/roster/RosterCalendarTable';
 
 interface RosterAssignment {
   id: string;
@@ -158,7 +157,7 @@ const RosterViewer = () => {
   return (
     <div className="space-y-6">
       <RosterViewerHeader rosterData={rosterData} onBack={() => navigate('/my-rosters')} />
-      <RosterViewerTable assignments={rosterData.assignments} />
+      <RosterCalendarTable assignments={rosterData.assignments} />
     </div>
   );
 };
