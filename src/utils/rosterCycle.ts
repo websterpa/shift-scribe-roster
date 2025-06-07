@@ -12,37 +12,137 @@ export function buildRosterCycle(
   operationalHours: number,
   handshakeMinutes: number
 ): CycleAssignment {
+  console.log('🔄 buildRosterCycle called with:', {
+    staffCount: staffList.length,
+    cycleWeeks,
+    shiftType,
+    operationalHours,
+    handshakeMinutes
+  });
+
   const assignment: CycleAssignment = {};
+  
+  // Filter out staff who can work shifts
+  const shiftWorkers = staffList.filter(staff => staff.is_shift_worker && staff.eligible_shifts?.length > 0);
+  const supervisors = staffList.filter(staff => !staff.is_shift_worker);
+  
+  console.log('📊 Staff breakdown:', {
+    totalStaff: staffList.length,
+    shiftWorkers: shiftWorkers.length,
+    supervisors: supervisors.length
+  });
+
+  if (shiftWorkers.length === 0) {
+    console.warn('⚠️ No shift workers available for roster generation');
+  }
 
   for (let w = 0; w < cycleWeeks; w++) {
     assignment[w] = {};
     for (let d = 0; d < 7; d++) {
       assignment[w][d] = {};
-      staffList.forEach((staff, idx) => {
-        const base = (idx + w) % staffList.length;
-        const eligible = staffList[base].eligible_shifts;
-        let code: ShiftCode = "R";
-
-        if (shiftType === "12h") {
-          // Alternate D/N each day
-          code = (w + d + idx) % 2 === 0 ? "D" : "N";
+      
+      if (shiftType === "12h") {
+        // 12-hour shifts: Day (6am-6pm) and Night (6pm-6am)
+        const dayStaffNeeded = Math.ceil(operationalHours / 24 * 1); // At least 1 person per 12-hour period
+        const nightStaffNeeded = Math.ceil(operationalHours / 24 * 1);
+        
+        // Assign day shifts
+        for (let i = 0; i < Math.min(dayStaffNeeded, shiftWorkers.length); i++) {
+          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          if (staff.eligible_shifts.includes('Day') || staff.eligible_shifts.includes('D')) {
+            assignment[w][d][staff.id] = "D";
+          } else {
+            assignment[w][d][staff.id] = "R";
+          }
+        }
+        
+        // Assign night shifts to different staff
+        for (let i = dayStaffNeeded; i < Math.min(dayStaffNeeded + nightStaffNeeded, shiftWorkers.length); i++) {
+          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          if (staff.eligible_shifts.includes('Night') || staff.eligible_shifts.includes('N')) {
+            assignment[w][d][staff.id] = "N";
+          } else {
+            assignment[w][d][staff.id] = "R";
+          }
+        }
+        
+        // Rest of shift workers get rest days
+        for (let i = dayStaffNeeded + nightStaffNeeded; i < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          assignment[w][d][staff.id] = "R";
+        }
+      } else {
+        // 8-hour shifts: Early, Late, Night
+        const shiftsPerDay = Math.ceil(operationalHours / 8);
+        const staffPerShift = Math.ceil(shiftWorkers.length / shiftsPerDay);
+        
+        let staffAssigned = 0;
+        
+        // Early shift (6am-2pm)
+        if (shiftsPerDay >= 1) {
+          for (let i = 0; i < Math.min(staffPerShift, shiftWorkers.length - staffAssigned); i++) {
+            const staffIndex = (w * 7 + d + staffAssigned + i) % shiftWorkers.length;
+            const staff = shiftWorkers[staffIndex];
+            if (staff.eligible_shifts.includes('Early') || staff.eligible_shifts.includes('E')) {
+              assignment[w][d][staff.id] = "E";
+            } else {
+              assignment[w][d][staff.id] = "R";
+            }
+          }
+          staffAssigned += Math.min(staffPerShift, shiftWorkers.length - staffAssigned);
+        }
+        
+        // Late shift (2pm-10pm)
+        if (shiftsPerDay >= 2) {
+          for (let i = 0; i < Math.min(staffPerShift, shiftWorkers.length - staffAssigned); i++) {
+            const staffIndex = (w * 7 + d + staffAssigned + i) % shiftWorkers.length;
+            const staff = shiftWorkers[staffIndex];
+            if (staff.eligible_shifts.includes('Late') || staff.eligible_shifts.includes('L')) {
+              assignment[w][d][staff.id] = "L";
+            } else {
+              assignment[w][d][staff.id] = "R";
+            }
+          }
+          staffAssigned += Math.min(staffPerShift, shiftWorkers.length - staffAssigned);
+        }
+        
+        // Night shift (10pm-6am)
+        if (shiftsPerDay >= 3) {
+          for (let i = 0; i < Math.min(staffPerShift, shiftWorkers.length - staffAssigned); i++) {
+            const staffIndex = (w * 7 + d + staffAssigned + i) % shiftWorkers.length;
+            const staff = shiftWorkers[staffIndex];
+            if (staff.eligible_shifts.includes('Night') || staff.eligible_shifts.includes('N')) {
+              assignment[w][d][staff.id] = "N";
+            } else {
+              assignment[w][d][staff.id] = "R";
+            }
+          }
+          staffAssigned += Math.min(staffPerShift, shiftWorkers.length - staffAssigned);
+        }
+        
+        // Rest of shift workers get rest days
+        for (let i = staffAssigned; i < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          assignment[w][d][staff.id] = "R";
+        }
+      }
+      
+      // Handle supervisors - only work weekdays during day hours
+      supervisors.forEach(staff => {
+        const isWeekend = d === 0 || d === 6; // Sunday = 0, Saturday = 6
+        if (!isWeekend) {
+          assignment[w][d][staff.id] = "D"; // Day shift for supervisors on weekdays
         } else {
-          // 8h: determine number of shifts = operationalHours / 8
-          const shiftsPerDay = operationalHours / 8;
-          const slot = (w * 7 + d + idx) % (shiftsPerDay + 1);
-          if (slot === shiftsPerDay) code = "R";
-          else code = eligible.includes(slot === 0 ? "E" : "L") ? (slot === 0 ? "E" : "L") : "R";
+          assignment[w][d][staff.id] = "R"; // Rest on weekends
         }
-
-        // Supervisors: if not shift_worker, only D on weekdays
-        if (!staff.is_shift_worker) {
-          const isWeekendDay = [0, 6].includes(d); // d is the day index (0-6)
-          code = (code === "D" && !isWeekendDay) ? "D" : "R";
-        }
-
-        assignment[w][d][staff.id] = code;
       });
     }
   }
+
+  console.log('✅ Roster cycle generated successfully');
   return assignment;
 }

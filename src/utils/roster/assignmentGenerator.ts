@@ -1,3 +1,4 @@
+
 import { isPublicHoliday } from "../dateHelpers";
 import { hasDailyRest, withinWeeklyHours, calculateRollingAverage, WeeklyHours } from "../wtrCompliance";
 import { StaffMember, Assignment } from "@/types/roster";
@@ -45,31 +46,38 @@ export function generateAssignments(
         if (!staff?.id) continue;
         
         let code = cycle[w]?.[d]?.[staff.id] || 'R';
+        
+        console.log(`📋 Processing ${staff.first_name} ${staff.last_name} for ${dateKey}: cycle assignment = ${code}`);
 
         // Override if on leave/sick
         const leaveEntries = leaveMap[staff.id] || [];
         const leave = leaveEntries.find((e) => e.date === dateKey);
         if (leave) {
+          console.log(`🏥 ${staff.first_name} ${staff.last_name} on leave: ${leave.type}`);
           code = leave.type; // 'S' for sick, 'R' for annual leave
         }
 
         // Determine hours and shift times
         const shiftInfo = calculateShiftInfo(code, config, shiftDetails, dateObj);
         
-        // Check WTD compliance
-        const weeklyHours = calculateWeeklyHours(assignments, staff.id, w, dateObj, shiftInfo.hours);
-        const wtdCompliant = checkWTDCompliance(staff, weeklyHours, pastWeeksMap[staff.id]);
-        
-        if (!wtdCompliant && ['D', 'E', 'L', 'N'].includes(code)) {
-          logger.debug('WTD compliance issue - changing to rest day', { 
-            staffId: staff.id, 
-            weeklyHours, 
-            maxHours: staff.max_hours_per_week
-          });
-          code = 'R';
-          shiftInfo.hours = 0;
-          shiftInfo.shiftStart = null;
-          shiftInfo.shiftEnd = null;
+        // Only check WTD compliance for working shifts, not rest days
+        if (['D', 'E', 'L', 'N'].includes(code)) {
+          // Check WTD compliance
+          const weeklyHours = calculateWeeklyHours(assignments, staff.id, w, dateObj, shiftInfo.hours);
+          const wtdCompliant = checkWTDCompliance(staff, weeklyHours, pastWeeksMap[staff.id]);
+          
+          if (!wtdCompliant) {
+            console.log(`⚠️ WTD compliance issue for ${staff.first_name} ${staff.last_name} - changing to rest day`, { 
+              weeklyHours, 
+              maxHours: staff.max_hours_per_week
+            });
+            code = 'R';
+            shiftInfo.hours = 0;
+            shiftInfo.shiftStart = null;
+            shiftInfo.shiftEnd = null;
+          } else {
+            console.log(`✅ ${staff.first_name} ${staff.last_name} assigned to ${code} shift: ${shiftInfo.hours}h`);
+          }
         }
 
         // Calculate cost including public holiday multiplier
@@ -90,6 +98,15 @@ export function generateAssignments(
   }
 
   logger.info('Assignment generation completed', { totalAssignments: assignments.length });
+  
+  // Log summary of assignments by shift type
+  const shiftSummary = assignments.reduce((acc, assignment) => {
+    acc[assignment.shift_code] = (acc[assignment.shift_code] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  console.log('📊 Assignment summary by shift type:', shiftSummary);
+  
   return assignments;
 }
 
