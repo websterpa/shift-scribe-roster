@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut } from 'lucide-react';
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, TestTube } from 'lucide-react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 const Navigation = () => {
@@ -104,6 +104,17 @@ const Navigation = () => {
               >
                 <Archive className="w-4 h-4 mr-2" />
                 My Rosters
+              </Link>
+              <Link
+                to="/test-pro"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                  isActive('/test-pro')
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <TestTube className="w-4 h-4 mr-2" />
+                Test Pro
               </Link>
             </div>
           </div>

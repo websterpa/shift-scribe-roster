@@ -20,6 +20,7 @@ import RosterConfig from '@/pages/RosterConfig';
 import Staff from '@/pages/Staff';
 import LeaveRequests from '@/pages/LeaveRequests';
 import ManageLeave from '@/pages/ManageLeave';
+import TestPro from '@/pages/TestPro';
 import NotFound from '@/pages/NotFound';
 
 const logger = createLogger('AppRouter');
@@ -59,6 +60,7 @@ export const AppRouter: React.FC = () => {
             <Route path="staff" element={<Staff />} />
             <Route path="leave-requests" element={<LeaveRequests />} />
             <Route path="manage-leave" element={<ManageLeave />} />
+            <Route path="test-pro" element={<TestPro />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         ) : (

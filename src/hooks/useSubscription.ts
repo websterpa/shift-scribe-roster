@@ -27,6 +27,7 @@ export function useSubscription() {
     loading,
     error: null,
     isAdmin: false, // Keep admin separate from Pro access
+    hasPro: true, // Always true
     hasProAccess: true, // Always true
     canViewRosters: () => true, // Always true
     refreshSubscription: () => {} // No-op
