@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -104,10 +103,7 @@ const MyRosters = () => {
 
   const handleViewRoster = (roster: RosterVersion) => {
     console.log('👁️ Viewing roster:', roster.version_name);
-    toast({
-      title: "Feature coming soon",
-      description: "Roster viewer will be available in the next update",
-    });
+    window.location.href = `/roster/${roster.id}`;
   };
 
   const handleExportRoster = (roster: RosterVersion) => {

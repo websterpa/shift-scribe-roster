@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { SupabaseAuth } from '@/components/auth/SupabaseAuth';
@@ -16,6 +15,7 @@ import Dashboard from '@/pages/Dashboard';
 import GenerateRoster from '@/pages/GenerateRoster';
 import MyConfigurations from '@/pages/MyConfigurations';
 import MyRosters from '@/pages/MyRosters';
+import RosterViewer from '@/pages/RosterViewer';
 import RosterConfig from '@/pages/RosterConfig';
 import Staff from '@/pages/Staff';
 import LeaveRequests from '@/pages/LeaveRequests';
@@ -56,6 +56,7 @@ export const AppRouter: React.FC = () => {
             <Route path="generate-roster" element={<GenerateRoster />} />
             <Route path="my-configurations" element={<MyConfigurations />} />
             <Route path="my-rosters" element={<MyRosters />} />
+            <Route path="roster/:rosterId" element={<RosterViewer />} />
             <Route path="roster-config" element={<RosterConfig />} />
             <Route path="staff" element={<Staff />} />
             <Route path="leave-requests" element={<LeaveRequests />} />
