@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface RosterAssignment {
   id: string;
@@ -24,6 +26,8 @@ interface RosterCalendarTableProps {
 
 export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) => {
   console.log('🔄 RosterCalendarTable component rendered with', assignments.length, 'assignments');
+  
+  const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
 
   // Get unique staff members and dates
   const staffMap = new Map<string, { name: string; role: string }>();
@@ -41,7 +45,30 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
   });
 
   const staff = Array.from(staffMap.entries()).map(([name, data]) => ({ name, ...data }));
-  const dates = Array.from(dateSet).sort();
+  const allDates = Array.from(dateSet).sort();
+
+  // Group dates into weeks (7 days each)
+  const weeks: string[][] = [];
+  let currentWeek: string[] = [];
+  
+  allDates.forEach((date, index) => {
+    currentWeek.push(date);
+    
+    // If we have 7 days or it's the last date, complete the week
+    if (currentWeek.length === 7 || index === allDates.length - 1) {
+      weeks.push([...currentWeek]);
+      currentWeek = [];
+    }
+  });
+
+  console.log('📅 Calendar weeks breakdown:', {
+    totalDates: allDates.length,
+    totalWeeks: weeks.length,
+    currentWeekIndex,
+    datesInCurrentWeek: weeks[currentWeekIndex]?.length || 0
+  });
+
+  const currentWeekDates = weeks[currentWeekIndex] || [];
 
   // Create assignment lookup map: staffName -> date -> assignment
   const assignmentMap = new Map<string, Map<string, RosterAssignment>>();
@@ -80,20 +107,53 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
     return { day, weekday };
   };
 
-  // Group dates by month for header
-  const monthGroups = dates.reduce((acc, date) => {
-    const monthYear = new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase();
-    if (!acc[monthYear]) {
-      acc[monthYear] = [];
+  const canNavigatePrevious = currentWeekIndex > 0;
+  const canNavigateNext = currentWeekIndex < weeks.length - 1;
+
+  const navigateToPreviousWeek = () => {
+    if (canNavigatePrevious) {
+      setCurrentWeekIndex(currentWeekIndex - 1);
     }
-    acc[monthYear].push(date);
-    return acc;
-  }, {} as Record<string, string[]>);
+  };
+
+  const navigateToNextWeek = () => {
+    if (canNavigateNext) {
+      setCurrentWeekIndex(currentWeekIndex + 1);
+    }
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Roster Calendar View</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Roster Calendar View</CardTitle>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={navigateToPreviousWeek}
+              disabled={!canNavigatePrevious}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-normal min-w-[120px] text-center">
+              Week {currentWeekIndex + 1} of {weeks.length}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={navigateToNextWeek}
+              disabled={!canNavigateNext}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        {weeks.length > 0 && (
+          <div className="text-sm text-gray-600">
+            Showing {new Date(currentWeekDates[0]).toLocaleDateString()} - {new Date(currentWeekDates[currentWeekDates.length - 1]).toLocaleDateString()}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -104,7 +164,7 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                   <div className="font-semibold">Staff Member</div>
                   <div className="text-xs text-gray-500">Role</div>
                 </TableHead>
-                {dates.map((date) => {
+                {currentWeekDates.map((date) => {
                   const { day, weekday } = formatDate(date);
                   return (
                     <TableHead key={date} className="text-center min-w-[60px] border-l">
@@ -114,11 +174,11 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                   );
                 })}
                 <TableHead className="text-center border-l-2 min-w-[80px]">
-                  <div className="font-semibold">Total</div>
+                  <div className="font-semibold">Week</div>
                   <div className="text-xs">Hours</div>
                 </TableHead>
                 <TableHead className="text-center min-w-[100px]">
-                  <div className="font-semibold">Total</div>
+                  <div className="font-semibold">Week</div>
                   <div className="text-xs">Cost (£)</div>
                 </TableHead>
               </TableRow>
@@ -126,11 +186,11 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
             <TableBody>
               {staff.map((staffMember) => {
                 const staffAssignments = assignmentMap.get(staffMember.name);
-                const totalHours = dates.reduce((sum, date) => {
+                const weekHours = currentWeekDates.reduce((sum, date) => {
                   const assignment = staffAssignments?.get(date);
                   return sum + (assignment?.hours || 0);
                 }, 0);
-                const totalCost = dates.reduce((sum, date) => {
+                const weekCost = currentWeekDates.reduce((sum, date) => {
                   const assignment = staffAssignments?.get(date);
                   return sum + (assignment?.cost || 0);
                 }, 0);
@@ -141,7 +201,7 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                       <div className="font-medium">{staffMember.name}</div>
                       <div className="text-xs text-gray-500">{staffMember.role}</div>
                     </TableCell>
-                    {dates.map((date) => {
+                    {currentWeekDates.map((date) => {
                       const assignment = staffAssignments?.get(date);
                       return (
                         <TableCell key={`${staffMember.name}-${date}`} className="text-center p-1 border-l">
@@ -158,10 +218,10 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                       );
                     })}
                     <TableCell className="text-center border-l-2 font-medium">
-                      {totalHours}
+                      {weekHours}
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      £{totalCost.toFixed(2)}
+                      £{weekCost.toFixed(2)}
                     </TableCell>
                   </TableRow>
                 );

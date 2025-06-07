@@ -5,19 +5,28 @@ interface CycleAssignment {
   [weekIndex: number]: { [dayIndex: number]: { [staffId: string]: ShiftCode } };
 }
 
+interface StaffingRequirements {
+  day_shift_staff?: number;
+  night_shift_staff?: number;
+  early_shift_staff?: number;
+  late_shift_staff?: number;
+}
+
 export function buildRosterCycle(
   staffList: Array<{ id: string; eligible_shifts: string[]; is_shift_worker: boolean }>,
   cycleWeeks: number,
   shiftType: "8h" | "12h",
   operationalHours: number,
-  handshakeMinutes: number
+  handshakeMinutes: number,
+  staffingRequirements?: StaffingRequirements
 ): CycleAssignment {
   console.log('🔄 buildRosterCycle called with:', {
     staffCount: staffList.length,
     cycleWeeks,
     shiftType,
     operationalHours,
-    handshakeMinutes
+    handshakeMinutes,
+    staffingRequirements
   });
 
   const assignment: CycleAssignment = {};
@@ -36,6 +45,16 @@ export function buildRosterCycle(
     console.warn('⚠️ No shift workers available for roster generation');
   }
 
+  // Default staffing requirements if not provided
+  const defaultStaffing: StaffingRequirements = {
+    day_shift_staff: 2,
+    night_shift_staff: 2,
+    early_shift_staff: 1,
+    late_shift_staff: 1
+  };
+  
+  const staffing = { ...defaultStaffing, ...staffingRequirements };
+
   for (let w = 0; w < cycleWeeks; w++) {
     assignment[w] = {};
     for (let d = 0; d < 7; d++) {
@@ -43,91 +62,95 @@ export function buildRosterCycle(
       
       if (shiftType === "12h") {
         // 12-hour shifts: Day (6am-6pm) and Night (6pm-6am)
-        const dayStaffNeeded = Math.ceil(operationalHours / 24 * 1); // At least 1 person per 12-hour period
-        const nightStaffNeeded = Math.ceil(operationalHours / 24 * 1);
+        const dayStaffNeeded = staffing.day_shift_staff || 2;
+        const nightStaffNeeded = staffing.night_shift_staff || 2;
+        
+        console.log(`📅 Week ${w + 1}, Day ${d + 1}: Need ${dayStaffNeeded} day staff, ${nightStaffNeeded} night staff`);
         
         // Assign day shifts
-        for (let i = 0; i < Math.min(dayStaffNeeded, shiftWorkers.length); i++) {
-          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+        let assignedStaff = 0;
+        for (let i = 0; i < dayStaffNeeded && assignedStaff < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
           const staff = shiftWorkers[staffIndex];
           if (staff.eligible_shifts.includes('Day') || staff.eligible_shifts.includes('D')) {
             assignment[w][d][staff.id] = "D";
           } else {
             assignment[w][d][staff.id] = "R";
           }
+          assignedStaff++;
         }
         
         // Assign night shifts to different staff
-        for (let i = dayStaffNeeded; i < Math.min(dayStaffNeeded + nightStaffNeeded, shiftWorkers.length); i++) {
-          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+        for (let i = 0; i < nightStaffNeeded && assignedStaff < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
           const staff = shiftWorkers[staffIndex];
           if (staff.eligible_shifts.includes('Night') || staff.eligible_shifts.includes('N')) {
             assignment[w][d][staff.id] = "N";
           } else {
             assignment[w][d][staff.id] = "R";
           }
+          assignedStaff++;
         }
         
         // Rest of shift workers get rest days
-        for (let i = dayStaffNeeded + nightStaffNeeded; i < shiftWorkers.length; i++) {
-          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+        while (assignedStaff < shiftWorkers.length) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
           const staff = shiftWorkers[staffIndex];
           assignment[w][d][staff.id] = "R";
+          assignedStaff++;
         }
       } else {
         // 8-hour shifts: Early, Late, Night
-        const shiftsPerDay = Math.ceil(operationalHours / 8);
-        const staffPerShift = Math.ceil(shiftWorkers.length / shiftsPerDay);
+        const earlyStaffNeeded = staffing.early_shift_staff || 1;
+        const lateStaffNeeded = staffing.late_shift_staff || 1;
+        const nightStaffNeeded = staffing.night_shift_staff || 1;
         
-        let staffAssigned = 0;
+        console.log(`📅 Week ${w + 1}, Day ${d + 1}: Need ${earlyStaffNeeded} early, ${lateStaffNeeded} late, ${nightStaffNeeded} night staff`);
+        
+        let assignedStaff = 0;
         
         // Early shift (6am-2pm)
-        if (shiftsPerDay >= 1) {
-          for (let i = 0; i < Math.min(staffPerShift, shiftWorkers.length - staffAssigned); i++) {
-            const staffIndex = (w * 7 + d + staffAssigned + i) % shiftWorkers.length;
-            const staff = shiftWorkers[staffIndex];
-            if (staff.eligible_shifts.includes('Early') || staff.eligible_shifts.includes('E')) {
-              assignment[w][d][staff.id] = "E";
-            } else {
-              assignment[w][d][staff.id] = "R";
-            }
+        for (let i = 0; i < earlyStaffNeeded && assignedStaff < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          if (staff.eligible_shifts.includes('Early') || staff.eligible_shifts.includes('E')) {
+            assignment[w][d][staff.id] = "E";
+          } else {
+            assignment[w][d][staff.id] = "R";
           }
-          staffAssigned += Math.min(staffPerShift, shiftWorkers.length - staffAssigned);
+          assignedStaff++;
         }
         
         // Late shift (2pm-10pm)
-        if (shiftsPerDay >= 2) {
-          for (let i = 0; i < Math.min(staffPerShift, shiftWorkers.length - staffAssigned); i++) {
-            const staffIndex = (w * 7 + d + staffAssigned + i) % shiftWorkers.length;
-            const staff = shiftWorkers[staffIndex];
-            if (staff.eligible_shifts.includes('Late') || staff.eligible_shifts.includes('L')) {
-              assignment[w][d][staff.id] = "L";
-            } else {
-              assignment[w][d][staff.id] = "R";
-            }
+        for (let i = 0; i < lateStaffNeeded && assignedStaff < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          if (staff.eligible_shifts.includes('Late') || staff.eligible_shifts.includes('L')) {
+            assignment[w][d][staff.id] = "L";
+          } else {
+            assignment[w][d][staff.id] = "R";
           }
-          staffAssigned += Math.min(staffPerShift, shiftWorkers.length - staffAssigned);
+          assignedStaff++;
         }
         
         // Night shift (10pm-6am)
-        if (shiftsPerDay >= 3) {
-          for (let i = 0; i < Math.min(staffPerShift, shiftWorkers.length - staffAssigned); i++) {
-            const staffIndex = (w * 7 + d + staffAssigned + i) % shiftWorkers.length;
-            const staff = shiftWorkers[staffIndex];
-            if (staff.eligible_shifts.includes('Night') || staff.eligible_shifts.includes('N')) {
-              assignment[w][d][staff.id] = "N";
-            } else {
-              assignment[w][d][staff.id] = "R";
-            }
+        for (let i = 0; i < nightStaffNeeded && assignedStaff < shiftWorkers.length; i++) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
+          const staff = shiftWorkers[staffIndex];
+          if (staff.eligible_shifts.includes('Night') || staff.eligible_shifts.includes('N')) {
+            assignment[w][d][staff.id] = "N";
+          } else {
+            assignment[w][d][staff.id] = "R";
           }
-          staffAssigned += Math.min(staffPerShift, shiftWorkers.length - staffAssigned);
+          assignedStaff++;
         }
         
         // Rest of shift workers get rest days
-        for (let i = staffAssigned; i < shiftWorkers.length; i++) {
-          const staffIndex = (w * 7 + d + i) % shiftWorkers.length;
+        while (assignedStaff < shiftWorkers.length) {
+          const staffIndex = (w * 7 + d + assignedStaff) % shiftWorkers.length;
           const staff = shiftWorkers[staffIndex];
           assignment[w][d][staff.id] = "R";
+          assignedStaff++;
         }
       }
       
@@ -143,6 +166,6 @@ export function buildRosterCycle(
     }
   }
 
-  console.log('✅ Roster cycle generated successfully');
+  console.log('✅ Roster cycle generated successfully with staffing requirements');
   return assignment;
 }

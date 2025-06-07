@@ -2,6 +2,7 @@
 import React from 'react';
 import { ConfigForm } from '@/components/config/ConfigForm';
 import { ConfigHandoverSettings } from '@/components/config/ConfigHandoverSettings';
+import { ConfigStaffingRequirements } from '@/components/config/ConfigStaffingRequirements';
 import { ConfigPreview } from '@/components/config/ConfigPreview';
 import { ConfigActions } from '@/components/config/ConfigActions';
 import { useConfigForm } from '@/hooks/useConfigForm';
@@ -33,8 +34,9 @@ const RosterConfig = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <ConfigForm formData={formData} onFormDataChange={setFormData} />
+          <ConfigHandoverSettings formData={formData} onFormDataChange={setFormData} />
+          <ConfigStaffingRequirements formData={formData} onFormDataChange={setFormData} />
           <div className="p-4">
-            <ConfigHandoverSettings formData={formData} onFormDataChange={setFormData} />
             <ConfigActions 
               saving={saving}
               configId={configId}
