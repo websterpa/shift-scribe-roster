@@ -16,6 +16,45 @@ export interface SubscriptionData {
   stripe_subscription_id?: string;
 }
 
+async function checkAdmin(userId: string): Promise<boolean> {
+  logger.info('Checking admin status for user:', userId);
+  
+  try {
+    // First try the RPC function
+    console.log('useSubscription: Trying RPC is_admin function...');
+    const { data: rpcResult, error: rpcError } = await supabase
+      .rpc('is_admin', { user_id: userId });
+
+    if (rpcError) {
+      console.error('useSubscription: RPC is_admin failed:', rpcError);
+    } else if (rpcResult !== null) {
+      console.log('useSubscription: RPC is_admin result:', rpcResult);
+      return rpcResult === true;
+    }
+
+    // Fallback to direct staff_profiles query
+    console.log('useSubscription: Fallback to staff_profiles query...');
+    const { data: profileData, error: profileError } = await supabase
+      .from('staff_profiles')
+      .select('is_admin')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError) {
+      console.error('useSubscription: staff_profiles query failed:', profileError);
+      return false;
+    }
+
+    const adminStatus = profileData?.is_admin || false;
+    console.log('useSubscription: Fallback admin status:', adminStatus);
+    return adminStatus;
+
+  } catch (error) {
+    console.error('useSubscription: Exception in checkAdmin:', error);
+    return false;
+  }
+}
+
 export function useSubscription() {
   const { user, isAuthenticated } = useSupabaseAuth();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -25,6 +64,7 @@ export function useSubscription() {
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
+      console.log('useSubscription: No authenticated user, resetting state');
       setSubscription(null);
       setIsAdmin(false);
       setLoading(false);
@@ -35,64 +75,47 @@ export function useSubscription() {
   }, [user, isAuthenticated]);
 
   const fetchSubscriptionAndAdminStatus = async () => {
+    if (!user?.id) return;
+
     try {
       setLoading(true);
-      console.log('useSubscription: Starting fetch for user:', user?.id);
-      
-      // Check admin status from staff_profiles using RPC function
-      console.log('useSubscription: Checking admin status with RPC...');
-      
-      const { data: adminResult, error: adminError } = await supabase
-        .rpc('is_admin', { user_id: user?.id });
+      setError(null);
+      console.log('useSubscription: Starting comprehensive check for user:', user.id);
 
-      console.log('useSubscription: Admin RPC result:', { adminResult, adminError, userId: user?.id });
-
-      let adminStatus = false;
-      
-      if (adminError) {
-        console.error('useSubscription: Admin RPC failed:', adminError);
-        adminStatus = false;
-      } else {
-        adminStatus = adminResult === true;
-        console.log('useSubscription: Admin status from staff_profiles:', adminStatus);
-      }
-
+      // Check admin status using the robust checkAdmin function
+      const adminStatus = await checkAdmin(user.id);
       setIsAdmin(adminStatus);
       console.log('useSubscription: Final admin status set to:', adminStatus);
 
       // Fetch subscription data
-      const { data, error } = await supabase
+      console.log('useSubscription: Fetching subscription data...');
+      const { data: subData, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single();
 
-      console.log('useSubscription: Subscription query result:', { data, error });
-
-      if (error) {
-        console.error('useSubscription: Subscription fetch failed:', error);
-        // Don't set error for missing subscription if user is admin
+      if (subError) {
+        console.error('useSubscription: Subscription fetch failed:', subError);
         if (!adminStatus) {
-          setError(error.message);
+          setError(subError.message);
         }
         setSubscription(null);
       } else {
-        // Type cast to ensure proper typing
+        console.log('useSubscription: Subscription data retrieved:', subData);
         const typedSubscription: SubscriptionData = {
-          id: data.id,
-          subscription_tier: data.subscription_tier as 'free' | 'pro',
-          subscription_status: data.subscription_status as 'active' | 'cancelled' | 'expired',
-          subscription_start_date: data.subscription_start_date,
-          subscription_end_date: data.subscription_end_date,
-          stripe_customer_id: data.stripe_customer_id,
-          stripe_subscription_id: data.stripe_subscription_id,
+          id: subData.id,
+          subscription_tier: subData.subscription_tier as 'free' | 'pro',
+          subscription_status: subData.subscription_status as 'active' | 'cancelled' | 'expired',
+          subscription_start_date: subData.subscription_start_date,
+          subscription_end_date: subData.subscription_end_date,
+          stripe_customer_id: subData.stripe_customer_id,
+          stripe_subscription_id: subData.stripe_subscription_id,
         };
-
         setSubscription(typedSubscription);
-        console.log('useSubscription: Subscription set:', typedSubscription);
       }
     } catch (err: any) {
-      console.error('useSubscription: Unexpected error:', err);
+      console.error('useSubscription: Unexpected error in fetchSubscriptionAndAdminStatus:', err);
       setError('Failed to load subscription data');
     } finally {
       setLoading(false);
@@ -100,39 +123,44 @@ export function useSubscription() {
   };
 
   const hasProAccess = () => {
-    console.log('useSubscription: hasProAccess check - isAdmin:', isAdmin, 'subscription:', subscription);
+    console.log('useSubscription: hasProAccess evaluation:');
+    console.log('  - isAdmin:', isAdmin);
+    console.log('  - subscription:', subscription);
     
-    // Admin users from staff_profiles ALWAYS have Pro access regardless of subscription
+    // Admin users ALWAYS have Pro access
     if (isAdmin) {
-      console.log('useSubscription: ADMIN ACCESS GRANTED - Pro access via staff_profiles admin status');
+      console.log('useSubscription: ✅ ADMIN ACCESS GRANTED - Pro access via admin status');
       return true;
     }
 
+    // Check subscription for non-admin users
     if (!subscription) {
-      console.log('useSubscription: No subscription, no pro access');
+      console.log('useSubscription: ❌ No subscription found, no pro access');
       return false;
     }
     
     if (subscription.subscription_tier !== 'pro') {
-      console.log('useSubscription: Not pro tier:', subscription.subscription_tier);
+      console.log('useSubscription: ❌ Not pro tier:', subscription.subscription_tier);
       return false;
     }
     
     if (subscription.subscription_status !== 'active') {
-      console.log('useSubscription: Not active status:', subscription.subscription_status);
+      console.log('useSubscription: ❌ Not active status:', subscription.subscription_status);
       return false;
     }
     
-    // Check if subscription hasn't expired
+    // Check subscription expiration
     if (subscription.subscription_end_date) {
       const endDate = new Date(subscription.subscription_end_date);
       const now = new Date();
       const hasExpired = endDate <= now;
       console.log('useSubscription: Expiration check - expired:', hasExpired);
-      return !hasExpired;
+      if (hasExpired) {
+        return false;
+      }
     }
     
-    console.log('useSubscription: Pro access via valid subscription');
+    console.log('useSubscription: ✅ Pro access via valid subscription');
     return true;
   };
 
@@ -145,7 +173,7 @@ export function useSubscription() {
   };
 
   const proAccess = hasProAccess();
-  console.log('useSubscription: FINAL RESULT - hasProAccess:', proAccess, 'isAdmin:', isAdmin);
+  console.log('useSubscription: 🎯 FINAL RESULT - hasProAccess:', proAccess, 'isAdmin:', isAdmin);
 
   return {
     subscription,
