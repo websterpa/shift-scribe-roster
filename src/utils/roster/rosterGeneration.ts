@@ -8,9 +8,6 @@ import { createRosterVersion } from "./rosterVersion";
 
 const logger = createLogger('RosterGeneration');
 
-/**
- * Generates and saves a roster to the database based on staff and configuration data
- */
 export async function generateAndSaveRoster(
   staffList: StaffMember[],
   config: {
@@ -67,7 +64,7 @@ export async function generateAndSaveRoster(
     console.log('✅ Validation passed', { eligibleStaff: eligibleStaff.length, minRequired: minStaffRequired });
     logger.info('Validation passed', { eligibleStaff: eligibleStaff.length, minRequired: minStaffRequired });
 
-    // 1. Build cycle assignments with enhanced logic
+    // 1. Build cycle assignments
     console.log('📋 Building roster cycle...');
     const cycle = buildRosterCycle(
       staffList,
@@ -80,7 +77,7 @@ export async function generateAndSaveRoster(
     console.log('✅ Cycle assignments built successfully');
     logger.info('Cycle assignments built successfully');
 
-    // 2. Fetch approved leave requests with better error handling
+    // 2. Fetch approved leave requests
     console.log('📅 Fetching leave requests...');
     const leaveMap = await fetchLeaveRequests();
     console.log('✅ Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
@@ -92,7 +89,7 @@ export async function generateAndSaveRoster(
     console.log('✅ Past weeks data prepared');
     logger.info('Past weeks data prepared');
 
-    // 4. Create roster version with proper parameter passing
+    // 4. Create roster version
     console.log('📄 Creating roster version...');
     console.log('Calling supabase for roster version creation...');
     const versionId = await createRosterVersion(
@@ -104,7 +101,7 @@ export async function generateAndSaveRoster(
     console.log('✅ Created roster version:', versionId);
     logger.info('Created roster version:', versionId);
 
-    // 5. Generate assignments with improved logic
+    // 5. Generate assignments
     console.log('⚙️ Generating assignments...');
     const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
     
@@ -117,7 +114,7 @@ export async function generateAndSaveRoster(
     console.log('✅ Generated assignments', { count: assignments.length });
     logger.info('Generated assignments', { count: assignments.length });
 
-    // 6. Save assignments to database with validation
+    // 6. Save assignments to database
     console.log('💾 Saving assignments to database...');
     console.log('Calling supabase.from("roster_assignments").insert...');
     await saveAssignments(assignments, versionId);
@@ -133,26 +130,18 @@ export async function generateAndSaveRoster(
   }
 }
 
-/**
- * Calculate minimum staff required based on configuration
- */
 function calculateMinimumStaffRequired(config: {
   shift_type: "8h" | "12h";
   operational_hours_per_day: number;
   cycle_length_weeks: number;
 }): number {
   if (config.shift_type === "12h") {
-    // For 12h shifts, need at least 2 staff per day (day/night) + coverage
     return Math.max(4, Math.ceil(config.operational_hours_per_day / 12) + 2);
   } else {
-    // For 8h shifts, need at least 3 staff per day + coverage
     return Math.max(6, Math.ceil(config.operational_hours_per_day / 8) + 3);
   }
 }
 
-/**
- * Fetch approved leave requests with improved error handling
- */
 async function fetchLeaveRequests(): Promise<Record<string, { date: string; type: string }[]>> {
   try {
     console.log('Calling supabase.from("leave_requests").select...');
@@ -210,10 +199,6 @@ async function fetchLeaveRequests(): Promise<Record<string, { date: string; type
       totalRequests: leaves.length, 
       staffAffected: Object.keys(leaveMap).length 
     });
-    logger.info('Successfully processed leave requests', { 
-      totalRequests: leaves.length, 
-      staffAffected: Object.keys(leaveMap).length 
-    });
     return leaveMap;
   } catch (error: any) {
     console.error('❌ Error fetching leave requests:', error);
@@ -222,17 +207,12 @@ async function fetchLeaveRequests(): Promise<Record<string, { date: string; type
   }
 }
 
-/**
- * Fetch historical hours data for staff members
- */
 async function fetchPastWeeks(staffList: StaffMember[], cycleLengthWeeks: number): Promise<Record<string, number[]>> {
   try {
     const pastWeeksMap: Record<string, number[]> = {};
     
-    // Initialize with empty arrays for each staff member
     staffList.forEach(staff => {
       if (staff && staff.id) {
-        // For now, initialize with zeros. In production, this would fetch actual historical data
         pastWeeksMap[staff.id] = Array(Math.max(0, cycleLengthWeeks - 1)).fill(0);
       }
     });
@@ -240,14 +220,10 @@ async function fetchPastWeeks(staffList: StaffMember[], cycleLengthWeeks: number
     return pastWeeksMap;
   } catch (error: any) {
     logger.error(new Error('Error fetching past weeks data'), { error });
-    // Return empty data rather than failing
     return {};
   }
 }
 
-/**
- * Save generated assignments to the database with enhanced validation
- */
 async function saveAssignments(assignments: Assignment[], versionId: string): Promise<void> {
   try {
     if (!assignments || assignments.length === 0) {
@@ -305,7 +281,6 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
       }
       
       console.log(`✅ Saved batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
-      logger.info(`Saved batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
     }
 
     console.log('🎉 Successfully saved all assignments to database');
@@ -317,6 +292,5 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
   }
 }
 
-// Export from original file for backward compatibility
-export { generateAssignments as generateRosterAssignments } from "./assignmentGenerator";
+// Export helper functions
 export { fetchStaffMembers } from "./staffHelpers";

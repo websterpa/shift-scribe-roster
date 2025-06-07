@@ -1,10 +1,131 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Eye } from 'lucide-react';
+import { LoadingState } from '@/components/ui/loading-state';
+import { Calendar, Eye, Download, FileText } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+
+interface RosterVersion {
+  id: string;
+  version_name: string;
+  version_number: number;
+  generated_at: string;
+  start_date?: string;
+  end_date?: string;
+  config: {
+    config_name: string;
+    shift_type: string;
+    cycle_length_weeks: number;
+  };
+  assignment_count?: number;
+}
 
 const MyRosters = () => {
+  const [rosters, setRosters] = useState<RosterVersion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadRosters();
+  }, []);
+
+  const loadRosters = async () => {
+    try {
+      console.log('📊 Loading roster versions...');
+      setLoading(true);
+
+      // Fetch roster versions with their configurations
+      const { data: versions, error: versionsError } = await supabase
+        .from('roster_versions')
+        .select(`
+          id,
+          version_name,
+          version_number,
+          generated_at,
+          start_date,
+          end_date,
+          config:roster_config(
+            config_name,
+            shift_type,
+            cycle_length_weeks
+          )
+        `)
+        .order('generated_at', { ascending: false });
+
+      if (versionsError) {
+        console.error('❌ Error loading roster versions:', versionsError);
+        toast({
+          title: "Error loading rosters",
+          description: versionsError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Loaded roster versions:', versions?.length || 0);
+
+      // Count assignments for each version
+      const rostersWithCounts = await Promise.all(
+        (versions || []).map(async (version) => {
+          try {
+            const { count, error: countError } = await supabase
+              .from('roster_assignments')
+              .select('*', { count: 'exact', head: true })
+              .eq('version_id', version.id);
+
+            if (countError) {
+              console.warn('⚠️ Error counting assignments for version:', version.id, countError);
+            }
+
+            return {
+              ...version,
+              assignment_count: count || 0
+            };
+          } catch (error) {
+            console.warn('⚠️ Exception counting assignments for version:', version.id, error);
+            return {
+              ...version,
+              assignment_count: 0
+            };
+          }
+        })
+      );
+
+      setRosters(rostersWithCounts);
+      console.log('✅ Processed roster data with assignment counts');
+    } catch (error: any) {
+      console.error('❌ Exception loading rosters:', error);
+      toast({
+        title: "Error loading rosters",
+        description: "Failed to load roster data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewRoster = (roster: RosterVersion) => {
+    console.log('👁️ Viewing roster:', roster.version_name);
+    toast({
+      title: "Feature coming soon",
+      description: "Roster viewer will be available in the next update",
+    });
+  };
+
+  const handleExportRoster = (roster: RosterVersion) => {
+    console.log('📄 Exporting roster:', roster.version_name);
+    toast({
+      title: "Feature coming soon",
+      description: "Roster export will be available in the next update",
+    });
+  };
+
+  if (loading) {
+    return <LoadingState message="Loading your rosters..." />;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -18,21 +139,97 @@ const MyRosters = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Generated Rosters
+            Generated Rosters ({rosters.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No rosters generated yet</h3>
-            <p className="text-gray-500 mb-4">
-              Create your first roster to see it here. Generated rosters will appear with options to view and export.
-            </p>
-            <Button variant="outline">
-              <Eye className="h-4 w-4 mr-2" />
-              View Sample Roster
-            </Button>
-          </div>
+          {rosters.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No rosters generated yet</h3>
+              <p className="text-gray-500 mb-4">
+                Create your first roster to see it here. Generated rosters will appear with options to view and export.
+              </p>
+              <Button onClick={() => window.location.href = '/generate-roster'}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Generate Your First Roster
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Roster Name</th>
+                    <th className="text-left py-3 px-4 font-medium">Configuration</th>
+                    <th className="text-left py-3 px-4 font-medium">Version</th>
+                    <th className="text-left py-3 px-4 font-medium">Shift Type</th>
+                    <th className="text-left py-3 px-4 font-medium">Assignments</th>
+                    <th className="text-left py-3 px-4 font-medium">Generated</th>
+                    <th className="text-right py-3 px-4 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rosters.map((roster) => (
+                    <tr key={roster.id} className="border-b hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <div className="font-medium">{roster.version_name}</div>
+                        {roster.start_date && roster.end_date && (
+                          <div className="text-sm text-gray-500">
+                            {new Date(roster.start_date).toLocaleDateString()} - {new Date(roster.end_date).toLocaleDateString()}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">{roster.config?.config_name || 'Unknown'}</td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          v{roster.version_number}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {roster.config?.shift_type || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm">
+                          {roster.assignment_count || 0} assignments
+                          {roster.config?.cycle_length_weeks && (
+                            <div className="text-xs text-gray-500">
+                              {roster.config.cycle_length_weeks} weeks
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 text-sm">
+                        {new Date(roster.generated_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewRoster(roster)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportRoster(roster)}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Export
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

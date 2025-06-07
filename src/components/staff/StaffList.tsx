@@ -1,25 +1,14 @@
 
-import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, Filter } from 'lucide-react';
-import { StaffDialog } from './StaffDialog';
+import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
-} from '@/components/ui/alert-dialog';
+import { StaffDialog } from './StaffDialog';
+import { Users, Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StaffMember {
   id: string;
@@ -27,285 +16,242 @@ interface StaffMember {
   first_name: string;
   last_name: string;
   email: string;
-  phone: string | null;
-  hire_date: string;
-  is_active: boolean;
+  phone?: string;
   role?: string;
+  is_active: boolean;
+  hire_date: string;
   hourly_rate?: number;
-  roles: {
-    name: string;
-  } | null;
+  eligible_shifts: string[];
 }
 
 const StaffList = () => {
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [filteredStaff, setFilteredStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
-  const { toast } = useToast();
 
-  const fetchStaff = async () => {
+  useEffect(() => {
+    loadStaff();
+  }, []);
+
+  const loadStaff = async () => {
     try {
+      console.log('📊 Loading staff members...');
       setLoading(true);
+      
       const { data, error } = await supabase
         .from('staff_profiles')
-        .select(`
-          *,
-          roles:role_id (
-            name
-          )
-        `)
-        .order('last_name');
+        .select('*')
+        .order('first_name');
 
       if (error) {
+        console.error('❌ Error loading staff:', error);
         toast({
-          title: "Error",
-          description: "Failed to load staff data",
+          title: "Error loading staff",
+          description: error.message,
           variant: "destructive",
         });
-      } else {
-        setStaff(data || []);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching staff:', error);
+
+      console.log('✅ Loaded staff members:', data?.length || 0);
+      setStaff(data || []);
+    } catch (error: any) {
+      console.error('❌ Exception loading staff:', error);
+      toast({
+        title: "Error loading staff",
+        description: "Failed to load staff members",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  // Filter staff based on search and filters
-  useEffect(() => {
-    let filtered = staff;
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(member => 
-        member.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Role filter
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter(member => member.role === roleFilter);
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(member => 
-        statusFilter === 'active' ? member.is_active : !member.is_active
-      );
-    }
-
-    setFilteredStaff(filtered);
-  }, [staff, searchTerm, roleFilter, statusFilter]);
-
   const handleEdit = (staffMember: StaffMember) => {
+    console.log('✏️ Editing staff member:', staffMember.first_name, staffMember.last_name);
     setSelectedStaff(staffMember);
     setDialogOpen(true);
   };
 
-  const handleDelete = (staffMember: StaffMember) => {
-    setStaffToDelete(staffMember);
-    setDeleteDialogOpen(true);
+  const handleAdd = () => {
+    console.log('➕ Adding new staff member');
+    setSelectedStaff(null);
+    setDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!staffToDelete) return;
+  const handleDelete = async (staffMember: StaffMember) => {
+    if (!confirm(`Are you sure you want to deactivate ${staffMember.first_name} ${staffMember.last_name}?`)) {
+      return;
+    }
 
     try {
+      console.log('🗑️ Deactivating staff member:', staffMember.id);
+      
       const { error } = await supabase
         .from('staff_profiles')
-        .delete()
-        .eq('id', staffToDelete.id);
+        .update({ is_active: false })
+        .eq('id', staffMember.id);
 
       if (error) {
-        throw error;
+        console.error('❌ Error deactivating staff:', error);
+        toast({
+          title: "Error deactivating staff",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
       }
 
+      console.log('✅ Staff member deactivated');
       toast({
-        title: "Success",
-        description: "Staff member deleted successfully",
+        title: "Staff deactivated",
+        description: `${staffMember.first_name} ${staffMember.last_name} has been deactivated`,
       });
       
-      fetchStaff();
+      await loadStaff();
     } catch (error: any) {
-      console.error('Error deleting staff member:', error);
+      console.error('❌ Exception deactivating staff:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete staff member",
+        title: "Error deactivating staff",
+        description: "Failed to deactivate staff member",
         variant: "destructive",
       });
-    } finally {
-      setDeleteDialogOpen(false);
-      setStaffToDelete(null);
     }
   };
 
-  const uniqueRoles = Array.from(new Set(staff.map(s => s.role || s.roles?.name).filter(Boolean)));
+  const filteredStaff = staff.filter(member =>
+    member.is_active &&
+    (member.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     member.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     member.employee_id.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   if (loading) {
-    return <LoadingState message="Loading staff..." />;
+    return <LoadingState message="Loading staff members..." />;
   }
 
   return (
-    <>
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
-            <CardTitle>Staff Members ({filteredStaff.length})</CardTitle>
-            <Button onClick={() => { setSelectedStaff(null); setDialogOpen(true); }}>
-              <Plus className="w-4 h-4 mr-2" />
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Staff Members ({filteredStaff.length})
+            </div>
+            <Button onClick={handleAdd}>
+              <Plus className="h-4 w-4 mr-2" />
               Add Staff Member
             </Button>
-          </div>
-          
-          {/* Enhanced search and filter controls */}
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, email, or employee ID..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-40">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {uniqueRoles.map(role => (
-                    <SelectItem key={role} value={role!}>{role}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search staff members..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
           </div>
         </CardHeader>
-        
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Employee ID</th>
-                  <th className="text-left p-2">Name</th>
-                  <th className="text-left p-2">Email</th>
-                  <th className="text-left p-2">Role</th>
-                  <th className="text-left p-2">Rate</th>
-                  <th className="text-left p-2">Status</th>
-                  <th className="text-left p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStaff.map((member) => (
-                  <tr key={member.id} className="border-b hover:bg-gray-50">
-                    <td className="p-2 font-mono text-sm">{member.employee_id}</td>
-                    <td className="p-2">
-                      {member.first_name} {member.last_name}
-                    </td>
-                    <td className="p-2">{member.email}</td>
-                    <td className="p-2">
-                      {(member.role || member.roles?.name) && (
-                        <Badge variant="outline">{member.role || member.roles?.name}</Badge>
-                      )}
-                    </td>
-                    <td className="p-2">
-                      {member.hourly_rate && (
-                        <span className="text-sm">£{member.hourly_rate}/hr</span>
-                      )}
-                    </td>
-                    <td className="p-2">
-                      <Badge variant={member.is_active ? "default" : "secondary"}>
-                        {member.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="p-2">
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEdit(member)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDelete(member)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
+          {filteredStaff.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {searchTerm ? 'No staff members match your search' : 'No staff members found'}
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {searchTerm ? 'Try a different search term' : 'Add your first staff member to get started'}
+              </p>
+              {!searchTerm && (
+                <Button onClick={handleAdd}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Staff Member
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Employee ID</th>
+                    <th className="text-left py-3 px-4 font-medium">Name</th>
+                    <th className="text-left py-3 px-4 font-medium">Email</th>
+                    <th className="text-left py-3 px-4 font-medium">Role</th>
+                    <th className="text-left py-3 px-4 font-medium">Eligible Shifts</th>
+                    <th className="text-left py-3 px-4 font-medium">Hourly Rate</th>
+                    <th className="text-right py-3 px-4 font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {filteredStaff.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                {searchTerm || roleFilter !== 'all' || statusFilter !== 'all' 
-                  ? 'No staff members match your search criteria.'
-                  : 'No staff members found. Add your first staff member to get started.'
-                }
-              </div>
-            )}
-          </div>
+                </thead>
+                <tbody>
+                  {filteredStaff.map((member) => (
+                    <tr key={member.id} className="border-b hover:bg-gray-50">
+                      <td className="py-3 px-4 font-mono text-sm">{member.employee_id}</td>
+                      <td className="py-3 px-4">
+                        <div>
+                          <div className="font-medium">{member.first_name} {member.last_name}</div>
+                          <div className="text-sm text-gray-500">Hired: {new Date(member.hire_date).toLocaleDateString()}</div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm">{member.email}</td>
+                      <td className="py-3 px-4">
+                        <Badge variant="outline">{member.role || 'Staff'}</Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {member.eligible_shifts?.map((shift) => (
+                            <Badge key={shift} variant="secondary" className="text-xs">
+                              {shift}
+                            </Badge>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {member.hourly_rate ? `£${member.hourly_rate.toFixed(2)}` : 'Not set'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(member)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(member)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <StaffDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        staffMember={selectedStaff}
-        onSuccess={fetchStaff}
+        staff={selectedStaff}
+        onSuccess={() => {
+          loadStaff();
+          setDialogOpen(false);
+          setSelectedStaff(null);
+        }}
       />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Staff Member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {staffToDelete?.first_name} {staffToDelete?.last_name}? 
-              This action cannot be undone and will remove all associated data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    </div>
   );
 };
 

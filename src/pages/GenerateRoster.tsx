@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingState } from '@/components/ui/loading-state';
-import { Settings, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
+import { Settings, Calendar, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 
 const GenerateRoster = () => {
@@ -40,20 +40,13 @@ const GenerateRoster = () => {
     errors
   });
 
-  const handleButtonClick = async () => {
+  const handleButtonClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     console.log('🚀 Generate Roster button clicked!');
-    console.log('🛠️ GenerateRoster click, config:', selectedConfig, 'versionName:', rosterName);
+    console.log('🛠️ GenerateRoster click, config:', selectedConfig?.config_name, 'versionName:', rosterName);
     console.log('📋 Staff list:', staffList.length, 'members');
-    
-    if (!selectedConfig) {
-      console.warn('⚠️ No config selected');
-      return;
-    }
-    
-    if (!rosterName.trim()) {
-      console.warn('⚠️ No roster name provided');
-      return;
-    }
     
     try {
       console.log('📞 Calling handleGenerateRoster...');
@@ -68,6 +61,8 @@ const GenerateRoster = () => {
     return <LoadingState message="Loading roster configuration data..." />;
   }
 
+  const canGenerate = selectedConfig && rosterName.trim() && staffList.length > 0 && !isGenerating;
+
   return (
     <div className="space-y-6">
       <div>
@@ -80,7 +75,18 @@ const GenerateRoster = () => {
       {/* Debug Information */}
       <Card className="bg-blue-50 border-blue-200">
         <CardHeader>
-          <CardTitle className="text-blue-800 text-sm">Debug Information</CardTitle>
+          <CardTitle className="text-blue-800 text-sm flex items-center justify-between">
+            Debug Information
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshData}
+              disabled={isLoading}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-blue-700">
           <div>Configs loaded: {configs.length}</div>
@@ -88,6 +94,7 @@ const GenerateRoster = () => {
           <div>Selected config: {selectedConfig?.config_name || 'None'}</div>
           <div>Roster name: {rosterName || 'Empty'}</div>
           <div>Is generating: {isGenerating.toString()}</div>
+          <div>Can generate: {canGenerate.toString()}</div>
           {generatedVersionId && <div>Generated version ID: {generatedVersionId}</div>}
         </CardContent>
       </Card>
@@ -125,12 +132,6 @@ const GenerateRoster = () => {
                 No configurations found. Create one in Roster Config first.
               </p>
             )}
-            {errors.configs && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                {errors.configs}
-              </p>
-            )}
           </div>
 
           <div className="space-y-2">
@@ -146,41 +147,21 @@ const GenerateRoster = () => {
               required
             />
             <p className="text-xs text-gray-500">This name will be saved with your roster version</p>
-            {errors.name && (
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                {errors.name}
-              </p>
-            )}
           </div>
 
-          {staffList.length === 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-              <p className="text-sm text-yellow-800 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                No staff members found. Add staff members first.
-              </p>
-            </div>
-          )}
+          {/* Error Messages */}
+          {Object.entries(errors).map(([key, message]) => (
+            message && (
+              <div key={key} className="bg-red-50 border border-red-200 rounded-md p-3">
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {message}
+                </p>
+              </div>
+            )
+          ))}
 
-          {errors.staff && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                {errors.staff}
-              </p>
-            </div>
-          )}
-
-          {errors.general && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-              <p className="text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                {errors.general}
-              </p>
-            </div>
-          )}
-
+          {/* Success Message */}
           {generatedVersionId && (
             <div className="bg-green-50 border border-green-200 rounded-md p-3">
               <p className="text-sm text-green-800 flex items-center gap-1">
@@ -190,10 +171,20 @@ const GenerateRoster = () => {
             </div>
           )}
 
+          {/* Validation Warnings */}
+          {staffList.length === 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+              <p className="text-sm text-yellow-800 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                No staff members found. Add staff members first.
+              </p>
+            </div>
+          )}
+
           <Button 
             className="w-full" 
             onClick={handleButtonClick}
-            disabled={isGenerating || !selectedConfig || !rosterName.trim() || staffList.length === 0}
+            disabled={!canGenerate}
             type="button"
           >
             {isGenerating ? (
@@ -209,7 +200,8 @@ const GenerateRoster = () => {
             )}
           </Button>
 
-          {(isGenerating || !selectedConfig || !rosterName.trim() || staffList.length === 0) && (
+          {/* Helper Text */}
+          {!canGenerate && (
             <div className="text-xs text-gray-500">
               {isGenerating && "Please wait while the roster is being generated..."}
               {!isGenerating && !selectedConfig && "Please select a configuration first."}
