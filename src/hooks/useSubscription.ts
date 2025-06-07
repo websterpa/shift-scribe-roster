@@ -21,20 +21,35 @@ export function useSubscription() {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setSubscription(null);
+      setIsAdmin(false);
       setLoading(false);
       return;
     }
 
-    fetchSubscription();
+    fetchSubscriptionAndAdminStatus();
   }, [user, isAuthenticated]);
 
-  const fetchSubscription = async () => {
+  const fetchSubscriptionAndAdminStatus = async () => {
     try {
       setLoading(true);
+      
+      // Check if user is admin
+      const { data: adminResult, error: adminError } = await supabase
+        .rpc('is_admin', { user_id: user?.id });
+
+      if (adminError) {
+        logger.error(new Error('Failed to check admin status'), { error: adminError });
+      } else {
+        setIsAdmin(adminResult || false);
+        logger.info('Admin status checked', { isAdmin: adminResult });
+      }
+
+      // Fetch subscription data
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -69,6 +84,12 @@ export function useSubscription() {
   };
 
   const hasProAccess = () => {
+    // Admin users always have Pro access
+    if (isAdmin) {
+      logger.info('Admin user granted Pro access');
+      return true;
+    }
+
     if (!subscription) return false;
     
     if (subscription.subscription_tier !== 'pro') return false;
@@ -89,13 +110,14 @@ export function useSubscription() {
   };
 
   const refreshSubscription = () => {
-    fetchSubscription();
+    fetchSubscriptionAndAdminStatus();
   };
 
   return {
     subscription,
     loading,
     error,
+    isAdmin,
     hasProAccess: hasProAccess(),
     canViewRosters: canViewRosters(),
     refreshSubscription
