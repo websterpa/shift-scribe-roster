@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchConfigById } from '@/utils/configHelpers';
@@ -73,6 +74,24 @@ export function useConfigForm() {
         ? validHandshake as 0 | 15 | 30 | 45 | 60
         : 0;
       
+      // Safely parse staffing_requirements from JSON
+      let staffingRequirements = {
+        day_shift_staff: 2,
+        night_shift_staff: 2,
+        early_shift_staff: 1,
+        late_shift_staff: 1
+      };
+      
+      if (data.staffing_requirements && typeof data.staffing_requirements === 'object') {
+        const parsed = data.staffing_requirements as any;
+        staffingRequirements = {
+          day_shift_staff: parsed.day_shift_staff || 2,
+          night_shift_staff: parsed.night_shift_staff || 2,
+          early_shift_staff: parsed.early_shift_staff || 1,
+          late_shift_staff: parsed.late_shift_staff || 1
+        };
+      }
+      
       setFormData({
         config_name: data.config_name,
         cycle_length_weeks: data.cycle_length_weeks,
@@ -80,12 +99,7 @@ export function useConfigForm() {
         operational_hours_per_day: data.operational_hours_per_day,
         handshake_minutes: closestValid,
         start_date: data.start_date,
-        staffing_requirements: data.staffing_requirements || {
-          day_shift_staff: 2,
-          night_shift_staff: 2,
-          early_shift_staff: 1,
-          late_shift_staff: 1
-        }
+        staffing_requirements: staffingRequirements
       });
     } catch (error) {
       console.error('❌ useConfigForm: Exception loading config:', error);
