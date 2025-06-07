@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { LoadingState } from '@/components/ui/loading-state';
 import { validateForm, staffValidationSchema, showValidationToast, showSuccessToast } from '@/utils/formValidation';
 import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 interface StaffMember {
   id?: string;
@@ -37,21 +38,13 @@ interface StaffDialogProps {
 const AVAILABLE_SHIFTS = ['Early', 'Late', 'Night', 'Day'];
 const AVAILABLE_ROLES = ['CCTV Operator', 'Senior Operator', 'Supervisor', 'Manager'];
 
-// Generate a proper UUID v4 format
-const generateDemoUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
 export const StaffDialog: React.FC<StaffDialogProps> = ({
   open,
   onOpenChange,
   staffMember,
   onSuccess
 }) => {
+  const { user, isAuthenticated } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<StaffMember>>({
     employee_id: '',
@@ -116,11 +109,9 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if user is authenticated first
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      console.error('Authentication error:', authError);
+    // Check authentication status
+    if (!isAuthenticated || !user) {
+      console.error('User not authenticated');
       showValidationToast({ general: 'You must be logged in to perform this action' });
       return;
     }
@@ -138,10 +129,6 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
 
     setLoading(true);
     try {
-      // Generate a proper UUID for the user_id
-      const generatedUserId = generateDemoUUID();
-      console.log('Generated UUID:', generatedUserId);
-      
       const dataToSave = {
         employee_id: formData.employee_id,
         first_name: formData.first_name,
@@ -156,7 +143,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         max_hours_per_week: formData.max_hours_per_week,
         eligible_shifts: formData.eligible_shifts,
         is_shift_worker: formData.is_shift_worker,
-        user_id: generatedUserId
+        user_id: user.id // Use the authenticated user's ID
       };
 
       console.log('Data being saved:', dataToSave);

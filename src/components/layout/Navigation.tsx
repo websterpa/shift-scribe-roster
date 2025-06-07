@@ -2,12 +2,22 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap } from 'lucide-react';
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut } from 'lucide-react';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 const Navigation = () => {
   const location = useLocation();
+  const { user, signOut } = useSupabaseAuth();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -97,10 +107,11 @@ const Navigation = () => {
               </Link>
             </div>
           </div>
-          <div className="flex items-center">
-            <span className="text-sm text-gray-700 mr-4">dev@example.com</span>
-            <Button variant="outline" size="sm" disabled>
-              Development Mode
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-700">{user?.email}</span>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
             </Button>
           </div>
         </div>

@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { SimpleAuth } from '@/components/auth/SimpleAuth';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { SupabaseAuth } from '@/components/auth/SupabaseAuth';
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { createLogger } from '@/utils/errorLogger';
 
 // Import pages
@@ -19,39 +20,14 @@ import NotFound from '@/pages/NotFound';
 const logger = createLogger('AppRouter');
 
 export const AppRouter: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { isAuthenticated, loading } = useSupabaseAuth();
 
-  useEffect(() => {
-    // Check if user is already authenticated
-    const checkAuth = () => {
-      try {
-        const authStatus = localStorage.getItem('demo_authenticated');
-        setIsAuthenticated(authStatus === 'true');
-        logger.info('Authentication status checked', { isAuthenticated: authStatus === 'true' });
-      } catch (error) {
-        logger.error(new Error('Error checking authentication'), { originalError: error });
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  const handleLogin = (authenticated: boolean) => {
-    setIsAuthenticated(authenticated);
-    logger.info('Authentication state updated', { authenticated });
+  const handleAuthSuccess = () => {
+    logger.info('Authentication successful, reloading to sync state');
+    window.location.reload(); // Simple way to ensure auth state is synced
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('demo_authenticated');
-    setIsAuthenticated(false);
-    logger.info('User logged out');
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -63,7 +39,7 @@ export const AppRouter: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <SimpleAuth onLogin={handleLogin} />;
+    return <SupabaseAuth onAuthSuccess={handleAuthSuccess} />;
   }
 
   return (
