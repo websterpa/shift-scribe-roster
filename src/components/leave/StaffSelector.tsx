@@ -2,16 +2,10 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface StaffOption {
-  id: string;
-  first_name: string;
-  last_name: string;
-  leave_allowance_days?: number;
-}
+import { StaffMember } from "@/types/roster";
 
 interface StaffSelectorProps {
-  staffList: StaffOption[];
+  staffList: StaffMember[];
   selectedStaff: string;
   onStaffChange: (staffId: string) => void;
 }

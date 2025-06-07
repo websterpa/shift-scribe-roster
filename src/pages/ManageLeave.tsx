@@ -10,14 +10,7 @@ import { LeaveTypeSelector } from "@/components/leave/LeaveTypeSelector";
 import { LeaveSummary } from "@/components/leave/LeaveSummary";
 import { useStaffData } from "@/hooks/useStaffData";
 import { calculateDaysBetween } from "@/utils/leaveCalculations";
-
-interface StaffOption {
-  id: string;
-  first_name: string;
-  last_name: string;
-  leave_allowance_days?: number;
-  leave_taken_monthly: Record<string, number>;
-}
+import { StaffMember } from "@/types/roster";
 
 export default function ManageLeave() {
   const { staffList, loading, refetchStaffList } = useStaffData();
