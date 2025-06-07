@@ -17,7 +17,7 @@ export interface SubscriptionData {
 }
 
 async function checkAdmin(userId: string): Promise<boolean> {
-  logger.info('Checking admin status for user:', userId);
+  logger.info('🔍 Checking admin status for user:', userId);
   
   try {
     // First try the RPC function
@@ -28,7 +28,7 @@ async function checkAdmin(userId: string): Promise<boolean> {
     if (rpcError) {
       console.error('useSubscription: RPC is_admin failed:', rpcError);
     } else if (rpcResult !== null) {
-      console.log('useSubscription: RPC is_admin result:', rpcResult);
+      console.log('useSubscription: 🎯 RPC is_admin result:', rpcResult);
       return rpcResult === true;
     }
 
@@ -46,7 +46,7 @@ async function checkAdmin(userId: string): Promise<boolean> {
     }
 
     const adminStatus = profileData?.is_admin || false;
-    console.log('useSubscription: Fallback admin status:', adminStatus);
+    console.log('useSubscription: 🎯 Fallback admin status:', adminStatus);
     return adminStatus;
 
   } catch (error) {
@@ -80,15 +80,15 @@ export function useSubscription() {
     try {
       setLoading(true);
       setError(null);
-      console.log('useSubscription: Starting comprehensive check for user:', user.id);
+      console.log('useSubscription: 🚀 Starting comprehensive check for user:', user.id);
 
       // Check admin status using the robust checkAdmin function
       const adminStatus = await checkAdmin(user.id);
       setIsAdmin(adminStatus);
-      console.log('useSubscription: Final admin status set to:', adminStatus);
+      console.log('useSubscription: 👑 ADMIN STATUS SET TO:', adminStatus);
 
       // Fetch subscription data
-      console.log('useSubscription: Fetching subscription data...');
+      console.log('useSubscription: 📊 Fetching subscription data...');
       const { data: subData, error: subError } = await supabase
         .from('subscriptions')
         .select('*')
@@ -102,7 +102,7 @@ export function useSubscription() {
         }
         setSubscription(null);
       } else {
-        console.log('useSubscription: Subscription data retrieved:', subData);
+        console.log('useSubscription: 📊 Subscription data retrieved:', subData);
         const typedSubscription: SubscriptionData = {
           id: subData.id,
           subscription_tier: subData.subscription_tier as 'free' | 'pro',
@@ -123,24 +123,24 @@ export function useSubscription() {
   };
 
   const hasProAccess = () => {
-    console.log('useSubscription: hasProAccess evaluation:');
+    console.log('useSubscription: 🎯 hasProAccess evaluation starting:');
     console.log('  - isAdmin:', isAdmin);
     console.log('  - subscription:', subscription);
     
-    // Admin users ALWAYS have Pro access
+    // ⭐ CRITICAL: Admin users ALWAYS have Pro access, regardless of subscription
     if (isAdmin) {
-      console.log('useSubscription: ✅ ADMIN ACCESS GRANTED - Pro access via admin status');
+      console.log('useSubscription: ✅ 👑 ADMIN ACCESS GRANTED - Pro access via admin status');
       return true;
     }
 
-    // Check subscription for non-admin users
+    // Only check subscription for non-admin users
     if (!subscription) {
       console.log('useSubscription: ❌ No subscription found, no pro access');
       return false;
     }
     
     if (subscription.subscription_tier !== 'pro') {
-      console.log('useSubscription: ❌ Not pro tier:', subscription.subscription_tier);
+      console.log('useSubscription: ❌ Not pro tier:', subscription.subscription_tier, '(but not admin, so no access)');
       return false;
     }
     
