@@ -292,5 +292,8 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
   }
 }
 
-// Export helper functions
+// Export helper functions including the missing one
 export { fetchStaffMembers } from "./staffHelpers";
+
+// Export the missing function that was referenced
+export const generateRosterAssignments = generateAndSaveRoster;

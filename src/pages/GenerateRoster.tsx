@@ -61,7 +61,8 @@ const GenerateRoster = () => {
     return <LoadingState message="Loading roster configuration data..." />;
   }
 
-  const canGenerate = selectedConfig && rosterName.trim() && staffList.length > 0 && !isGenerating;
+  // Safe check for canGenerate
+  const canGenerate = Boolean(selectedConfig && rosterName && rosterName.trim() && staffList.length > 0 && !isGenerating);
 
   return (
     <div className="space-y-6">
@@ -93,8 +94,8 @@ const GenerateRoster = () => {
           <div>Staff members: {staffList.length}</div>
           <div>Selected config: {selectedConfig?.config_name || 'None'}</div>
           <div>Roster name: {rosterName || 'Empty'}</div>
-          <div>Is generating: {isGenerating.toString()}</div>
-          <div>Can generate: {canGenerate.toString()}</div>
+          <div>Is generating: {String(isGenerating)}</div>
+          <div>Can generate: {String(canGenerate)}</div>
           {generatedVersionId && <div>Generated version ID: {generatedVersionId}</div>}
         </CardContent>
       </Card>

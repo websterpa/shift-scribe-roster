@@ -1,232 +1,181 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
+import { Plus, Edit, Trash2, User } from 'lucide-react';
+import { useStaffData } from '@/hooks/useStaffData';
 import { StaffDialog } from './StaffDialog';
-import { Users, Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { StaffMember } from '@/types/roster';
 import { supabase } from '@/integrations/supabase/client';
 
-interface StaffMember {
-  id: string;
-  employee_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone?: string;
-  role?: string;
-  is_active: boolean;
-  hire_date: string;
-  hourly_rate?: number;
-  eligible_shifts: string[];
-}
-
 const StaffList = () => {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const { staffMembers, loading, error, refreshStaff } = useStaffData();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | undefined>(undefined);
 
-  useEffect(() => {
-    loadStaff();
-  }, []);
-
-  const loadStaff = async () => {
-    try {
-      console.log('📊 Loading staff members...');
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('staff_profiles')
-        .select('*')
-        .order('first_name');
-
-      if (error) {
-        console.error('❌ Error loading staff:', error);
-        toast({
-          title: "Error loading staff",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('✅ Loaded staff members:', data?.length || 0);
-      setStaff(data || []);
-    } catch (error: any) {
-      console.error('❌ Exception loading staff:', error);
-      toast({
-        title: "Error loading staff",
-        description: "Failed to load staff members",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleAddStaff = () => {
+    setEditingStaff(undefined);
+    setIsDialogOpen(true);
   };
 
-  const handleEdit = (staffMember: StaffMember) => {
-    console.log('✏️ Editing staff member:', staffMember.first_name, staffMember.last_name);
-    setSelectedStaff(staffMember);
-    setDialogOpen(true);
+  const handleEditStaff = (staff: StaffMember) => {
+    setEditingStaff(staff);
+    setIsDialogOpen(true);
   };
 
-  const handleAdd = () => {
-    console.log('➕ Adding new staff member');
-    setSelectedStaff(null);
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (staffMember: StaffMember) => {
-    if (!confirm(`Are you sure you want to deactivate ${staffMember.first_name} ${staffMember.last_name}?`)) {
+  const handleDeleteStaff = async (staffId: string) => {
+    if (!confirm('Are you sure you want to delete this staff member?')) {
       return;
     }
 
     try {
-      console.log('🗑️ Deactivating staff member:', staffMember.id);
-      
       const { error } = await supabase
         .from('staff_profiles')
-        .update({ is_active: false })
-        .eq('id', staffMember.id);
+        .delete()
+        .eq('id', staffId);
 
-      if (error) {
-        console.error('❌ Error deactivating staff:', error);
-        toast({
-          title: "Error deactivating staff",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
+      if (error) throw error;
 
-      console.log('✅ Staff member deactivated');
       toast({
-        title: "Staff deactivated",
-        description: `${staffMember.first_name} ${staffMember.last_name} has been deactivated`,
+        title: "Staff member deleted",
+        description: "The staff member has been successfully removed.",
       });
-      
-      await loadStaff();
+
+      refreshStaff();
     } catch (error: any) {
-      console.error('❌ Exception deactivating staff:', error);
+      console.error('Error deleting staff member:', error);
       toast({
-        title: "Error deactivating staff",
-        description: "Failed to deactivate staff member",
+        title: "Error deleting staff member",
+        description: error.message,
         variant: "destructive",
       });
     }
   };
 
-  const filteredStaff = staff.filter(member =>
-    member.is_active &&
-    (member.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     member.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     member.employee_id.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handleDialogSuccess = () => {
+    setIsDialogOpen(false);
+    setEditingStaff(undefined);
+    refreshStaff();
+  };
 
   if (loading) {
     return <LoadingState message="Loading staff members..." />;
   }
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">
+            <p className="text-red-600">Error loading staff: {error}</p>
+            <Button onClick={refreshStaff} className="mt-4">
+              Try Again
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
+          <p className="text-gray-600">Manage your team members and their shift preferences.</p>
+        </div>
+        <Button onClick={handleAddStaff}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Staff Member
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Staff Members ({filteredStaff.length})
-            </div>
-            <Button onClick={handleAdd}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Staff Member
-            </Button>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Staff Members ({staffMembers.length})
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search staff members..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
-          </div>
         </CardHeader>
         <CardContent>
-          {filteredStaff.length === 0 ? (
+          {staffMembers.length === 0 ? (
             <div className="text-center py-8">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm ? 'No staff members match your search' : 'No staff members found'}
-              </h3>
+              <User className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No staff members yet</h3>
               <p className="text-gray-500 mb-4">
-                {searchTerm ? 'Try a different search term' : 'Add your first staff member to get started'}
+                Add your first staff member to get started with roster generation.
               </p>
-              {!searchTerm && (
-                <Button onClick={handleAdd}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Staff Member
-                </Button>
-              )}
+              <Button onClick={handleAddStaff}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add First Staff Member
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium">Employee ID</th>
                     <th className="text-left py-3 px-4 font-medium">Name</th>
-                    <th className="text-left py-3 px-4 font-medium">Email</th>
+                    <th className="text-left py-3 px-4 font-medium">Employee ID</th>
                     <th className="text-left py-3 px-4 font-medium">Role</th>
+                    <th className="text-left py-3 px-4 font-medium">Rate</th>
+                    <th className="text-left py-3 px-4 font-medium">Hours/Week</th>
                     <th className="text-left py-3 px-4 font-medium">Eligible Shifts</th>
-                    <th className="text-left py-3 px-4 font-medium">Hourly Rate</th>
+                    <th className="text-left py-3 px-4 font-medium">Status</th>
                     <th className="text-right py-3 px-4 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStaff.map((member) => (
-                    <tr key={member.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono text-sm">{member.employee_id}</td>
+                  {staffMembers.map((staff) => (
+                    <tr key={staff.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4">
-                        <div>
-                          <div className="font-medium">{member.first_name} {member.last_name}</div>
-                          <div className="text-sm text-gray-500">Hired: {new Date(member.hire_date).toLocaleDateString()}</div>
+                        <div className="font-medium">{staff.first_name} {staff.last_name}</div>
+                        <div className="text-sm text-gray-500">{staff.email}</div>
+                      </td>
+                      <td className="py-3 px-4">{staff.employee_id}</td>
+                      <td className="py-3 px-4">{staff.role}</td>
+                      <td className="py-3 px-4">£{staff.hourly_rate}/hr</td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm">
+                          {staff.min_hours_per_week} - {staff.max_hours_per_week}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm">{member.email}</td>
                       <td className="py-3 px-4">
-                        <Badge variant="outline">{member.role || 'Staff'}</Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {member.eligible_shifts?.map((shift) => (
-                            <Badge key={shift} variant="secondary" className="text-xs">
+                        <div className="flex gap-1">
+                          {staff.eligible_shifts?.map((shift, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
                               {shift}
-                            </Badge>
-                          ))}
+                            </span>
+                          )) || <span className="text-gray-400">None</span>}
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        {member.hourly_rate ? `£${member.hourly_rate.toFixed(2)}` : 'Not set'}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          staff.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {staff.is_active ? 'Active' : 'Inactive'}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEdit(member)}
+                            onClick={() => handleEditStaff(staff)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDelete(member)}
+                            onClick={() => handleDeleteStaff(staff.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -242,14 +191,10 @@ const StaffList = () => {
       </Card>
 
       <StaffDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        staff={selectedStaff}
-        onSuccess={() => {
-          loadStaff();
-          setDialogOpen(false);
-          setSelectedStaff(null);
-        }}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        staffMember={editingStaff}
+        onSuccess={handleDialogSuccess}
       />
     </div>
   );

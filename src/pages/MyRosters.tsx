@@ -12,13 +12,11 @@ interface RosterVersion {
   version_name: string;
   version_number: number;
   generated_at: string;
-  start_date?: string;
-  end_date?: string;
   config: {
     config_name: string;
     shift_type: string;
     cycle_length_weeks: number;
-  };
+  } | null;
   assignment_count?: number;
 }
 
@@ -43,8 +41,6 @@ const MyRosters = () => {
           version_name,
           version_number,
           generated_at,
-          start_date,
-          end_date,
           config:roster_config(
             config_name,
             shift_type,
@@ -174,11 +170,6 @@ const MyRosters = () => {
                     <tr key={roster.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4">
                         <div className="font-medium">{roster.version_name}</div>
-                        {roster.start_date && roster.end_date && (
-                          <div className="text-sm text-gray-500">
-                            {new Date(roster.start_date).toLocaleDateString()} - {new Date(roster.end_date).toLocaleDateString()}
-                          </div>
-                        )}
                       </td>
                       <td className="py-3 px-4">{roster.config?.config_name || 'Unknown'}</td>
                       <td className="py-3 px-4">
