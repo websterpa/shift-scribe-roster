@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -36,7 +35,7 @@ interface StaffDialogProps {
 }
 
 const AVAILABLE_SHIFTS = ['Early', 'Late', 'Night', 'Day'];
-const AVAILABLE_ROLES = ['CCTV Operator', 'Senior Operator', 'Supervisor', 'Manager'];
+const AVAILABLE_ROLES = ['Security Officer', 'Senior Officer', 'Supervisor', 'Manager'];
 
 export const StaffDialog: React.FC<StaffDialogProps> = ({
   open,
@@ -54,11 +53,11 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
     phone: '',
     hire_date: new Date().toISOString().split('T')[0],
     is_active: true,
-    role: 'CCTV Operator',
+    role: 'Security Officer',
     hourly_rate: 15.50,
-    min_hours_per_week: 32,
+    min_hours_per_week: 37,
     max_hours_per_week: 48,
-    eligible_shifts: ['Early', 'Late'],
+    eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
     is_shift_worker: true
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -68,7 +67,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
       setFormData({
         ...staffMember,
         hire_date: staffMember.hire_date || new Date().toISOString().split('T')[0],
-        eligible_shifts: staffMember.eligible_shifts || ['Early', 'Late']
+        eligible_shifts: staffMember.eligible_shifts || ['Early', 'Late', 'Night', 'Day']
       });
     } else {
       setFormData({
@@ -79,11 +78,11 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         phone: '',
         hire_date: new Date().toISOString().split('T')[0],
         is_active: true,
-        role: 'CCTV Operator',
+        role: 'Security Officer',
         hourly_rate: 15.50,
-        min_hours_per_week: 32,
+        min_hours_per_week: 37,
         max_hours_per_week: 48,
-        eligible_shifts: ['Early', 'Late'],
+        eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
         is_shift_worker: true
       });
     }
@@ -308,7 +307,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
                 max="168"
                 value={formData.min_hours_per_week || ''}
                 onChange={(e) => handleInputChange('min_hours_per_week', parseInt(e.target.value))}
-                placeholder="32"
+                placeholder="37"
               />
             </div>
 

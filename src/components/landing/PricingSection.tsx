@@ -1,17 +1,14 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const PricingSection = () => {
-  const [isAnnual, setIsAnnual] = useState(false);
-
   const plans = [
     {
       name: 'Free',
       description: 'Perfect for trying out our platform',
-      monthlyPrice: 0,
       annualPrice: 0,
       features: [
         'Create and manage staff profiles',
@@ -31,8 +28,7 @@ export const PricingSection = () => {
     {
       name: 'Pro',
       description: 'Full roster management solution',
-      monthlyPrice: 49,
-      annualPrice: 490,
+      annualPrice: 399,
       features: [
         'Everything in Free',
         'Full roster generation',
@@ -60,27 +56,6 @@ export const PricingSection = () => {
           <p className="text-xl text-gray-600 mb-8">
             Choose the plan that works best for your organization
           </p>
-          
-          <div className="flex items-center justify-center mb-8">
-            <span className={`mr-3 ${!isAnnual ? 'text-gray-900' : 'text-gray-500'}`}>
-              Monthly
-            </span>
-            <button
-              onClick={() => setIsAnnual(!isAnnual)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                isAnnual ? 'bg-blue-600' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isAnnual ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <span className={`ml-3 ${isAnnual ? 'text-gray-900' : 'text-gray-500'}`}>
-              Annual (save 17%)
-            </span>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -111,10 +86,10 @@ export const PricingSection = () => {
                 </p>
                 <div className="mb-4">
                   <span className="text-4xl font-bold text-gray-900">
-                    £{isAnnual ? plan.annualPrice : plan.monthlyPrice}
+                    £{plan.annualPrice}
                   </span>
                   <span className="text-gray-600">
-                    /{isAnnual ? 'year' : 'month'}
+                    /year
                   </span>
                 </div>
               </div>
