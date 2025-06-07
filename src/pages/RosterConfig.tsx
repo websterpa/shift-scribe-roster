@@ -25,7 +25,7 @@ const RosterConfig = () => {
     cycle_length_weeks: 4,
     shift_type: '8h' as '8h' | '12h',
     operational_hours_per_day: 24,
-    handshake_minutes: 30,
+    handshake_minutes: 0 as 0 | 15 | 30 | 45 | 60,
     start_date: ''
   });
   const [loading, setLoading] = useState(false);
@@ -53,7 +53,7 @@ const RosterConfig = () => {
   };
 
   const loadConfig = async (id: string) => {
-    console.log('📥 Loading config:', id);
+    console.log('📥 RosterConfig: Loading config:', id);
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -63,7 +63,7 @@ const RosterConfig = () => {
         .single();
 
       if (error) {
-        console.error('❌ Error loading config:', error);
+        console.error('❌ RosterConfig: Error loading config:', error);
         toast({
           title: "Error loading configuration",
           description: error.message,
@@ -72,17 +72,25 @@ const RosterConfig = () => {
         return;
       }
 
-      console.log('✅ Config loaded:', data);
+      console.log('✅ RosterConfig: Config loaded:', data);
+      
+      // Ensure handshake minutes is a valid value
+      const validHandshake = data.handshake_minutes || 0;
+      const allowedValues: (0 | 15 | 30 | 45 | 60)[] = [0, 15, 30, 45, 60];
+      const closestValid = allowedValues.includes(validHandshake as any) 
+        ? validHandshake as 0 | 15 | 30 | 45 | 60
+        : 0;
+      
       setFormData({
         config_name: data.config_name,
         cycle_length_weeks: data.cycle_length_weeks,
         shift_type: data.shift_type as '8h' | '12h',
         operational_hours_per_day: data.operational_hours_per_day,
-        handshake_minutes: data.handshake_minutes || 30,
+        handshake_minutes: closestValid,
         start_date: data.start_date
       });
     } catch (error) {
-      console.error('❌ Exception loading config:', error);
+      console.error('❌ RosterConfig: Exception loading config:', error);
       toast({
         title: "Error loading configuration",
         variant: "destructive",
@@ -93,10 +101,10 @@ const RosterConfig = () => {
   };
 
   const saveConfig = async () => {
-    console.log('💾 Saving config:', formData);
+    console.log('💾 RosterConfig: Saving config:', formData);
     
     if (!formData.config_name.trim()) {
-      console.warn('⚠️ Config name is required');
+      console.warn('⚠️ RosterConfig: Config name is required');
       toast({
         title: "Configuration name is required",
         variant: "destructive",
@@ -105,7 +113,7 @@ const RosterConfig = () => {
     }
 
     if (!formData.start_date) {
-      console.warn('⚠️ Start date is required');
+      console.warn('⚠️ RosterConfig: Start date is required');
       toast({
         title: "Start date is required",
         variant: "destructive",
@@ -115,9 +123,10 @@ const RosterConfig = () => {
 
     try {
       setSaving(true);
-      console.log('📤 Submitting config to database...');
+      console.log('📤 RosterConfig: Submitting config to database...');
 
       if (configId) {
+        console.log('🔄 RosterConfig: Updating existing config');
         // Update existing config
         const { error } = await supabase
           .from('roster_config')
@@ -125,12 +134,13 @@ const RosterConfig = () => {
           .eq('id', configId);
 
         if (error) {
-          console.error('❌ Error updating config:', error);
+          console.error('❌ RosterConfig: Error updating config:', error);
           throw error;
         }
-        console.log('✅ Config updated successfully');
+        console.log('✅ RosterConfig: Config updated successfully');
         toast({ title: "Configuration updated successfully" });
       } else {
+        console.log('➕ RosterConfig: Creating new config');
         // Create new config
         const { data, error } = await supabase
           .from('roster_config')
@@ -139,15 +149,15 @@ const RosterConfig = () => {
           .single();
 
         if (error) {
-          console.error('❌ Error creating config:', error);
+          console.error('❌ RosterConfig: Error creating config:', error);
           throw error;
         }
-        console.log('✅ Config created successfully:', data.id);
+        console.log('✅ RosterConfig: Config created successfully:', data.id);
         toast({ title: "Configuration saved successfully" });
 
         // If action is generate, redirect to generate roster with this config
         if (action === 'generate') {
-          console.log('🚀 Redirecting to generate roster...');
+          console.log('🚀 RosterConfig: Redirecting to generate roster...');
           navigate(`/generate-roster?configId=${data.id}`);
           return;
         }
@@ -156,7 +166,7 @@ const RosterConfig = () => {
       // Redirect to configurations list
       navigate('/my-configurations');
     } catch (error: any) {
-      console.error('❌ Exception saving config:', error);
+      console.error('❌ RosterConfig: Exception saving config:', error);
       toast({
         title: "Error saving configuration",
         description: error.message,
@@ -168,11 +178,11 @@ const RosterConfig = () => {
   };
 
   const handleGenerateRoster = () => {
-    console.log('🚀 Generate Roster button clicked');
+    console.log('🚀 RosterConfig: Generate Roster button clicked');
     if (configId) {
       navigate(`/generate-roster?configId=${configId}`);
     } else {
-      console.log('💾 Saving config first, then generating roster...');
+      console.log('💾 RosterConfig: Saving config first, then generating roster...');
       // Save first, then redirect to generate
       setFormData(prev => ({ ...prev }));
       // This will trigger a save with action=generate
@@ -181,7 +191,7 @@ const RosterConfig = () => {
   };
 
   if (loading) {
-    console.log('⏳ RosterConfig showing loading state');
+    console.log('⏳ RosterConfig: Showing loading state');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div>Loading configuration...</div>
@@ -212,7 +222,7 @@ const RosterConfig = () => {
                 id="config_name"
                 value={formData.config_name}
                 onChange={(e) => {
-                  console.log('📝 Config name changed:', e.target.value);
+                  console.log('📝 RosterConfig: Config name changed:', e.target.value);
                   setFormData(prev => ({ ...prev, config_name: e.target.value }));
                 }}
                 placeholder="e.g. CCTV Control Room Standard"
@@ -224,7 +234,7 @@ const RosterConfig = () => {
               <Select 
                 value={formData.cycle_length_weeks.toString()} 
                 onValueChange={(value) => {
-                  console.log('📊 Cycle length changed:', value);
+                  console.log('📊 RosterConfig: Cycle length changed:', value);
                   setFormData(prev => ({ ...prev, cycle_length_weeks: parseInt(value) }));
                 }}
               >
@@ -245,7 +255,7 @@ const RosterConfig = () => {
               <Select 
                 value={formData.shift_type} 
                 onValueChange={(value: '8h' | '12h') => {
-                  console.log('⏰ Shift type changed:', value);
+                  console.log('⏰ RosterConfig: Shift type changed:', value);
                   setFormData(prev => ({ ...prev, shift_type: value }));
                 }}
               >
@@ -266,7 +276,7 @@ const RosterConfig = () => {
                 type="number"
                 value={formData.operational_hours_per_day}
                 onChange={(e) => {
-                  console.log('🕐 Operational hours changed:', e.target.value);
+                  console.log('🕐 RosterConfig: Operational hours changed:', e.target.value);
                   setFormData(prev => ({ ...prev, operational_hours_per_day: parseInt(e.target.value) || 24 }));
                 }}
                 min="1"
@@ -275,18 +285,27 @@ const RosterConfig = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="handshake_minutes">Handshake Minutes</Label>
-              <Input
-                id="handshake_minutes"
-                type="number"
-                value={formData.handshake_minutes}
-                onChange={(e) => {
-                  console.log('🤝 Handshake minutes changed:', e.target.value);
-                  setFormData(prev => ({ ...prev, handshake_minutes: parseInt(e.target.value) || 0 }));
+              <Label htmlFor="handshake_minutes">Handover Time</Label>
+              <Select 
+                value={formData.handshake_minutes.toString()} 
+                onValueChange={(value) => {
+                  const numValue = Number(value) as 0 | 15 | 30 | 45 | 60;
+                  console.log('🤝 RosterConfig: Handshake minutes changed:', numValue);
+                  setFormData(prev => ({ ...prev, handshake_minutes: numValue }));
                 }}
-                min="0"
-                max="60"
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">No handover (0 minutes)</SelectItem>
+                  <SelectItem value="15">15 minutes</SelectItem>
+                  <SelectItem value="30">30 minutes</SelectItem>
+                  <SelectItem value="45">45 minutes</SelectItem>
+                  <SelectItem value="60">60 minutes</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Time for shift handover between operators</p>
             </div>
 
             <div className="space-y-2">
@@ -296,7 +315,7 @@ const RosterConfig = () => {
                 type="date"
                 value={formData.start_date}
                 onChange={(e) => {
-                  console.log('📅 Start date changed:', e.target.value);
+                  console.log('📅 RosterConfig: Start date changed:', e.target.value);
                   setFormData(prev => ({ ...prev, start_date: e.target.value }));
                 }}
               />
@@ -305,7 +324,7 @@ const RosterConfig = () => {
             <div className="flex gap-2 pt-4">
               <Button 
                 onClick={() => {
-                  console.log('💾 Save Config button clicked');
+                  console.log('💾 RosterConfig: Save Config button clicked');
                   saveConfig();
                 }}
                 disabled={saving}
@@ -338,7 +357,7 @@ const RosterConfig = () => {
               <div><strong>Cycle:</strong> {formData.cycle_length_weeks} weeks</div>
               <div><strong>Shifts:</strong> {formData.shift_type}</div>
               <div><strong>Daily Hours:</strong> {formData.operational_hours_per_day} hours</div>
-              <div><strong>Handshake:</strong> {formData.handshake_minutes} minutes</div>
+              <div><strong>Handover:</strong> {formData.handshake_minutes} minutes</div>
               <div><strong>Start Date:</strong> {formData.start_date || 'Not set'}</div>
             </div>
           </CardContent>

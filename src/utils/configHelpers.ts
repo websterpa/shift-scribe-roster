@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { createLogger } from "./errorLogger";
 
@@ -25,8 +24,16 @@ export async function saveConfig({
     configName, 
     cycle_length_weeks, 
     shift_type,
-    operational_hours_per_day
+    operational_hours_per_day,
+    handshake_minutes
   });
+  
+  // Ensure handshake_minutes is a valid value
+  const validHandshakeValues = [0, 15, 30, 45, 60];
+  const validHandshake = validHandshakeValues.includes(handshake_minutes) ? handshake_minutes : 0;
+  if (validHandshake !== handshake_minutes) {
+    console.warn('⚠️ ConfigHelpers: Invalid handshake minutes value, using 0 instead:', handshake_minutes);
+  }
   
   try {
     const { data, error } = await supabase
@@ -36,7 +43,7 @@ export async function saveConfig({
         cycle_length_weeks,
         shift_type,
         operational_hours_per_day,
-        handshake_minutes,
+        handshake_minutes: validHandshake,
         start_date
       })
       .select("id")
@@ -63,6 +70,16 @@ export async function updateConfig(
   fields: Partial<Omit<ConfigData, 'configName'> & { config_name: string }>
 ) {
   console.log('🔄 ConfigHelpers: Updating configuration:', { configId, fields });
+  
+  // Ensure handshake_minutes is a valid value if it's being updated
+  if (fields.handshake_minutes !== undefined) {
+    const validHandshakeValues = [0, 15, 30, 45, 60];
+    const validHandshake = validHandshakeValues.includes(fields.handshake_minutes) ? fields.handshake_minutes : 0;
+    if (validHandshake !== fields.handshake_minutes) {
+      console.warn('⚠️ ConfigHelpers: Invalid handshake minutes value in update, using 0 instead:', fields.handshake_minutes);
+      fields.handshake_minutes = validHandshake;
+    }
+  }
   
   try {
     const { error } = await supabase
@@ -152,7 +169,7 @@ export async function ensureDefaultConfig() {
         cycle_length_weeks: 4,
         shift_type: "8h" as "8h" | "12h",
         operational_hours_per_day: 24,
-        handshake_minutes: 30,
+        handshake_minutes: 15, // Valid handshake value
         start_date: getNextMonday()
       };
       

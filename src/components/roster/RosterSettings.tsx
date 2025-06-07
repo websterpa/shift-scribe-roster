@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { saveConfig, updateConfig, fetchConfigById, ConfigData } from "@/utils/configHelpers";
 import { toast } from "@/hooks/use-toast";
@@ -35,6 +36,8 @@ export default function RosterSettings({
   defaultOpsHours = 16,
   defaultHandshake = 0
 }: Props) {
+  console.log('🔄 RosterSettings component rendered');
+  
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const configId = searchParams.get('configId');
@@ -43,7 +46,7 @@ export default function RosterSettings({
   const [cycle, setCycle] = useState(defaultCycle);
   const [shiftType, setShiftType] = useState(defaultShift);
   const [opsHours, setOpsHours] = useState(defaultOpsHours);
-  const [handshake, setHandshake] = useState(defaultHandshake);
+  const [handshakeMinutes, setHandshakeMinutes] = useState<0 | 15 | 30 | 45 | 60>(defaultHandshake as 0 | 15 | 30 | 45 | 60);
   const [startDate, setStartDate] = useState(() => {
     // First Monday today or next
     const d = new Date();
@@ -57,6 +60,7 @@ export default function RosterSettings({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    console.log('🔄 RosterSettings useEffect triggered', { configId });
     if (configId) {
       loadConfiguration(configId);
     }
@@ -64,15 +68,26 @@ export default function RosterSettings({
 
   const loadConfiguration = async (id: string) => {
     try {
+      console.log('📥 RosterSettings: Loading configuration:', id);
       setIsLoading(true);
       setValidationErrors({});
       const config = await fetchConfigById(id);
       
+      console.log('✅ RosterSettings: Configuration loaded:', config);
       setConfigName(config.config_name || "");
       setCycle(config.cycle_length_weeks || defaultCycle);
       setShiftType((config.shift_type as "8h" | "12h") || defaultShift);
       setOpsHours(config.operational_hours_per_day || defaultOpsHours);
-      setHandshake(config.handshake_minutes || defaultHandshake);
+      
+      // Ensure handshake minutes is a valid value (0, 15, 30, 45, 60)
+      const validHandshake = config.handshake_minutes || 0;
+      const allowedValues: (0 | 15 | 30 | 45 | 60)[] = [0, 15, 30, 45, 60];
+      const closestValid = allowedValues.includes(validHandshake as any) 
+        ? validHandshake as 0 | 15 | 30 | 45 | 60
+        : 0;
+      setHandshakeMinutes(closestValid);
+      console.log('🤝 RosterSettings: Handshake minutes set to:', closestValid);
+      
       setStartDate(config.start_date || startDate);
       
       toast({
@@ -80,7 +95,7 @@ export default function RosterSettings({
         description: `Loaded configuration: ${config.config_name}`,
       });
     } catch (error) {
-      console.error('Error loading configuration:', error);
+      console.error('❌ RosterSettings: Error loading configuration:', error);
       toast({
         title: "Error loading configuration",
         description: "Failed to load the selected configuration",
@@ -92,6 +107,7 @@ export default function RosterSettings({
   };
 
   const validateForm = (): boolean => {
+    console.log('🔍 RosterSettings: Validating form');
     const errors: Record<string, string> = {};
 
     if (!configName.trim()) {
@@ -106,10 +122,6 @@ export default function RosterSettings({
       errors.opsHours = "Operational hours must be between 8 and 24";
     }
 
-    if (handshake < 0 || handshake > 60) {
-      errors.handshake = "Handover time must be between 0 and 60 minutes";
-    }
-
     if (!startDate) {
       errors.startDate = "Start date is required";
     } else {
@@ -121,11 +133,16 @@ export default function RosterSettings({
     }
 
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    const isValid = Object.keys(errors).length === 0;
+    console.log('✅ RosterSettings: Form validation result:', { isValid, errors });
+    return isValid;
   };
 
   const handleSave = async () => {
+    console.log('💾 RosterSettings: Save button clicked', { configName, cycle, shiftType, opsHours, handshakeMinutes, startDate });
+    
     if (!validateForm()) {
+      console.warn('⚠️ RosterSettings: Form validation failed');
       toast({
         title: "Validation Error",
         description: "Please fix the errors before saving",
@@ -136,19 +153,21 @@ export default function RosterSettings({
 
     try {
       setIsSaving(true);
+      console.log('📤 RosterSettings: Submitting configuration...');
       
       const configData: ConfigData = {
         configName: configName.trim(),
         cycle_length_weeks: cycle,
         shift_type: shiftType,
         operational_hours_per_day: opsHours,
-        handshake_minutes: handshake,
+        handshake_minutes: handshakeMinutes,
         start_date: startDate
       };
 
       let savedConfigId: string;
 
       if (configId) {
+        console.log('🔄 RosterSettings: Updating existing configuration');
         // Update existing configuration
         await updateConfig(configId, {
           config_name: configData.configName,
@@ -165,6 +184,7 @@ export default function RosterSettings({
           description: `Successfully updated: ${configData.configName}`,
         });
       } else {
+        console.log('➕ RosterSettings: Creating new configuration');
         // Save new configuration
         savedConfigId = await saveConfig(configData);
         
@@ -174,18 +194,20 @@ export default function RosterSettings({
         });
       }
 
+      console.log('✅ RosterSettings: Configuration saved with ID:', savedConfigId);
+
       // Call the parent callback
       onSaveConfig({
         id: savedConfigId,
         cycle_length_weeks: cycle,
         shift_type: shiftType,
         operational_hours_per_day: opsHours,
-        handshake_minutes: handshake,
+        handshake_minutes: handshakeMinutes,
         start_date: startDate
       });
 
     } catch (error) {
-      console.error('Error saving configuration:', error);
+      console.error('❌ RosterSettings: Error saving configuration:', error);
       toast({
         title: "Save failed",
         description: "Failed to save configuration. Please try again.",
@@ -199,6 +221,8 @@ export default function RosterSettings({
   const handleDelete = async () => {
     if (!configId) return;
 
+    console.log('🗑️ RosterSettings: Deleting configuration:', configId);
+
     try {
       setIsDeleting(true);
       
@@ -208,9 +232,11 @@ export default function RosterSettings({
         .eq("id", configId);
         
       if (error) {
+        console.error('❌ RosterSettings: Error deleting configuration:', error);
         throw error;
       }
       
+      console.log('✅ RosterSettings: Configuration deleted successfully');
       toast({
         title: "Configuration deleted",
         description: "Configuration has been permanently deleted",
@@ -218,7 +244,7 @@ export default function RosterSettings({
       
       navigate('/my-configurations');
     } catch (error) {
-      console.error('Error deleting configuration:', error);
+      console.error('❌ RosterSettings: Exception deleting configuration:', error);
       toast({
         title: "Delete failed",
         description: "Failed to delete configuration. Please try again.",
@@ -230,6 +256,7 @@ export default function RosterSettings({
   };
 
   if (isLoading) {
+    console.log('⏳ RosterSettings: Showing loading state');
     return (
       <Card className="max-w-md mx-auto">
         <CardContent className="flex items-center justify-center p-8">
@@ -285,7 +312,10 @@ export default function RosterSettings({
             id="configName"
             type="text"
             value={configName}
-            onChange={(e) => setConfigName(e.target.value)}
+            onChange={(e) => {
+              console.log('📝 RosterSettings: Config name changed:', e.target.value);
+              setConfigName(e.target.value);
+            }}
             placeholder="e.g. Summer 2025 Cycle"
             className={validationErrors.configName ? "border-red-500" : ""}
           />
@@ -304,7 +334,11 @@ export default function RosterSettings({
             max={52}
             step={1}
             value={cycle}
-            onChange={(e) => setCycle(Number(e.target.value))}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              console.log('📊 RosterSettings: Cycle changed:', value);
+              setCycle(value);
+            }}
             className={validationErrors.cycle ? "border-red-500" : ""}
           />
           {validationErrors.cycle && (
@@ -315,7 +349,10 @@ export default function RosterSettings({
 
         <div className="space-y-2">
           <Label htmlFor="shiftType">Shift Type:</Label>
-          <Select value={shiftType} onValueChange={(value: "8h" | "12h") => setShiftType(value)}>
+          <Select value={shiftType} onValueChange={(value: "8h" | "12h") => {
+            console.log('⏰ RosterSettings: Shift type changed:', value);
+            setShiftType(value);
+          }}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -335,7 +372,11 @@ export default function RosterSettings({
             max={24}
             step={1}
             value={opsHours}
-            onChange={(e) => setOpsHours(Number(e.target.value))}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              console.log('🕐 RosterSettings: Operational hours changed:', value);
+              setOpsHours(value);
+            }}
             className={validationErrors.opsHours ? "border-red-500" : ""}
           />
           {validationErrors.opsHours && (
@@ -344,20 +385,27 @@ export default function RosterSettings({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="handshake">Handover (minutes):</Label>
-          <Input
-            id="handshake"
-            type="number"
-            min={0}
-            max={60}
-            step={15}
-            value={handshake}
-            onChange={(e) => setHandshake(Number(e.target.value))}
-            className={validationErrors.handshake ? "border-red-500" : ""}
-          />
-          {validationErrors.handshake && (
-            <p className="text-sm text-red-500">{validationErrors.handshake}</p>
-          )}
+          <Label>Handover Time:</Label>
+          <Select 
+            value={handshakeMinutes.toString()} 
+            onValueChange={(value) => {
+              const numValue = Number(value) as 0 | 15 | 30 | 45 | 60;
+              console.log('🤝 RosterSettings: Handshake minutes changed:', numValue);
+              setHandshakeMinutes(numValue);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">No handover (0 minutes)</SelectItem>
+              <SelectItem value="15">15 minutes</SelectItem>
+              <SelectItem value="30">30 minutes</SelectItem>
+              <SelectItem value="45">45 minutes</SelectItem>
+              <SelectItem value="60">60 minutes</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Time for shift handover between operators</p>
         </div>
 
         <div className="space-y-2">
@@ -366,7 +414,10 @@ export default function RosterSettings({
             id="startDate"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              console.log('📅 RosterSettings: Start date changed:', e.target.value);
+              setStartDate(e.target.value);
+            }}
             className={validationErrors.startDate ? "border-red-500" : ""}
           />
           {validationErrors.startDate && (
