@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +26,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     name?: string;
     general?: string;
   }>({});
+  const [validationReport, setValidationReport] = useState<import('@/utils/roster/staffingValidation').StaffingValidationReport | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
     console.log('🔄 useRosterGeneration: Initial data load effect triggered');
@@ -107,6 +108,11 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       const generatedName = `${config.config_name} - ${monthName} ${year}`;
       setRosterName(generatedName);
       console.log('✅ useRosterGeneration: Generated roster name:', generatedName);
+
+      // Trigger staffing validation when config and staff are both loaded
+      if (staffList.length > 0) {
+        await validateStaffing(typedConfig, staffList);
+      }
     } catch (error: any) {
       console.error('❌ useRosterGeneration: Error loading config:', error);
       setErrors(prev => ({
@@ -115,6 +121,47 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       }));
     }
   };
+
+  const validateStaffing = async (config: ConfigItem, staff: StaffMember[]) => {
+    console.log('🔍 Starting staffing validation...');
+    setIsValidating(true);
+    
+    try {
+      const { validateStaffingRequirements } = await import('@/utils/roster/staffingValidation');
+      const report = validateStaffingRequirements(staff, config);
+      
+      setValidationReport(report);
+      console.log('✅ Staffing validation completed:', { isValid: report.isValid });
+      
+      // Update errors based on validation
+      if (!report.isValid) {
+        setErrors(prev => ({
+          ...prev,
+          general: 'Staffing requirements not met - see validation report below'
+        }));
+      } else {
+        setErrors(prev => {
+          const { general, ...rest } = prev;
+          return rest;
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Error during staffing validation:', error);
+      setErrors(prev => ({
+        ...prev,
+        general: 'Failed to validate staffing requirements'
+      }));
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // Update when staffList changes and we have a selected config
+  useEffect(() => {
+    if (selectedConfig && staffList.length > 0) {
+      validateStaffing(selectedConfig, staffList);
+    }
+  }, [staffList, selectedConfig]);
 
   const handleGenerateRoster = async () => {
     console.log('🚀 useRosterGeneration: handleGenerateRoster called');
@@ -150,6 +197,18 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     if (staffList.length === 0) {
       const error = "No staff members available";
       console.warn('⚠️ useRosterGeneration: Validation failed:', error);
+      toast({
+        title: "Cannot generate roster",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check validation report
+    if (validationReport && !validationReport.isValid) {
+      const error = "Staffing requirements not met. Please review the validation report and add more staff or adjust requirements.";
+      console.warn('⚠️ useRosterGeneration: Staffing validation failed:', validationReport);
       toast({
         title: "Cannot generate roster",
         description: error,
@@ -227,6 +286,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     setSelectedConfigId,
     setRosterName,
     handleGenerateRoster,
-    refreshData
+    refreshData,
+    validationReport,
+    isValidating
   };
 };

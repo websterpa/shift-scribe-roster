@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { Settings, Calendar, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 import { useSearchParams } from 'react-router-dom';
+import { StaffingValidationDisplay } from '@/components/roster/StaffingValidationDisplay';
 
 const GenerateRoster = () => {
   console.log('🔄 GenerateRoster component rendered');
