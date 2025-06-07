@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Settings, Calendar, AlertCircle, CheckCircle, RefreshCw } from 'lucide-
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 import { useSearchParams } from 'react-router-dom';
 import { StaffingValidationDisplay } from '@/components/roster/StaffingValidationDisplay';
+import { ShiftCycleTestInterface } from '@/components/roster/ShiftCycleTestInterface';
 
 const GenerateRoster = () => {
   console.log('🔄 GenerateRoster component rendered');
@@ -27,6 +29,8 @@ const GenerateRoster = () => {
     isLoading,
     generatedVersionId,
     errors,
+    validationReport,
+    isValidating,
     setSelectedConfigId,
     setRosterName,
     handleGenerateRoster,
@@ -122,6 +126,15 @@ const GenerateRoster = () => {
           {generatedVersionId && <div>Generated version ID: {generatedVersionId}</div>}
         </CardContent>
       </Card>
+
+      {/* Shift Cycle Test Interface */}
+      <ShiftCycleTestInterface />
+      
+      {/* Staffing Validation Display */}
+      <StaffingValidationDisplay 
+        report={validationReport} 
+        isLoading={isValidating}
+      />
       
       <Card>
         <CardHeader>

@@ -22,12 +22,29 @@ export function generateAssignments(
   leaveMap: Record<string, { date: string; type: string }[]>,
   pastWeeksMap: Record<string, number[]>
 ): Assignment[] {
-  logger.info('Generating assignments', { 
+  logger.info('Generating assignments with enhanced cycle generation', { 
     staffCount: staffList.length,
     cycleWeeks: config.cycle_length_weeks,
     shiftType: config.shift_type,
     handshakeMinutes: config.handshake_minutes
   });
+
+  // Use enhanced cycle generation if available
+  let enhancedCycle;
+  try {
+    const { generateEnhancedRosterCycle } = await import('./enhancedCycleIntegration');
+    enhancedCycle = generateEnhancedRosterCycle(
+      staffList,
+      config.cycle_length_weeks,
+      config.shift_type,
+      config.operational_hours_per_day,
+      config.handshake_minutes
+    );
+    console.log('✅ Using enhanced cycle generation');
+  } catch (error) {
+    console.log('⚠️ Enhanced cycle generation not available, using fallback');
+    enhancedCycle = cycle;
+  }
 
   const assignments: Assignment[] = [];
   
@@ -61,7 +78,8 @@ export function generateAssignments(
       for (const staff of staffList) {
         if (!staff?.id) continue;
         
-        let code = cycle[w]?.[d]?.[staff.id] || 'R';
+        // Get shift from enhanced cycle or fallback to original
+        let code = enhancedCycle[w]?.[d]?.[staff.id] || cycle[w]?.[d]?.[staff.id] || 'R';
         
         console.log(`📋 Processing ${staff.first_name} ${staff.last_name} for ${dateKey}: cycle assignment = ${code}`);
 
@@ -156,7 +174,7 @@ export function generateAssignments(
     }
   });
 
-  logger.info('Assignment generation completed', { totalAssignments: assignments.length });
+  logger.info('Assignment generation completed with enhanced cycle', { totalAssignments: assignments.length });
   
   // Log summary of assignments by shift type
   const shiftSummary = assignments.reduce((acc, assignment) => {
