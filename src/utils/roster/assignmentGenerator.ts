@@ -2,6 +2,7 @@ import { isPublicHoliday } from "../dateHelpers";
 import { hasDailyRest, withinWeeklyHours, calculateRollingAverage, WeeklyHours } from "../wtrCompliance";
 import { StaffMember, Assignment } from "@/types/roster";
 import { createLogger } from "../errorLogger";
+import { generateEnhancedRosterCycle } from './enhancedCycleIntegration';
 
 const logger = createLogger('AssignmentGenerator');
 
@@ -29,10 +30,9 @@ export function generateAssignments(
     handshakeMinutes: config.handshake_minutes
   });
 
-  // Use enhanced cycle generation if available
+  // Use enhanced cycle generation
   let enhancedCycle;
   try {
-    const { generateEnhancedRosterCycle } = await import('./enhancedCycleIntegration');
     enhancedCycle = generateEnhancedRosterCycle(
       staffList,
       config.cycle_length_weeks,
@@ -42,7 +42,7 @@ export function generateAssignments(
     );
     console.log('✅ Using enhanced cycle generation');
   } catch (error) {
-    console.log('⚠️ Enhanced cycle generation not available, using fallback');
+    console.log('⚠️ Enhanced cycle generation failed, using fallback cycle');
     enhancedCycle = cycle;
   }
 
