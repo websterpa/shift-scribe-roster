@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { WTDComplianceIndicator } from './WTDComplianceIndicator';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Table, TableBody } from '@/components/ui/table';
+import { RosterCalendarHeader } from './RosterCalendarHeader';
+import { RosterStaffRow } from './RosterStaffRow';
+import { RosterShiftLegend } from './RosterShiftLegend';
+import { RosterWeekNavigation } from './RosterWeekNavigation';
 
 interface RosterAssignment {
   id: string;
@@ -90,39 +91,14 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
     }
   });
 
-  const getShiftColor = (shiftCode: string) => {
-    switch (shiftCode) {
-      case 'D': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'E': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'L': return 'bg-green-100 text-green-800 border-green-200';
-      case 'N': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'R': return 'bg-gray-100 text-gray-600 border-gray-200';
-      case 'S': return 'bg-red-100 text-red-800 border-red-200';
-      case 'AL': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'T': return 'bg-teal-100 text-teal-800 border-teal-200';
-      case 'OT': return 'bg-orange-100 text-orange-800 border-orange-200';
-      default: return 'bg-gray-50 text-gray-500 border-gray-200';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const day = date.getDate();
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-    return { day, weekday };
-  };
-
-  const canNavigatePrevious = currentWeekIndex > 0;
-  const canNavigateNext = currentWeekIndex < weeks.length - 1;
-
   const navigateToPreviousWeek = () => {
-    if (canNavigatePrevious) {
+    if (currentWeekIndex > 0) {
       setCurrentWeekIndex(currentWeekIndex - 1);
     }
   };
 
   const navigateToNextWeek = () => {
-    if (canNavigateNext) {
+    if (currentWeekIndex < weeks.length - 1) {
       setCurrentWeekIndex(currentWeekIndex + 1);
     }
   };
@@ -130,64 +106,18 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Roster Calendar View</CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={navigateToPreviousWeek}
-              disabled={!canNavigatePrevious}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-normal min-w-[120px] text-center">
-              Week {currentWeekIndex + 1} of {weeks.length}
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={navigateToNextWeek}
-              disabled={!canNavigateNext}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        {weeks.length > 0 && (
-          <div className="text-sm text-gray-600">
-            Showing {new Date(currentWeekDates[0]).toLocaleDateString()} - {new Date(currentWeekDates[currentWeekDates.length - 1]).toLocaleDateString()}
-          </div>
-        )}
+        <RosterWeekNavigation
+          currentWeekIndex={currentWeekIndex}
+          totalWeeks={weeks.length}
+          onPrevious={navigateToPreviousWeek}
+          onNext={navigateToNextWeek}
+          currentWeekDates={currentWeekDates}
+        />
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 bg-white border-r-2 min-w-[200px]">
-                  <div className="font-semibold">Staff Member</div>
-                  <div className="text-xs text-gray-500">Role • WTD Status</div>
-                </TableHead>
-                {currentWeekDates.map((date) => {
-                  const { day, weekday } = formatDate(date);
-                  return (
-                    <TableHead key={date} className="text-center min-w-[60px] border-l">
-                      <div className="font-semibold">{weekday}</div>
-                      <div className="text-lg">{day}</div>
-                    </TableHead>
-                  );
-                })}
-                <TableHead className="text-center border-l-2 min-w-[80px]">
-                  <div className="font-semibold">Week</div>
-                  <div className="text-xs">Hours</div>
-                </TableHead>
-                <TableHead className="text-center min-w-[100px]">
-                  <div className="font-semibold">Week</div>
-                  <div className="text-xs">Cost (£)</div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
+            <RosterCalendarHeader currentWeekDates={currentWeekDates} />
             <TableBody>
               {staff.map((staffMember) => {
                 const staffAssignments = assignmentMap.get(staffMember.name);
@@ -201,90 +131,21 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                 }, 0);
 
                 return (
-                  <TableRow key={staffMember.name} className="hover:bg-gray-50">
-                    <TableCell className="sticky left-0 bg-white border-r-2">
-                      <div className="space-y-1">
-                        <div className="font-medium">{staffMember.name}</div>
-                        <div className="text-xs text-gray-500">{staffMember.role}</div>
-                        <WTDComplianceIndicator
-                          weeklyHours={weekHours}
-                          maxHours={staffMember.maxHours}
-                          optedOut={staffMember.optedOut}
-                          className="mt-1"
-                        />
-                      </div>
-                    </TableCell>
-                    {currentWeekDates.map((date) => {
-                      const assignment = staffAssignments?.get(date);
-                      return (
-                        <TableCell key={`${staffMember.name}-${date}`} className="text-center p-1 border-l">
-                          {assignment ? (
-                            <div className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-medium border ${getShiftColor(assignment.shift_code)}`}>
-                              {assignment.shift_code}
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center justify-center w-8 h-8 rounded text-xs text-gray-400">
-                              -
-                            </div>
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="text-center border-l-2 font-medium">
-                      {weekHours}
-                    </TableCell>
-                    <TableCell className="text-center font-medium">
-                      £{weekCost.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
+                  <RosterStaffRow
+                    key={staffMember.name}
+                    staffMember={staffMember}
+                    currentWeekDates={currentWeekDates}
+                    staffAssignments={staffAssignments}
+                    weekHours={weekHours}
+                    weekCost={weekCost}
+                  />
                 );
               })}
             </TableBody>
           </Table>
         </div>
         
-        {/* Shift Legend */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-medium mb-3">Shift Type Legend</h4>
-          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('D')}`}>D</div>
-              <span>Day Shift</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('N')}`}>N</div>
-              <span>Night Shift</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('L')}`}>L</div>
-              <span>Late/Evening</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('R')}`}>R</div>
-              <span>Rest Day</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('T')}`}>T</div>
-              <span>Training</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('S')}`}>S</div>
-              <span>Sick Leave</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('AL')}`}>AL</div>
-              <span>Annual Leave</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('OT')}`}>OT</div>
-              <span>Overtime</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center font-medium ${getShiftColor('E')}`}>E</div>
-              <span>Early</span>
-            </div>
-          </div>
-        </div>
+        <RosterShiftLegend />
       </CardContent>
     </Card>
   );
