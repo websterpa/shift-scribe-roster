@@ -1,12 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { fetchAllConfigs } from '@/utils/configHelpers';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Search, Settings, Calendar, Clock, Edit } from 'lucide-react';
+import { Search, Settings, Calendar, Clock, Edit, Trash } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ConfigItem {
   id: string;
@@ -25,6 +26,7 @@ const MyConfigurations = () => {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingConfigId, setDeletingConfigId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,6 +50,83 @@ const MyConfigurations = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteConfig = async (configId: string, configName: string) => {
+    console.log('🗑️ MyConfigurations: Deleting configuration:', configId);
+    
+    try {
+      setDeletingConfigId(configId);
+      
+      // First, check if there are any rosters using this configuration
+      const { data: rosters, error: rostersError } = await supabase
+        .from('roster_versions')
+        .select('id')
+        .eq('config_id', configId);
+      
+      if (rostersError) {
+        console.error('❌ MyConfigurations: Error checking rosters:', rostersError);
+        throw rostersError;
+      }
+      
+      // Delete associated rosters and their assignments first
+      if (rosters && rosters.length > 0) {
+        console.log('🗑️ MyConfigurations: Deleting associated rosters and assignments...');
+        
+        // Delete roster assignments for all versions
+        for (const roster of rosters) {
+          const { error: assignmentsError } = await supabase
+            .from('roster_assignments')
+            .delete()
+            .eq('version_id', roster.id);
+          
+          if (assignmentsError) {
+            console.error('❌ MyConfigurations: Error deleting assignments:', assignmentsError);
+            throw assignmentsError;
+          }
+        }
+        
+        // Delete roster versions
+        const { error: versionsError } = await supabase
+          .from('roster_versions')
+          .delete()
+          .eq('config_id', configId);
+        
+        if (versionsError) {
+          console.error('❌ MyConfigurations: Error deleting roster versions:', versionsError);
+          throw versionsError;
+        }
+      }
+      
+      // Finally, delete the configuration
+      const { error } = await supabase
+        .from('roster_config')
+        .delete()
+        .eq('id', configId);
+      
+      if (error) {
+        console.error('❌ MyConfigurations: Error deleting configuration:', error);
+        throw error;
+      }
+      
+      console.log('✅ MyConfigurations: Configuration deleted successfully');
+      toast({
+        title: "Configuration deleted",
+        description: `"${configName}" and all associated rosters have been deleted`,
+      });
+      
+      // Reload configurations
+      await loadConfigurations();
+    } catch (error: any) {
+      console.error('❌ MyConfigurations: Exception deleting configuration:', error);
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete configuration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingConfigId(null);
     }
   };
 
@@ -175,24 +254,47 @@ const MyConfigurations = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              console.log('✏️ Edit button clicked for config:', config.id);
-                              handleEditConfig(config.id);
-                            }}
+                            onClick={() => handleEditConfig(config.id)}
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => {
-                              console.log('🚀 Generate Roster button clicked for config:', config.id);
-                              handleGenerateWithConfig(config.id);
-                            }}
+                            onClick={() => handleGenerateWithConfig(config.id)}
                           >
                             <Calendar className="h-4 w-4 mr-1" />
                             Generate Roster
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingConfigId === config.id}
+                              >
+                                <Trash className="h-4 w-4 mr-1" />
+                                {deletingConfigId === config.id ? 'Deleting...' : 'Delete'}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Configuration</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{config.config_name}"? This will also delete all rosters generated from this configuration. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDeleteConfig(config.id, config.config_name)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete Configuration
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </td>
                     </tr>

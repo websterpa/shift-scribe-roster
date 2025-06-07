@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
-import { Calendar, Eye, Download, FileText } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Calendar, Eye, Download, FileText, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -22,6 +24,7 @@ interface RosterVersion {
 const MyRosters = () => {
   const [rosters, setRosters] = useState<RosterVersion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingRosterId, setDeletingRosterId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRosters();
@@ -112,6 +115,54 @@ const MyRosters = () => {
       title: "Feature coming soon",
       description: "Roster export will be available in the next update",
     });
+  };
+
+  const handleDeleteRoster = async (rosterId: string, rosterName: string) => {
+    console.log('🗑️ MyRosters: Deleting roster:', rosterId);
+    
+    try {
+      setDeletingRosterId(rosterId);
+      
+      // First delete all roster assignments for this version
+      const { error: assignmentsError } = await supabase
+        .from('roster_assignments')
+        .delete()
+        .eq('version_id', rosterId);
+      
+      if (assignmentsError) {
+        console.error('❌ MyRosters: Error deleting roster assignments:', assignmentsError);
+        throw assignmentsError;
+      }
+      
+      // Then delete the roster version
+      const { error: versionError } = await supabase
+        .from('roster_versions')
+        .delete()
+        .eq('id', rosterId);
+      
+      if (versionError) {
+        console.error('❌ MyRosters: Error deleting roster version:', versionError);
+        throw versionError;
+      }
+      
+      console.log('✅ MyRosters: Roster deleted successfully');
+      toast({
+        title: "Roster deleted",
+        description: `"${rosterName}" has been permanently deleted`,
+      });
+      
+      // Reload rosters
+      await loadRosters();
+    } catch (error: any) {
+      console.error('❌ MyRosters: Exception deleting roster:', error);
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete roster. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingRosterId(null);
+    }
   };
 
   if (loading) {
@@ -209,6 +260,35 @@ const MyRosters = () => {
                             <Download className="h-4 w-4 mr-1" />
                             Export
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingRosterId === roster.id}
+                              >
+                                <Trash className="h-4 w-4 mr-1" />
+                                {deletingRosterId === roster.id ? 'Deleting...' : 'Delete'}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Roster</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{roster.version_name}"? This will permanently remove all shift assignments and data for this roster. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDeleteRoster(roster.id, roster.version_name)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete Roster
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </td>
                     </tr>
