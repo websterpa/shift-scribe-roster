@@ -39,36 +39,23 @@ export function useSubscription() {
       setLoading(true);
       console.log('useSubscription: Starting fetch for user:', user?.id);
       
-      // Check if user is admin first - try multiple approaches
-      console.log('useSubscription: Checking admin status...');
+      // Check if user is admin using the corrected RPC function
+      console.log('useSubscription: Checking admin status with RPC...');
       
-      // First try the RPC function
       const { data: adminResult, error: adminError } = await supabase
         .rpc('is_admin', { user_id: user?.id });
 
-      console.log('useSubscription: RPC result:', { adminResult, adminError, userId: user?.id });
-
-      // Also try checking profiles table directly as backup
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('user_id', user?.id)
-        .single();
-
-      console.log('useSubscription: Profile check result:', { profileData, profileError });
+      console.log('useSubscription: Admin RPC result:', { adminResult, adminError, userId: user?.id });
 
       let adminStatus = false;
       
       if (adminError) {
-        console.error('useSubscription: RPC admin check failed:', adminError);
-        // Fallback to profile check
-        if (!profileError && profileData) {
-          adminStatus = profileData.is_admin === true;
-          console.log('useSubscription: Using profile data for admin status:', adminStatus);
-        }
+        console.error('useSubscription: Admin RPC failed:', adminError);
+        // If RPC fails, admin status remains false
+        adminStatus = false;
       } else {
         adminStatus = adminResult === true;
-        console.log('useSubscription: Using RPC result for admin status:', adminStatus);
+        console.log('useSubscription: Admin status from RPC:', adminStatus);
       }
 
       setIsAdmin(adminStatus);
@@ -118,7 +105,7 @@ export function useSubscription() {
     
     // Admin users ALWAYS have Pro access regardless of subscription
     if (isAdmin) {
-      console.log('useSubscription: ADMIN ACCESS GRANTED');
+      console.log('useSubscription: ADMIN ACCESS GRANTED - Pro access via admin status');
       return true;
     }
 

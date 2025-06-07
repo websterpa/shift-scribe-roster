@@ -17,15 +17,25 @@ export function useAdminAuth() {
       
       if (user) {
         setUser(user);
-        // For now, we'll assume any authenticated user can manage leave
-        // In a real app, you'd check the profiles table for is_admin flag
-        setIsAdmin(true);
+        
+        // Use the corrected is_admin RPC function
+        const { data: adminResult, error: adminError } = await supabase
+          .rpc('is_admin', { user_id: user.id });
+
+        console.log('useAdminAuth: Admin check result:', { adminResult, adminError });
+
+        if (adminError) {
+          console.error('useAdminAuth: Admin check failed:', adminError);
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(adminResult === true);
+        }
       } else {
         setUser(null);
         setIsAdmin(false);
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.error('useAdminAuth: Auth check error:', error);
       setUser(null);
       setIsAdmin(false);
     } finally {
