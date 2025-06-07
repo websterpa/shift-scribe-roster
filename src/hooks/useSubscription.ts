@@ -47,8 +47,19 @@ export function useSubscription() {
         return;
       }
 
-      setSubscription(data);
-      logger.info('Subscription fetched successfully', { tier: data?.subscription_tier });
+      // Type cast to ensure proper typing
+      const typedSubscription: SubscriptionData = {
+        id: data.id,
+        subscription_tier: data.subscription_tier as 'free' | 'pro',
+        subscription_status: data.subscription_status as 'active' | 'cancelled' | 'expired',
+        subscription_start_date: data.subscription_start_date,
+        subscription_end_date: data.subscription_end_date,
+        stripe_customer_id: data.stripe_customer_id,
+        stripe_subscription_id: data.stripe_subscription_id,
+      };
+
+      setSubscription(typedSubscription);
+      logger.info('Subscription fetched successfully', { tier: typedSubscription.subscription_tier });
     } catch (err: any) {
       logger.error(new Error('Subscription fetch error'), { error: err });
       setError('Failed to load subscription data');

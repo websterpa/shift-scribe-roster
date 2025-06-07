@@ -11,35 +11,35 @@ import { ConfigItem } from '@/types/roster';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface RosterGenerationSettingsProps {
-  configs: ConfigItem[];
-  selectedConfig: ConfigItem | null;
-  selectedConfigId: string;
-  rosterName: string;
-  staffCount: number;
-  isGenerating: boolean;
+  configs?: ConfigItem[];
+  selectedConfig?: ConfigItem | null;
+  selectedConfigId?: string;
+  rosterName?: string;
+  staffCount?: number;
+  isGenerating?: boolean;
   errors?: {
     configs?: string;
     name?: string;
     staff?: string;
     general?: string;
   };
-  onSelectConfig: (configId: string) => void;
-  onRosterNameChange: (name: string) => void;
-  onGenerateRoster: () => void;
+  onSelectConfig?: (configId: string) => void;
+  onRosterNameChange?: (name: string) => void;
+  onGenerateRoster?: () => void;
   onRefresh?: () => void;
 }
 
 export const RosterGenerationSettings = ({
-  configs,
-  selectedConfig,
-  selectedConfigId,
-  rosterName,
-  staffCount,
-  isGenerating,
+  configs = [],
+  selectedConfig = null,
+  selectedConfigId = '',
+  rosterName = '',
+  staffCount = 0,
+  isGenerating = false,
   errors = {},
-  onSelectConfig,
-  onRosterNameChange,
-  onGenerateRoster,
+  onSelectConfig = () => {},
+  onRosterNameChange = () => {},
+  onGenerateRoster = () => {},
   onRefresh
 }: RosterGenerationSettingsProps) => {
   const navigate = useNavigate();

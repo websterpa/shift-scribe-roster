@@ -26,17 +26,17 @@ interface Staff {
 }
 
 interface RosterDisplayContainerProps {
-  loading: boolean;
-  weeks: MultiWeekData[];
-  currentWeekOffset: number;
-  displayStaff: Staff[];
+  loading?: boolean;
+  weeks?: MultiWeekData[];
+  currentWeekOffset?: number;
+  displayStaff?: Staff[];
 }
 
 export function RosterDisplayContainer({
-  loading,
-  weeks,
-  currentWeekOffset,
-  displayStaff
+  loading = false,
+  weeks = [],
+  currentWeekOffset = 0,
+  displayStaff = []
 }: RosterDisplayContainerProps) {
   if (loading) {
     return (
