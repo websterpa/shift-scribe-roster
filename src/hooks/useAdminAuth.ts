@@ -6,7 +6,18 @@ async function checkAdminStatus(userId: string): Promise<boolean> {
   try {
     console.log('useAdminAuth: Checking admin status for user:', userId);
     
-    // First try the RPC function
+    // First try the new get_admin_status function
+    const { data: adminResult, error: adminError } = await supabase
+      .rpc('get_admin_status', { check_user_id: userId });
+
+    if (adminError) {
+      console.error('useAdminAuth: RPC get_admin_status failed:', adminError);
+    } else if (adminResult !== null) {
+      console.log('useAdminAuth: RPC get_admin_status result:', adminResult);
+      return adminResult === true;
+    }
+
+    // Fallback to original is_admin function
     const { data: rpcResult, error: rpcError } = await supabase
       .rpc('is_admin', { user_id: userId });
 
