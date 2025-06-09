@@ -1,8 +1,16 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, TestTube } from 'lucide-react';
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, TestTube, ChevronDown, User } from 'lucide-react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Navigation = () => {
   const location = useLocation();
@@ -45,17 +53,6 @@ const Navigation = () => {
                 Dashboard
               </Link>
               <Link
-                to="/generate-roster"
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                  isActive('/generate-roster')
-                    ? 'bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-lg transform scale-105'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-md hover:scale-105'
-                }`}
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Generate Roster
-              </Link>
-              <Link
                 to="/staff"
                 className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   isActive('/staff')
@@ -78,6 +75,17 @@ const Navigation = () => {
                 Leave Requests
               </Link>
               <Link
+                to="/my-configurations"
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  isActive('/my-configurations')
+                    ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg transform scale-105'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-md hover:scale-105'
+                }`}
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                My Configs
+              </Link>
+              <Link
                 to="/roster-config"
                 className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   isActive('/roster-config')
@@ -89,15 +97,15 @@ const Navigation = () => {
                 Configuration
               </Link>
               <Link
-                to="/my-configurations"
+                to="/generate-roster"
                 className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                  isActive('/my-configurations')
-                    ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg transform scale-105'
+                  isActive('/generate-roster')
+                    ? 'bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-lg transform scale-105'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-md hover:scale-105'
                 }`}
               >
-                <FolderOpen className="w-4 h-4 mr-2" />
-                My Configs
+                <Zap className="w-4 h-4 mr-2" />
+                Generate Roster
               </Link>
               <Link
                 to="/my-rosters"
@@ -123,19 +131,31 @@ const Navigation = () => {
               </Link>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="bg-white/70 backdrop-blur-sm px-3 py-1 rounded-full shadow-md">
-              <span className="text-sm font-medium text-gray-700">{user?.email}</span>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleSignOut}
-              className="bg-white/80 hover:bg-white border-gray-200 hover:shadow-lg transition-all duration-300 hover:scale-105"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+          <div className="flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-white/80 hover:bg-white border-gray-200 hover:shadow-lg transition-all duration-300 hover:scale-105"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white/95 backdrop-blur-sm">
+                <div className="px-3 py-2 text-sm">
+                  <p className="font-medium text-gray-900">Signed in as</p>
+                  <p className="text-gray-600 truncate">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
