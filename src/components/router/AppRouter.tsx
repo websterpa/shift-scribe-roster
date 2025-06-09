@@ -11,6 +11,7 @@ import RosterConfig from '@/pages/RosterConfig';
 import MyConfigurations from '@/pages/MyConfigurations';
 import MyRosters from '@/pages/MyRosters';
 import TestPro from '@/pages/TestPro';
+import RosterViewer from '@/pages/RosterViewer';
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 
@@ -43,6 +44,7 @@ export const AppRouter: React.FC = () => {
             <Route path="my-configurations" element={<MyConfigurations />} />
             <Route path="my-rosters" element={<MyRosters />} />
             <Route path="test-pro" element={<TestPro />} />
+            <Route path="roster/:rosterId" element={<RosterViewer />} />
           </Route>
           
           {/* Fallback route */}

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, Loader2, Users, Calendar, RefreshCcw } from 'lucide-react';
+import { Settings, Loader2, Users, Calendar, RefreshCcw, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ConfigItem } from '@/types/roster';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,6 +17,7 @@ interface RosterGenerationSettingsProps {
   rosterName?: string;
   staffCount?: number;
   isGenerating?: boolean;
+  generatedVersionId?: string | null;
   errors?: {
     configs?: string;
     name?: string;
@@ -36,6 +37,7 @@ export const RosterGenerationSettings = ({
   rosterName = '',
   staffCount = 0,
   isGenerating = false,
+  generatedVersionId = null,
   errors = {},
   onSelectConfig = () => {},
   onRosterNameChange = () => {},
@@ -43,6 +45,12 @@ export const RosterGenerationSettings = ({
   onRefresh
 }: RosterGenerationSettingsProps) => {
   const navigate = useNavigate();
+  
+  const handleViewRoster = () => {
+    if (generatedVersionId) {
+      navigate(`/roster/${generatedVersionId}`);
+    }
+  };
   
   return (
     <Card className="relative">
@@ -142,23 +150,38 @@ export const RosterGenerationSettings = ({
           )}
         </div>
 
-        <Button 
-          onClick={onGenerateRoster}
-          disabled={!selectedConfig || !rosterName.trim() || isGenerating || staffCount === 0}
-          className="w-full"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Calendar className="h-4 w-4 mr-2" />
-              Generate Roster
-            </>
+        <div className="flex flex-col gap-3">
+          <Button 
+            onClick={onGenerateRoster}
+            disabled={!selectedConfig || !rosterName.trim() || isGenerating || staffCount === 0}
+            size="sm"
+            className="self-start"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4 mr-2" />
+                Generate Roster
+              </>
+            )}
+          </Button>
+
+          {generatedVersionId && (
+            <Button 
+              onClick={handleViewRoster}
+              variant="outline"
+              size="sm"
+              className="self-start"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Roster
+            </Button>
           )}
-        </Button>
+        </div>
       </CardContent>
     </Card>
   );

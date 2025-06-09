@@ -84,6 +84,7 @@ const GenerateRoster = () => {
                 rosterName={rosterName}
                 staffCount={staffList.length}
                 isGenerating={isGenerating}
+                generatedVersionId={generatedVersionId}
                 errors={errors}
                 onSelectConfig={setSelectedConfigId}
                 onRosterNameChange={setRosterName}
