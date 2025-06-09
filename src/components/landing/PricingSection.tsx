@@ -1,31 +1,30 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, Star } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const PricingSection = () => {
   const plans = [
     {
-      name: "Free Trial",
+      name: "Limited Free Trial",
       price: "£0",
       period: "14 days",
       description: "Perfect for getting started",
       features: [
-        "Up to 5 staff members",
+        "Up to 4 staff members",
         "Basic roster generation",
         "Email support",
-        "WTR compliance monitoring",
-        "Export to PDF"
+        "WTR compliance monitoring"
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "outline" as const,
       popular: false
     },
     {
-      name: "Monthly Pro",
-      price: "£29",
-      period: "per month",
+      name: "Annual Pro",
+      price: "£399",
+      period: "per year",
       description: "Full-featured roster management",
       features: [
         "Unlimited staff profiles",
@@ -35,22 +34,7 @@ export const PricingSection = () => {
         "Excel/PDF export",
         "Priority support",
         "Custom configurations",
-        "Multi-site support"
-      ],
-      buttonText: "Start Monthly Plan",
-      buttonVariant: "default" as const,
-      popular: false
-    },
-    {
-      name: "Annual Pro",
-      price: "£23",
-      period: "per month",
-      originalPrice: "£29",
-      yearlyPrice: "£276",
-      description: "Best value - Save 20% annually",
-      features: [
-        "Everything in Monthly Pro",
-        "20% annual discount",
+        "Multi-site support",
         "Priority feature requests",
         "Dedicated account manager",
         "Advanced analytics",
@@ -74,13 +58,9 @@ export const PricingSection = () => {
           <p className="text-xl text-gray-600 mb-8">
             Choose the plan that works best for your organization
           </p>
-          <div className="inline-flex items-center bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium">
-            <Star className="w-4 h-4 mr-2" />
-            Save 20% with annual billing
-          </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {plans.map((plan, idx) => (
             <div 
               key={idx} 
@@ -113,16 +93,6 @@ export const PricingSection = () => {
                     {plan.period}
                   </span>
                 </div>
-                {plan.originalPrice && (
-                  <div className="mt-2">
-                    <span className="text-gray-500 line-through text-lg">
-                      {plan.originalPrice}/month
-                    </span>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Billed annually ({plan.yearlyPrice}/year)
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-4 mb-8">
@@ -155,7 +125,7 @@ export const PricingSection = () => {
 
         <div className="text-center mt-12">
           <p className="text-gray-600 mb-4">
-            All plans include 14-day free trial • No credit card required • Cancel anytime
+            All plans include 14-day free trial • Cancel anytime
           </p>
           <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
             <div className="flex items-center">
