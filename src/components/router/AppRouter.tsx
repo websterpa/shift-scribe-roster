@@ -33,47 +33,17 @@ export const AppRouter: React.FC = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
           
-          {/* Protected routes wrapped in AuthenticatedLayout */}
-          <Route path="/dashboard" element={
-            <AuthenticatedLayout>
-              <Dashboard />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/staff" element={
-            <AuthenticatedLayout>
-              <Staff />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/generate-roster" element={
-            <AuthenticatedLayout>
-              <GenerateRoster />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/leave-requests" element={
-            <AuthenticatedLayout>
-              <LeaveRequests />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/roster-config" element={
-            <AuthenticatedLayout>
-              <RosterConfig />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/my-configurations" element={
-            <AuthenticatedLayout>
-              <MyConfigurations />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/my-rosters" element={
-            <AuthenticatedLayout>
-              <MyRosters />
-            </AuthenticatedLayout>
-          } />
-          <Route path="/test-pro" element={
-            <AuthenticatedLayout>
-              <TestPro />
-            </AuthenticatedLayout>
-          } />
+          {/* Protected routes with AuthenticatedLayout as parent */}
+          <Route path="/" element={<AuthenticatedLayout />}>
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="staff" element={<Staff />} />
+            <Route path="generate-roster" element={<GenerateRoster />} />
+            <Route path="leave-requests" element={<LeaveRequests />} />
+            <Route path="roster-config" element={<RosterConfig />} />
+            <Route path="my-configurations" element={<MyConfigurations />} />
+            <Route path="my-rosters" element={<MyRosters />} />
+            <Route path="test-pro" element={<TestPro />} />
+          </Route>
           
           {/* Fallback route */}
           <Route path="*" element={<LandingPage />} />
