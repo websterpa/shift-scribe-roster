@@ -187,8 +187,8 @@ function generateRuleCompliantPattern(
  * Filter shifts based on eligibility and mode
  */
 function filterEligibleShifts(eligibleShifts: string[], shiftType: '8h' | '12h'): string[] {
-  // Ensure eligibleShifts is an array
-  if (!Array.isArray(eligibleShifts)) {
+  // Ensure eligibleShifts is an array and handle edge cases
+  if (!eligibleShifts || !Array.isArray(eligibleShifts)) {
     console.warn('filterEligibleShifts: eligibleShifts is not an array:', eligibleShifts);
     return [];
   }
