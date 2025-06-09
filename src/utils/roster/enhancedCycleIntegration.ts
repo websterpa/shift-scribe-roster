@@ -186,7 +186,7 @@ function generateRuleCompliantPattern(
  * Filter shifts based on eligibility and mode
  */
 function filterEligibleShifts(eligibleShifts: string[], shiftType: '8h' | '12h'): string[] {
-  // Ensure eligibleShifts is an array and handle edge cases
+  // Ensure eligibleShifts is a valid array
   if (!Array.isArray(eligibleShifts) || eligibleShifts.length === 0) {
     console.warn('filterEligibleShifts: eligibleShifts is not a valid array:', eligibleShifts);
     return [];
@@ -474,30 +474,16 @@ function violatesWeeklyLimit(pattern: string): boolean {
 }
 
 function canWorkShift(staff: StaffMember, shiftCode: string): boolean {
-  // Ensure staff.eligible_shifts is treated as an array
-  if (!staff.eligible_shifts) {
+  // Since eligible_shifts is typed as string[], we only need to handle array case
+  if (!staff.eligible_shifts || !Array.isArray(staff.eligible_shifts)) {
     return false;
   }
   
-  let eligibleShifts: string[] = [];
-  
-  // Handle both array and string cases with proper type checking
-  if (Array.isArray(staff.eligible_shifts)) {
-    eligibleShifts = staff.eligible_shifts;
-  } else if (typeof staff.eligible_shifts === 'string') {
-    // Handle case where eligible_shifts is a string (e.g., comma-separated values)
-    eligibleShifts = staff.eligible_shifts.split(',').map(s => s.trim());
-  } else {
-    // Handle any other case
-    console.warn('canWorkShift: eligible_shifts is not a valid type:', typeof staff.eligible_shifts);
+  if (staff.eligible_shifts.length === 0) {
     return false;
   }
   
-  if (eligibleShifts.length === 0) {
-    return false;
-  }
-  
-  return eligibleShifts.some(eligible => {
+  return staff.eligible_shifts.some(eligible => {
     if (eligible === shiftCode) return true;
     if (shiftCode === 'D' && (eligible === 'Day' || eligible === 'day')) return true;
     if (shiftCode === 'N' && (eligible === 'Night' || eligible === 'night')) return true;
