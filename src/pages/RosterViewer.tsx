@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
@@ -125,8 +124,25 @@ const RosterViewer = () => {
         return;
       }
 
+      // Parse staffing_requirements safely
+      const parseStaffingRequirements = (requirements: any) => {
+        if (!requirements) return undefined;
+        if (typeof requirements === 'string') {
+          try {
+            return JSON.parse(requirements);
+          } catch {
+            return undefined;
+          }
+        }
+        return requirements;
+      };
+
       const rosterData: RosterData = {
         ...rosterVersion,
+        config: rosterVersion.config ? {
+          ...rosterVersion.config,
+          staffing_requirements: parseStaffingRequirements(rosterVersion.config.staffing_requirements)
+        } : null,
         assignments: assignments || []
       };
 
