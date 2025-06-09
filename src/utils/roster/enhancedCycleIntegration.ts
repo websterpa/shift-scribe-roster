@@ -187,8 +187,8 @@ function generateRuleCompliantPattern(
  */
 function filterEligibleShifts(eligibleShifts: string[], shiftType: '8h' | '12h'): string[] {
   // Ensure eligibleShifts is an array and handle edge cases
-  if (!eligibleShifts || !Array.isArray(eligibleShifts)) {
-    console.warn('filterEligibleShifts: eligibleShifts is not an array:', eligibleShifts);
+  if (!Array.isArray(eligibleShifts) || eligibleShifts.length === 0) {
+    console.warn('filterEligibleShifts: eligibleShifts is not a valid array:', eligibleShifts);
     return [];
   }
 
@@ -474,7 +474,7 @@ function violatesWeeklyLimit(pattern: string): boolean {
 }
 
 function canWorkShift(staff: StaffMember, shiftCode: string): boolean {
-  // Normalize eligible_shifts to an array
+  // Normalize eligible_shifts to an array with proper type checking
   let eligibleShifts: string[] = [];
   
   if (staff.eligible_shifts) {
