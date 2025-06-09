@@ -1,4 +1,3 @@
-
 import { StaffMember } from '@/types/roster';
 import { createLogger } from '../errorLogger';
 
@@ -66,7 +65,7 @@ export function generateEnhancedRosterCycle(
     const pattern = generateRuleCompliantPattern(
       totalDays, 
       shiftType, 
-      staff.eligible_shifts,
+      staff.eligible_shifts || [],
       index,
       shiftWorkers.length
     );
