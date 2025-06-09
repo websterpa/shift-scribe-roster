@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -27,7 +26,7 @@ const Navigation = () => {
             <div className="flex-shrink-0 flex items-center">
               <div className="flex items-center">
                 <img 
-                  src="/lovable-uploads/57950d03-0066-4e69-b903-ffa7967734a1.png" 
+                  src="/lovable-uploads/837a79c3-c6d4-4a80-9d8c-f3b575868dea.png" 
                   alt="Logo" 
                   className="h-20 w-auto"
                 />
