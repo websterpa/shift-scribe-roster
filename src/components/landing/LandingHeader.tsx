@@ -11,16 +11,6 @@ export const LandingHeader = () => {
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center">
-              <img 
-                src="/lovable-uploads/837a79c3-c6d4-4a80-9d8c-f3b575868dea.png" 
-                alt="Logo" 
-                className="h-20 w-auto"
-              />
-            </Link>
-          </div>
-
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">
@@ -37,7 +27,7 @@ export const LandingHeader = () => {
             </Link>
           </nav>
 
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4 ml-auto">
             <Link to="/auth">
               <Button variant="ghost">Sign In</Button>
             </Link>
@@ -47,7 +37,7 @@ export const LandingHeader = () => {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden">
+          <div className="md:hidden ml-auto">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-gray-600 hover:text-gray-900"
