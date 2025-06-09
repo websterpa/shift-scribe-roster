@@ -1,4 +1,3 @@
-
 import { StaffMember } from '@/types/roster';
 import { createLogger } from '../errorLogger';
 
@@ -475,12 +474,23 @@ function violatesWeeklyLimit(pattern: string): boolean {
 }
 
 function canWorkShift(staff: StaffMember, shiftCode: string): boolean {
-  // Ensure eligible_shifts exists and is an array
-  if (!staff.eligible_shifts || !Array.isArray(staff.eligible_shifts) || staff.eligible_shifts.length === 0) {
+  // Normalize eligible_shifts to an array
+  let eligibleShifts: string[] = [];
+  
+  if (staff.eligible_shifts) {
+    if (Array.isArray(staff.eligible_shifts)) {
+      eligibleShifts = staff.eligible_shifts;
+    } else if (typeof staff.eligible_shifts === 'string') {
+      // Handle case where eligible_shifts is a string (e.g., comma-separated values)
+      eligibleShifts = staff.eligible_shifts.split(',').map(s => s.trim());
+    }
+  }
+  
+  if (eligibleShifts.length === 0) {
     return false;
   }
   
-  return staff.eligible_shifts.some(eligible => {
+  return eligibleShifts.some(eligible => {
     if (eligible === shiftCode) return true;
     if (shiftCode === 'D' && (eligible === 'Day' || eligible === 'day')) return true;
     if (shiftCode === 'N' && (eligible === 'Night' || eligible === 'night')) return true;
