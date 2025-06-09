@@ -4,11 +4,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
-import { ArrowLeft, Calendar, Users, Clock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Calendar, Users, Clock, Printer, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { RosterViewerHeader } from '@/components/roster/RosterViewerHeader';
 import { RosterCalendarTable } from '@/components/roster/RosterCalendarTable';
+import { RosterPrintView } from '@/components/roster/RosterPrintView';
 
 interface RosterAssignment {
   id: string;
@@ -35,6 +37,12 @@ interface RosterData {
     shift_type: string;
     cycle_length_weeks: number;
     start_date: string;
+    staffing_requirements?: {
+      day_shift_staff?: number;
+      night_shift_staff?: number;
+      early_shift_staff?: number;
+      late_shift_staff?: number;
+    };
   } | null;
   assignments: RosterAssignment[];
 }
@@ -70,7 +78,8 @@ const RosterViewer = () => {
             config_name,
             shift_type,
             cycle_length_weeks,
-            start_date
+            start_date,
+            staffing_requirements
           )
         `)
         .eq('id', id)
@@ -124,6 +133,7 @@ const RosterViewer = () => {
       console.log('✅ Loaded roster data:', {
         name: rosterData.version_name,
         assignments: rosterData.assignments.length,
+        config: rosterData.config,
         assignmentDetails: rosterData.assignments.slice(0, 3) // Log first 3 assignments for debugging
       });
 
@@ -138,6 +148,23 @@ const RosterViewer = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownload = () => {
+    // For now, show a toast - in a real implementation, you'd generate a PDF
+    toast({
+      title: "Download started",
+      description: "Your roster PDF is being prepared for download",
+    });
+    
+    // Use browser's print dialog as PDF generation
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
 
   console.log('🔍 RosterViewer render state:', {
@@ -165,7 +192,25 @@ const RosterViewer = () => {
   return (
     <div className="space-y-6">
       <RosterViewerHeader rosterData={rosterData} onBack={() => navigate('/my-rosters')} />
-      <RosterCalendarTable assignments={rosterData.assignments} />
+      
+      <Tabs defaultValue="calendar" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+          <TabsTrigger value="print">Print/Download</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="calendar" className="space-y-6">
+          <RosterCalendarTable assignments={rosterData.assignments} />
+        </TabsContent>
+        
+        <TabsContent value="print" className="space-y-6">
+          <RosterPrintView 
+            rosterData={rosterData} 
+            onPrint={handlePrint}
+            onDownload={handleDownload}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
