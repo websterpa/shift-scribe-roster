@@ -68,15 +68,39 @@ export function buildRosterCycle(
 
   console.log('✅ Enhanced cycle generated with proper shift grouping and rest periods');
   
+  // Convert the enhanced cycle to the expected return type with proper type casting
+  const typedCycle: CycleAssignment = {};
+  
+  Object.keys(enhancedCycle).forEach(weekStr => {
+    const weekIndex = parseInt(weekStr);
+    typedCycle[weekIndex] = {};
+    
+    Object.keys(enhancedCycle[weekIndex]).forEach(dayStr => {
+      const dayIndex = parseInt(dayStr);
+      typedCycle[weekIndex][dayIndex] = {};
+      
+      Object.keys(enhancedCycle[weekIndex][dayIndex]).forEach(staffId => {
+        const shiftValue = enhancedCycle[weekIndex][dayIndex][staffId];
+        // Ensure the shift value is a valid ShiftCode
+        if (['D', 'E', 'L', 'N', 'R', 'S'].includes(shiftValue)) {
+          typedCycle[weekIndex][dayIndex][staffId] = shiftValue as ShiftCode;
+        } else {
+          // Default to rest if invalid shift code
+          typedCycle[weekIndex][dayIndex][staffId] = 'R';
+        }
+      });
+    });
+  });
+  
   // Log a sample of the enhanced pattern for verification
   const sampleStaffId = enhancedStaffList[0]?.id;
-  if (sampleStaffId && enhancedCycle[0]) {
+  if (sampleStaffId && typedCycle[0]) {
     const week1Pattern = [];
     for (let day = 0; day < 7; day++) {
-      week1Pattern.push(enhancedCycle[0][day][sampleStaffId] || 'R');
+      week1Pattern.push(typedCycle[0][day][sampleStaffId] || 'R');
     }
     console.log(`📋 Sample week 1 pattern for ${sampleStaffId}:`, week1Pattern.join(''));
   }
 
-  return enhancedCycle;
+  return typedCycle;
 }
