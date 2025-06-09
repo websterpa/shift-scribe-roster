@@ -1,9 +1,9 @@
 
 import React from 'react';
-import DashboardVersionSelector from '@/components/dashboard/DashboardVersionSelector';
+import DashboardVersion1 from '@/components/dashboard/DashboardVersion1';
 
 const Dashboard = () => {
-  return <DashboardVersionSelector />;
+  return <DashboardVersion1 />;
 };
 
 export default Dashboard;
