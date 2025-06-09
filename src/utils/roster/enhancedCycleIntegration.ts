@@ -1,3 +1,4 @@
+
 import { StaffMember } from '@/types/roster';
 import { createLogger } from '../errorLogger';
 
@@ -474,7 +475,7 @@ function violatesWeeklyLimit(pattern: string): boolean {
 }
 
 function canWorkShift(staff: StaffMember, shiftCode: string): boolean {
-  if (!staff.eligible_shifts || staff.eligible_shifts.length === 0) {
+  if (!staff.eligible_shifts || !Array.isArray(staff.eligible_shifts) || staff.eligible_shifts.length === 0) {
     return false;
   }
   
