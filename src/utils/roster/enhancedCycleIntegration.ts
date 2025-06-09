@@ -186,6 +186,12 @@ function generateRuleCompliantPattern(
  * Filter shifts based on eligibility and mode
  */
 function filterEligibleShifts(eligibleShifts: string[], shiftType: '8h' | '12h'): string[] {
+  // Ensure eligibleShifts is an array
+  if (!Array.isArray(eligibleShifts)) {
+    console.warn('filterEligibleShifts: eligibleShifts is not an array:', eligibleShifts);
+    return [];
+  }
+
   const shiftMap: Record<string, string> = {
     'Day': 'D', 'day': 'D', 'D': 'D',
     'Night': 'N', 'night': 'N', 'N': 'N',
