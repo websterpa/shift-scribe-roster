@@ -475,6 +475,7 @@ function violatesWeeklyLimit(pattern: string): boolean {
 }
 
 function canWorkShift(staff: StaffMember, shiftCode: string): boolean {
+  // Ensure eligible_shifts exists and is an array
   if (!staff.eligible_shifts || !Array.isArray(staff.eligible_shifts) || staff.eligible_shifts.length === 0) {
     return false;
   }
