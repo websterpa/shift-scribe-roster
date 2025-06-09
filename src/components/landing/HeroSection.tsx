@@ -15,7 +15,7 @@ export const HeroSection = () => {
             <img 
               src="/lovable-uploads/5af74798-d286-4a86-b70f-2c48fe182aab.png" 
               alt="ShiftCraft Logo" 
-              className="h-50 w-auto mx-auto"
+              className="h-25 w-auto mx-auto"
             />
           </div>
           
