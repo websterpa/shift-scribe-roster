@@ -474,16 +474,23 @@ function violatesWeeklyLimit(pattern: string): boolean {
 }
 
 function canWorkShift(staff: StaffMember, shiftCode: string): boolean {
-  // Normalize eligible_shifts to an array with proper type checking
+  // Ensure staff.eligible_shifts is treated as an array
+  if (!staff.eligible_shifts) {
+    return false;
+  }
+  
   let eligibleShifts: string[] = [];
   
-  if (staff.eligible_shifts) {
-    if (Array.isArray(staff.eligible_shifts)) {
-      eligibleShifts = staff.eligible_shifts;
-    } else if (typeof staff.eligible_shifts === 'string') {
-      // Handle case where eligible_shifts is a string (e.g., comma-separated values)
-      eligibleShifts = staff.eligible_shifts.split(',').map(s => s.trim());
-    }
+  // Handle both array and string cases with proper type checking
+  if (Array.isArray(staff.eligible_shifts)) {
+    eligibleShifts = staff.eligible_shifts;
+  } else if (typeof staff.eligible_shifts === 'string') {
+    // Handle case where eligible_shifts is a string (e.g., comma-separated values)
+    eligibleShifts = staff.eligible_shifts.split(',').map(s => s.trim());
+  } else {
+    // Handle any other case
+    console.warn('canWorkShift: eligible_shifts is not a valid type:', typeof staff.eligible_shifts);
+    return false;
   }
   
   if (eligibleShifts.length === 0) {
