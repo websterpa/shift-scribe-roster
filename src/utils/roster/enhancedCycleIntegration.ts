@@ -216,7 +216,7 @@ function filterEligibleShifts(eligibleShifts: string[], shiftType: '8h' | '12h')
 function enforceWeeklyWorkLimits(pattern: string[]): void {
   for (let i = 0; i <= pattern.length - 7; i++) {
     const weekSlice = pattern.slice(i, i + 7);
-    const workDays = weekSlice.filter(day => day !== 'R').length;
+    const workDays = Array.from(weekSlice).filter(day => day !== 'R').length;
     
     if (workDays > 5) {
       // Convert excess work days to rest, prioritizing isolated shifts
@@ -465,7 +465,8 @@ function hasLateBeforeEarly(pattern: string): boolean {
 function violatesWeeklyLimit(pattern: string): boolean {
   for (let i = 0; i <= pattern.length - 7; i++) {
     const weekSlice = pattern.slice(i, i + 7);
-    const workDays = weekSlice.filter(day => day !== 'R').length;
+    // Convert string slice to array for filtering
+    const workDays = Array.from(weekSlice).filter(day => day !== 'R').length;
     if (workDays > 5) {
       return true;
     }
