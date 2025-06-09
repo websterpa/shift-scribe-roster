@@ -28,7 +28,7 @@ const Navigation = () => {
                 <img 
                   src="/lovable-uploads/4baad420-9f35-41c0-b679-bf3fb947409c.png" 
                   alt="ShiftCraft Logo" 
-                  className="h-20 w-auto"
+                  className="h-40 w-auto"
                 />
               </div>
             </div>
