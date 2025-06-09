@@ -12,13 +12,12 @@ export const LandingHeader = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-3">
+            <Link to="/" className="flex items-center">
               <img 
                 src="/lovable-uploads/57950d03-0066-4e69-b903-ffa7967734a1.png" 
-                alt="ShiftCraft Logo" 
-                className="h-10 w-auto"
+                alt="Logo" 
+                className="h-20 w-auto"
               />
-              <span className="text-xl font-bold text-gray-900">ShiftCraft</span>
             </Link>
           </div>
 

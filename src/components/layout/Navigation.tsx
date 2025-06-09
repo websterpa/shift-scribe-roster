@@ -25,15 +25,12 @@ const Navigation = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center">
                 <img 
                   src="/lovable-uploads/57950d03-0066-4e69-b903-ffa7967734a1.png" 
-                  alt="ShiftCraft Logo" 
-                  className="h-10 w-auto"
+                  alt="Logo" 
+                  className="h-20 w-auto"
                 />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  ShiftCraft
-                </h1>
               </div>
             </div>
             <div className="hidden sm:ml-8 sm:flex sm:space-x-2">
