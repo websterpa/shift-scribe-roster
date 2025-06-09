@@ -1,3 +1,4 @@
+
 import { StaffMember } from '@/types/roster';
 import { createLogger } from '../errorLogger';
 
@@ -465,8 +466,8 @@ function hasLateBeforeEarly(pattern: string): boolean {
 function violatesWeeklyLimit(pattern: string): boolean {
   for (let i = 0; i <= pattern.length - 7; i++) {
     const weekSlice = pattern.slice(i, i + 7);
-    // Convert string slice to array for filtering
-    const workDays = Array.from(weekSlice).filter(day => day !== 'R').length;
+    // good: spread into an array of single-char strings, then filter
+    const workDays = [...weekSlice].filter(day => day !== 'R').length;
     if (workDays > 5) {
       return true;
     }
