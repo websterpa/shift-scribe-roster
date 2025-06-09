@@ -1,63 +1,67 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Calendar, FileText, Settings, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
 const DashboardVersion1 = () => {
-  const quickActions = [
-    {
-      title: 'Manage Staff',
-      description: 'Add, edit, and manage your staff members',
-      icon: Users,
-      link: '/staff',
-      gradient: 'from-blue-500 to-purple-600'
-    },
-    {
-      title: 'Generate Roster',
-      description: 'Create optimized shift schedules',
-      icon: Calendar,
-      link: '/generate-roster',
-      gradient: 'from-green-500 to-teal-600'
-    },
-    {
-      title: 'Leave Requests',
-      description: 'Review and manage leave requests',
-      icon: FileText,
-      link: '/leave-requests',
-      gradient: 'from-yellow-500 to-orange-600'
-    },
-    {
-      title: 'Configuration',
-      description: 'Set up roster parameters',
-      icon: Settings,
-      link: '/roster-config',
-      gradient: 'from-purple-500 to-pink-600'
-    }
-  ];
-
-  const stats = [
-    { label: 'Active Staff', value: '24', change: '+2', icon: Users },
-    { label: 'This Week Shifts', value: '168', change: '+12', icon: Calendar },
-    { label: 'Pending Requests', value: '3', change: '-1', icon: FileText },
-    { label: 'Completion Rate', value: '98%', change: '+5%', icon: TrendingUp }
-  ];
-
-  return (
-    <div className="space-y-8">
+  const quickActions = [{
+    title: 'Manage Staff',
+    description: 'Add, edit, and manage your staff members',
+    icon: Users,
+    link: '/staff',
+    gradient: 'from-blue-500 to-purple-600'
+  }, {
+    title: 'Generate Roster',
+    description: 'Create optimized shift schedules',
+    icon: Calendar,
+    link: '/generate-roster',
+    gradient: 'from-green-500 to-teal-600'
+  }, {
+    title: 'Leave Requests',
+    description: 'Review and manage leave requests',
+    icon: FileText,
+    link: '/leave-requests',
+    gradient: 'from-yellow-500 to-orange-600'
+  }, {
+    title: 'Configuration',
+    description: 'Set up roster parameters',
+    icon: Settings,
+    link: '/roster-config',
+    gradient: 'from-purple-500 to-pink-600'
+  }];
+  const stats = [{
+    label: 'Active Staff',
+    value: '24',
+    change: '+2',
+    icon: Users
+  }, {
+    label: 'This Week Shifts',
+    value: '168',
+    change: '+12',
+    icon: Calendar
+  }, {
+    label: 'Pending Requests',
+    value: '3',
+    change: '-1',
+    icon: FileText
+  }, {
+    label: 'Completion Rate',
+    value: '98%',
+    change: '+5%',
+    icon: TrendingUp
+  }];
+  return <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Dashboard
           </h1>
-          <p className="text-lg text-muted-foreground mt-2">Welcome to your CCTV Roster management system</p>
+          <p className="text-lg text-muted-foreground mt-2">Welcome to your Staff Shift Roster management system</p>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <Card key={index} className="relative overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105">
+        {stats.map((stat, index) => <Card key={index} className="relative overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -73,14 +77,12 @@ const DashboardVersion1 = () => {
                 </div>
               </div>
             </CardContent>
-          </Card>
-        ))}
+          </Card>)}
       </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {quickActions.map((action, index) => (
-          <Link key={index} to={action.link} className="block group">
+        {quickActions.map((action, index) => <Link key={index} to={action.link} className="block group">
             <Card className="relative overflow-hidden hover:shadow-2xl transition-all duration-500 group-hover:scale-105">
               <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
               <CardHeader className="pb-3">
@@ -95,8 +97,7 @@ const DashboardVersion1 = () => {
                 <CardDescription className="text-base">{action.description}</CardDescription>
               </CardContent>
             </Card>
-          </Link>
-        ))}
+          </Link>)}
       </div>
 
       {/* Recent Activity & Quick Stats */}
@@ -142,7 +143,9 @@ const DashboardVersion1 = () => {
                 <span className="font-medium">87%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full" style={{width: '87%'}}></div>
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full" style={{
+                width: '87%'
+              }}></div>
               </div>
             </div>
             <div className="space-y-2">
@@ -151,14 +154,14 @@ const DashboardVersion1 = () => {
                 <span className="font-medium">94%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-gradient-to-r from-green-500 to-teal-600 h-2 rounded-full" style={{width: '94%'}}></div>
+                <div className="bg-gradient-to-r from-green-500 to-teal-600 h-2 rounded-full" style={{
+                width: '94%'
+              }}></div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default DashboardVersion1;
