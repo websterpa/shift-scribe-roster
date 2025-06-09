@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from '@/pages/LandingPage';
+import PricingPage from '@/pages/PricingPage';
 import AuthPage from '@/pages/AuthPage';
 import Dashboard from '@/pages/Dashboard';
 import Staff from '@/pages/Staff';
@@ -12,6 +13,9 @@ import MyConfigurations from '@/pages/MyConfigurations';
 import MyRosters from '@/pages/MyRosters';
 import TestPro from '@/pages/TestPro';
 import RosterViewer from '@/pages/RosterViewer';
+import SupportPage from '@/pages/SupportPage';
+import TermsPage from '@/pages/TermsPage';
+import PrivacyPage from '@/pages/PrivacyPage';
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 
@@ -32,6 +36,10 @@ export const AppRouter: React.FC = () => {
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/support" element={<SupportPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/auth" element={<AuthPage />} />
           
           {/* Protected routes with AuthenticatedLayout as parent */}

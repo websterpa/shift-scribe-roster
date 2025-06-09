@@ -26,11 +26,11 @@ export const HeroSection = () => {
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
-            <a href="#pricing">
+            <Link to="/pricing">
               <Button size="lg" variant="outline" className="text-lg px-8 py-4">
                 View Pricing
               </Button>
-            </a>
+            </Link>
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600">
