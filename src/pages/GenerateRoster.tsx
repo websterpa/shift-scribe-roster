@@ -12,15 +12,23 @@ import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 
 const GenerateRoster = () => {
   const [activeTab, setActiveTab] = useState("settings");
-  const { generateRoster, isGenerating } = useRosterGeneration();
-
-  const handleGenerate = async (configId: string) => {
-    try {
-      await generateRoster(configId);
-    } catch (error) {
-      console.error('Failed to generate roster:', error);
-    }
-  };
+  const {
+    configs,
+    selectedConfigId,
+    selectedConfig,
+    rosterName,
+    staffList,
+    isGenerating,
+    isLoading,
+    generatedVersionId,
+    errors,
+    setSelectedConfigId,
+    setRosterName,
+    handleGenerateRoster,
+    refreshData,
+    validationReport,
+    isValidating
+  } = useRosterGeneration(null);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -69,7 +77,19 @@ const GenerateRoster = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RosterGenerationSettings onGenerate={handleGenerate} />
+              <RosterGenerationSettings 
+                configs={configs}
+                selectedConfig={selectedConfig}
+                selectedConfigId={selectedConfigId}
+                rosterName={rosterName}
+                staffCount={staffList.length}
+                isGenerating={isGenerating}
+                errors={errors}
+                onSelectConfig={setSelectedConfigId}
+                onRosterNameChange={setRosterName}
+                onGenerateRoster={handleGenerateRoster}
+                onRefresh={refreshData}
+              />
             </CardContent>
           </Card>
         </TabsContent>
