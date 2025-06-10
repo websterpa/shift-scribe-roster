@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, TestTube, ChevronDown, User } from 'lucide-react';
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, TestTube, ChevronDown, User, FlaskConical } from 'lucide-react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import {
   DropdownMenu,
@@ -119,6 +119,17 @@ const Navigation = () => {
                 My Rosters
               </Link>
               <Link
+                to="/roster-testing"
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  isActive('/roster-testing')
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg transform scale-105'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-md hover:scale-105'
+                }`}
+              >
+                <FlaskConical className="w-4 h-4 mr-2" />
+                Roster Testing
+              </Link>
+              <Link
                 to="/test-pro"
                 className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   isActive('/test-pro')
@@ -144,7 +155,7 @@ const Navigation = () => {
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-white/95 backdrop-blur-sm">
+              <DropdownMenuContent align="end" className="w-56 bg-white/95 backdrop-blur-sm z-50">
                 <div className="px-3 py-2 text-sm">
                   <p className="font-medium text-gray-900">Signed in as</p>
                   <p className="text-gray-600 truncate">{user?.email}</p>

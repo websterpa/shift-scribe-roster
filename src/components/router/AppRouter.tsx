@@ -12,6 +12,7 @@ import RosterConfig from '@/pages/RosterConfig';
 import MyConfigurations from '@/pages/MyConfigurations';
 import MyRosters from '@/pages/MyRosters';
 import TestPro from '@/pages/TestPro';
+import RosterTesting from '@/pages/RosterTesting';
 import RosterViewer from '@/pages/RosterViewer';
 import SupportPage from '@/pages/SupportPage';
 import TermsPage from '@/pages/TermsPage';
@@ -52,6 +53,7 @@ export const AppRouter: React.FC = () => {
             <Route path="my-configurations" element={<MyConfigurations />} />
             <Route path="my-rosters" element={<MyRosters />} />
             <Route path="test-pro" element={<TestPro />} />
+            <Route path="roster-testing" element={<RosterTesting />} />
             <Route path="roster/:rosterId" element={<RosterViewer />} />
           </Route>
           
