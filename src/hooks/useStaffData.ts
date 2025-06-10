@@ -15,10 +15,12 @@ export function useStaffData() {
     try {
       console.log('📥 useStaffData: Fetching staff list...');
       setError(null);
+      // Remove the is_active filter to fetch ALL staff members
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("*")
-        .eq("is_active", true);
+        .order("is_active", { ascending: false }) // Show active staff first
+        .order("last_name", { ascending: true }); // Then order by last name
 
       if (error) {
         console.error('❌ useStaffData: Error fetching staff:', error);
@@ -31,7 +33,7 @@ export function useStaffData() {
 
       const enriched = await Promise.all(
         data?.map(async (s) => {
-          console.log('👤 Processing staff member:', s.first_name, s.last_name);
+          console.log('👤 Processing staff member:', s.first_name, s.last_name, 'Active:', s.is_active);
           
           // Count monthly leave requests for this staff member
           const { data: leaveData, error: leaveError } = await supabase
@@ -78,6 +80,8 @@ export function useStaffData() {
       );
 
       console.log('✅ useStaffData: Processed staff list:', enriched.length, 'members');
+      console.log('📊 Active staff:', enriched.filter(s => s.is_active).length);
+      console.log('📊 Inactive staff:', enriched.filter(s => !s.is_active).length);
       setStaffList(enriched);
     } catch (error) {
       console.error('❌ useStaffData: Exception in fetchStaffList:', error);

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
-import { Plus, User } from 'lucide-react';
+import { Plus, User, Eye, EyeOff } from 'lucide-react';
 import { useStaffData } from '@/hooks/useStaffData';
 import { StaffDialog } from './StaffDialog';
 import { StaffTable } from './StaffTable';
@@ -18,6 +18,7 @@ const StaffList = () => {
   const { staffMembers, loading, error, refreshStaff } = useStaffData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | undefined>(undefined);
+  const [showInactiveOnly, setShowInactiveOnly] = useState(false);
 
   const handleAddStaff = () => {
     console.log('➕ StaffList: Add staff clicked');
@@ -88,31 +89,59 @@ const StaffList = () => {
     );
   }
 
+  // Filter staff based on the toggle
+  const filteredStaff = showInactiveOnly 
+    ? staffMembers.filter(staff => !staff.is_active)
+    : staffMembers;
+
+  const activeCount = staffMembers.filter(staff => staff.is_active).length;
+  const inactiveCount = staffMembers.filter(staff => !staff.is_active).length;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-gray-600">Manage your team members and their shift preferences.</p>
+          <p className="text-gray-600">
+            Manage your team members and their shift preferences. 
+            {inactiveCount > 0 && (
+              <span className="text-sm text-gray-500 ml-2">
+                ({activeCount} active, {inactiveCount} inactive)
+              </span>
+            )}
+          </p>
         </div>
-        <Button onClick={handleAddStaff}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Staff Member
-        </Button>
+        <div className="flex items-center gap-2">
+          {inactiveCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setShowInactiveOnly(!showInactiveOnly)}
+              className="flex items-center gap-2"
+            >
+              {showInactiveOnly ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              {showInactiveOnly ? 'Show All Staff' : 'Show Inactive Only'}
+            </Button>
+          )}
+          <Button onClick={handleAddStaff}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Staff Member
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            Staff Members ({staffMembers.length})
+            Staff Members ({filteredStaff.length})
+            {showInactiveOnly && <span className="text-sm font-normal text-gray-500">(Inactive only)</span>}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <StaffActions onAddStaff={handleAddStaff} staffCount={staffMembers.length} />
-          {staffMembers.length > 0 && (
+          <StaffActions onAddStaff={handleAddStaff} staffCount={filteredStaff.length} />
+          {filteredStaff.length > 0 && (
             <StaffTable 
-              staffMembers={staffMembers}
+              staffMembers={filteredStaff}
               onEdit={handleEditStaff}
               onDelete={handleDeleteStaff}
             />

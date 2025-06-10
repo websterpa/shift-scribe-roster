@@ -11,18 +11,32 @@ interface StaffRowProps {
 }
 
 export const StaffRow = ({ staff, onEdit, onDelete }: StaffRowProps) => {
-  console.log('🔄 StaffRow rendered for:', staff.first_name, staff.last_name);
+  console.log('🔄 StaffRow rendered for:', staff.first_name, staff.last_name, 'Active:', staff.is_active);
+
+  // Apply greyed-out styling for inactive staff
+  const rowClassName = `border-b hover:bg-gray-50 ${
+    !staff.is_active ? 'opacity-60 bg-gray-50' : ''
+  }`;
+
+  const textClassName = !staff.is_active ? 'text-gray-500' : '';
 
   return (
-    <tr className="border-b hover:bg-gray-50">
+    <tr className={rowClassName}>
       <td className="py-3 px-4">
-        <div className="font-medium">{staff.first_name} {staff.last_name}</div>
-        <div className="text-sm text-gray-500">{staff.email}</div>
+        <div className={`font-medium ${textClassName}`}>
+          {staff.first_name} {staff.last_name}
+          {!staff.is_active && (
+            <span className="ml-2 text-xs text-gray-400 font-normal">(Inactive)</span>
+          )}
+        </div>
+        <div className={`text-sm ${!staff.is_active ? 'text-gray-400' : 'text-gray-500'}`}>
+          {staff.email}
+        </div>
       </td>
-      <td className="py-3 px-4">{staff.employee_id}</td>
-      <td className="py-3 px-4">{staff.role}</td>
-      <td className="py-3 px-4">£{staff.hourly_rate}/hr</td>
-      <td className="py-3 px-4">
+      <td className={`py-3 px-4 ${textClassName}`}>{staff.employee_id}</td>
+      <td className={`py-3 px-4 ${textClassName}`}>{staff.role}</td>
+      <td className={`py-3 px-4 ${textClassName}`}>£{staff.hourly_rate}/hr</td>
+      <td className={`py-3 px-4 ${textClassName}`}>
         <div className="text-sm">
           {staff.min_hours_per_week} - {staff.max_hours_per_week}
         </div>
@@ -32,7 +46,11 @@ export const StaffRow = ({ staff, onEdit, onDelete }: StaffRowProps) => {
           {staff.eligible_shifts?.map((shift, index) => (
             <span
               key={index}
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                staff.is_active 
+                  ? 'bg-blue-100 text-blue-800' 
+                  : 'bg-gray-100 text-gray-500'
+              }`}
             >
               {shift}
             </span>
@@ -57,6 +75,7 @@ export const StaffRow = ({ staff, onEdit, onDelete }: StaffRowProps) => {
               console.log('✏️ StaffRow: Edit clicked for:', staff.id);
               onEdit(staff);
             }}
+            className={!staff.is_active ? 'opacity-75' : ''}
           >
             <Edit className="h-4 w-4" />
           </Button>
@@ -67,6 +86,7 @@ export const StaffRow = ({ staff, onEdit, onDelete }: StaffRowProps) => {
               console.log('🗑️ StaffRow: Delete clicked for:', staff.id);
               onDelete(staff.id);
             }}
+            className={!staff.is_active ? 'opacity-75' : ''}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
