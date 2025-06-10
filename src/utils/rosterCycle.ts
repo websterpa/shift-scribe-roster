@@ -1,4 +1,5 @@
 
+
 import { generateEnhancedRosterCycle } from './roster/enhancedCycleIntegration';
 
 type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
@@ -31,13 +32,26 @@ export function buildRosterCycle(
     staffingRequirements
   });
 
-  // Convert staff list to StaffMember format
+  // Convert staff list to StaffMember format with all required properties
   const staffMembers = staffList.map(staff => ({
     id: staff.id,
+    employee_id: staff.id, // Use id as employee_id fallback
     first_name: staff.id,
     last_name: '',
+    email: `${staff.id}@company.com`, // Default email
+    phone: '',
+    hire_date: new Date().toISOString().split('T')[0], // Today's date
+    is_active: true,
+    role: 'CCTV Operator',
     eligible_shifts: staff.eligible_shifts,
-    is_shift_worker: staff.is_shift_worker
+    is_shift_worker: staff.is_shift_worker,
+    min_hours_per_week: 32,
+    max_hours_per_week: 48,
+    opted_out_wtd: false,
+    days_off_per_week: 2,
+    hourly_rate: 15.50,
+    holiday_multiplier: 2,
+    leave_allowance_days: 28
   }));
 
   console.log('🎯 Using enhanced cycle generation with STRICT shift grouping');
