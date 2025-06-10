@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, TestTube, FlaskConical } from 'lucide-react';
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, TestTube, FlaskConical, BarChart3 } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
@@ -12,6 +11,7 @@ const Navigation = () => {
     { path: '/dashboard', label: 'Dashboard', icon: Calendar, gradient: 'from-blue-500 to-purple-600' },
     { path: '/staff', label: 'Staff', icon: Users, gradient: 'from-yellow-500 to-orange-600' },
     { path: '/leave-requests', label: 'Leave Requests', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
+    { path: '/staffing-analysis', label: 'Staffing Analysis', icon: BarChart3, gradient: 'from-cyan-500 to-blue-600' },
     { path: '/my-configurations', label: 'My Configs', icon: FolderOpen, gradient: 'from-teal-500 to-cyan-600' },
     { path: '/roster-config', label: 'Configuration', icon: Settings, gradient: 'from-indigo-500 to-purple-600' },
     { path: '/generate-roster', label: 'Generate Roster', icon: Zap, gradient: 'from-green-500 to-teal-600' },

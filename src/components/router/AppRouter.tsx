@@ -14,6 +14,7 @@ import MyRosters from '@/pages/MyRosters';
 import TestPro from '@/pages/TestPro';
 import RosterTesting from '@/pages/RosterTesting';
 import RosterViewer from '@/pages/RosterViewer';
+import StaffingAnalysis from '@/pages/StaffingAnalysis';
 import SupportPage from '@/pages/SupportPage';
 import TermsPage from '@/pages/TermsPage';
 import PrivacyPage from '@/pages/PrivacyPage';
@@ -49,6 +50,7 @@ export const AppRouter: React.FC = () => {
             <Route path="staff" element={<Staff />} />
             <Route path="generate-roster" element={<GenerateRoster />} />
             <Route path="leave-requests" element={<LeaveRequests />} />
+            <Route path="staffing-analysis" element={<StaffingAnalysis />} />
             <Route path="roster-config" element={<RosterConfig />} />
             <Route path="my-configurations" element={<MyConfigurations />} />
             <Route path="my-rosters" element={<MyRosters />} />
