@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +64,7 @@ export const CycleValidationTestInterface = () => {
         email: `${staff.first_name.toLowerCase()}@test.com`,
         hire_date: '2024-01-01',
         is_active: true,
+        availability_status: 'active' as const,
         min_hours_per_week: 37,
         max_hours_per_week: 48,
         opted_out_wtd: false,

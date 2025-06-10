@@ -66,6 +66,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
         phone: `+44 7${String(Math.floor(Math.random() * 900000000) + 100000000)}`,
         hire_date: '2023-01-01',
         is_active: true,
+        availability_status: 'active' as const,
         role: role,
         eligible_shifts: ['D', 'E', 'N'],
         is_shift_worker: true,
@@ -135,7 +136,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
             
             const assignment: RosterAssignment = {
               staffId: staffMember.id,
-              staffName: staffMember.name,
+              staffName: staffMember.name || `${staffMember.first_name} ${staffMember.last_name}`,
               role: staffMember.role || 'Staff',
               date: date,
               shiftCode: shift,
@@ -174,7 +175,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
   
   // Filter staff based on search and role
   const filteredStaff = demoStaff.filter(staff => {
-    const nameMatch = staff.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const nameMatch = (staff.name || `${staff.first_name} ${staff.last_name}`).toLowerCase().includes(searchTerm.toLowerCase());
     const roleMatch = filterRole === 'all' || staff.role === filterRole;
     return nameMatch && roleMatch;
   });
@@ -182,7 +183,7 @@ export function MultiWeekRoster({ staffList = [], config, showWeeks = 4 }: Props
   // Convert StaffMember to the simplified Staff type for display
   const displayStaff: Staff[] = filteredStaff.map(staff => ({
     id: staff.id,
-    name: staff.name,
+    name: staff.name || `${staff.first_name} ${staff.last_name}`,
     role: staff.role || 'Staff'
   }));
 

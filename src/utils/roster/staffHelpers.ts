@@ -33,7 +33,7 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
       phone: staff.phone,
       hire_date: staff.hire_date,
       is_active: staff.is_active,
-      availability_status: staff.availability_status || 'active',
+      availability_status: (staff.availability_status || 'active') as 'active' | 'temporarily_unavailable' | 'inactive',
       unavailability_reason: staff.unavailability_reason,
       unavailable_from: staff.unavailable_from,
       expected_return_date: staff.expected_return_date,
@@ -49,9 +49,7 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
       days_off_per_week: staff.days_off_per_week || 2,
       hourly_rate: staff.hourly_rate || 15.50,
       holiday_multiplier: staff.holiday_multiplier || 2,
-      leave_allowance_days: staff.leave_allowance_days || 28,
-      // Include the new is_admin field
-      is_admin: staff.is_admin || false
+      leave_allowance_days: staff.leave_allowance_days || 28
     })) || [];
   } catch (error) {
     logger.error(new Error('Exception in fetchStaffMembers'), { originalError: error });

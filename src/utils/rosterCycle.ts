@@ -1,5 +1,4 @@
 
-
 import { generateEnhancedRosterCycle } from './roster/enhancedCycleIntegration';
 
 type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
@@ -42,6 +41,7 @@ export function buildRosterCycle(
     phone: '',
     hire_date: new Date().toISOString().split('T')[0], // Today's date
     is_active: true,
+    availability_status: 'active' as const,
     role: 'CCTV Operator',
     eligible_shifts: staff.eligible_shifts,
     is_shift_worker: staff.is_shift_worker,
