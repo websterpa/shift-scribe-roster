@@ -407,12 +407,14 @@ export type Database = {
       }
       staff_profiles: {
         Row: {
+          availability_status: string
           certifications: Json | null
           created_at: string
           days_off_per_week: number | null
           eligible_shifts: string[] | null
           email: string
           employee_id: string
+          expected_return_date: string | null
           first_name: string
           hire_date: string
           holiday_multiplier: number | null
@@ -431,16 +433,21 @@ export type Database = {
           role: string | null
           role_id: string | null
           shift_preferences: Json | null
+          unavailability_notes: string | null
+          unavailability_reason: string | null
+          unavailable_from: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          availability_status?: string
           certifications?: Json | null
           created_at?: string
           days_off_per_week?: number | null
           eligible_shifts?: string[] | null
           email: string
           employee_id: string
+          expected_return_date?: string | null
           first_name: string
           hire_date: string
           holiday_multiplier?: number | null
@@ -459,16 +466,21 @@ export type Database = {
           role?: string | null
           role_id?: string | null
           shift_preferences?: Json | null
+          unavailability_notes?: string | null
+          unavailability_reason?: string | null
+          unavailable_from?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          availability_status?: string
           certifications?: Json | null
           created_at?: string
           days_off_per_week?: number | null
           eligible_shifts?: string[] | null
           email?: string
           employee_id?: string
+          expected_return_date?: string | null
           first_name?: string
           hire_date?: string
           holiday_multiplier?: number | null
@@ -487,6 +499,9 @@ export type Database = {
           role?: string | null
           role_id?: string | null
           shift_preferences?: Json | null
+          unavailability_notes?: string | null
+          unavailability_reason?: string | null
+          unavailable_from?: string | null
           updated_at?: string
           user_id?: string
         }

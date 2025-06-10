@@ -18,7 +18,7 @@ const StaffList = () => {
   const { staffMembers, loading, error, refreshStaff } = useStaffData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | undefined>(undefined);
-  const [showInactiveOnly, setShowInactiveOnly] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'temporarily_unavailable' | 'inactive'>('all');
 
   const handleAddStaff = () => {
     console.log('➕ StaffList: Add staff clicked');
@@ -89,13 +89,14 @@ const StaffList = () => {
     );
   }
 
-  // Filter staff based on the toggle
-  const filteredStaff = showInactiveOnly 
-    ? staffMembers.filter(staff => !staff.is_active)
-    : staffMembers;
+  // Filter staff based on the selected filter
+  const filteredStaff = filterStatus === 'all' 
+    ? staffMembers
+    : staffMembers.filter(staff => staff.availability_status === filterStatus);
 
-  const activeCount = staffMembers.filter(staff => staff.is_active).length;
-  const inactiveCount = staffMembers.filter(staff => !staff.is_active).length;
+  const activeCount = staffMembers.filter(staff => staff.availability_status === 'active').length;
+  const tempUnavailableCount = staffMembers.filter(staff => staff.availability_status === 'temporarily_unavailable').length;
+  const inactiveCount = staffMembers.filter(staff => staff.availability_status === 'inactive').length;
 
   return (
     <div className="space-y-6">
@@ -103,25 +104,51 @@ const StaffList = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
           <p className="text-gray-600">
-            Manage your team members and their shift preferences. 
-            {inactiveCount > 0 && (
-              <span className="text-sm text-gray-500 ml-2">
-                ({activeCount} active, {inactiveCount} inactive)
-              </span>
-            )}
+            Manage your team members and their availability status.
+            <span className="text-sm text-gray-500 ml-2">
+              ({activeCount} active, {tempUnavailableCount} temporarily unavailable, {inactiveCount} inactive)
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {inactiveCount > 0 && (
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <Button
-              variant="outline"
-              onClick={() => setShowInactiveOnly(!showInactiveOnly)}
-              className="flex items-center gap-2"
+              variant={filterStatus === 'all' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilterStatus('all')}
+              className="text-xs"
             >
-              {showInactiveOnly ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              {showInactiveOnly ? 'Show All Staff' : 'Show Inactive Only'}
+              All ({staffMembers.length})
             </Button>
-          )}
+            <Button
+              variant={filterStatus === 'active' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilterStatus('active')}
+              className="text-xs"
+            >
+              Active ({activeCount})
+            </Button>
+            {tempUnavailableCount > 0 && (
+              <Button
+                variant={filterStatus === 'temporarily_unavailable' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setFilterStatus('temporarily_unavailable')}
+                className="text-xs"
+              >
+                Temp. Unavailable ({tempUnavailableCount})
+              </Button>
+            )}
+            {inactiveCount > 0 && (
+              <Button
+                variant={filterStatus === 'inactive' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setFilterStatus('inactive')}
+                className="text-xs"
+              >
+                Inactive ({inactiveCount})
+              </Button>
+            )}
+          </div>
           <Button onClick={handleAddStaff}>
             <Plus className="h-4 w-4 mr-2" />
             Add Staff Member
@@ -134,7 +161,11 @@ const StaffList = () => {
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
             Staff Members ({filteredStaff.length})
-            {showInactiveOnly && <span className="text-sm font-normal text-gray-500">(Inactive only)</span>}
+            {filterStatus !== 'all' && (
+              <span className="text-sm font-normal text-gray-500">
+                ({filterStatus === 'temporarily_unavailable' ? 'Temporarily Unavailable' : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)} only)
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -9,7 +9,7 @@ export interface ConfigItem {
   created_at?: string;
 }
 
-// Updated StaffMember interface to be consistent with database schema
+// Updated StaffMember interface to include new availability tracking fields
 export interface StaffMember {
   id: string;
   employee_id: string;
@@ -19,6 +19,11 @@ export interface StaffMember {
   phone?: string;
   hire_date: string;
   is_active: boolean;
+  availability_status: 'active' | 'temporarily_unavailable' | 'inactive';
+  unavailability_reason?: string;
+  unavailable_from?: string;
+  expected_return_date?: string;
+  unavailability_notes?: string;
   role?: string;
   eligible_shifts: string[];
   is_shift_worker: boolean;

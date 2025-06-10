@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { LoadingState } from '@/components/ui/loading-state';
 import { validateForm, staffValidationSchema, showValidationToast, showSuccessToast } from '@/utils/formValidation';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +21,11 @@ interface StaffMember {
   phone?: string;
   hire_date: string;
   is_active: boolean;
+  availability_status: 'active' | 'temporarily_unavailable' | 'inactive';
+  unavailability_reason?: string;
+  unavailable_from?: string;
+  expected_return_date?: string;
+  unavailability_notes?: string;
   role?: string;
   hourly_rate?: number;
   min_hours_per_week?: number;
@@ -37,6 +43,18 @@ interface StaffDialogProps {
 
 const AVAILABLE_SHIFTS = ['Early', 'Late', 'Night', 'Day'];
 const AVAILABLE_ROLES = ['CCTV Operator', 'Senior Operator', 'Supervisor', 'Manager'];
+const UNAVAILABILITY_REASONS = [
+  'Maternity Leave',
+  'Paternity Leave', 
+  'Long-term Sick Leave',
+  'Training/Education',
+  'Secondment',
+  'Sabbatical',
+  'Military Service',
+  'Bereavement Leave',
+  'Extended Leave',
+  'Other'
+];
 
 export const StaffDialog: React.FC<StaffDialogProps> = ({
   open,
@@ -54,6 +72,11 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
     phone: '',
     hire_date: new Date().toISOString().split('T')[0],
     is_active: true,
+    availability_status: 'active',
+    unavailability_reason: '',
+    unavailable_from: '',
+    expected_return_date: '',
+    unavailability_notes: '',
     role: 'CCTV Operator',
     hourly_rate: 15.50,
     min_hours_per_week: 37,
@@ -68,7 +91,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
       setFormData({
         ...staffMember,
         hire_date: staffMember.hire_date || new Date().toISOString().split('T')[0],
-        eligible_shifts: staffMember.eligible_shifts || ['Early', 'Late', 'Night', 'Day']
+        eligible_shifts: staffMember.eligible_shifts || ['Early', 'Late', 'Night', 'Day'],
+        availability_status: staffMember.availability_status || 'active'
       });
     } else {
       setFormData({
@@ -79,6 +103,11 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         phone: '',
         hire_date: new Date().toISOString().split('T')[0],
         is_active: true,
+        availability_status: 'active',
+        unavailability_reason: '',
+        unavailable_from: '',
+        expected_return_date: '',
+        unavailability_notes: '',
         role: 'CCTV Operator',
         hourly_rate: 15.50,
         min_hours_per_week: 37,
@@ -137,6 +166,11 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         phone: formData.phone || null,
         hire_date: formData.hire_date,
         is_active: formData.is_active,
+        availability_status: formData.availability_status,
+        unavailability_reason: formData.unavailability_reason || null,
+        unavailable_from: formData.unavailable_from || null,
+        expected_return_date: formData.expected_return_date || null,
+        unavailability_notes: formData.unavailability_notes || null,
         role: formData.role,
         hourly_rate: formData.hourly_rate,
         min_hours_per_week: formData.min_hours_per_week,
@@ -180,9 +214,11 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
     }
   };
 
+  const showUnavailabilityFields = formData.availability_status === 'temporarily_unavailable';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {staffMember ? 'Edit Staff Member' : 'Add New Staff Member'}
@@ -298,6 +334,77 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
             </div>
           </div>
 
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="availability_status">Availability Status</Label>
+              <Select
+                value={formData.availability_status || 'active'}
+                onValueChange={(value) => handleInputChange('availability_status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select availability status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="temporarily_unavailable">Temporarily Unavailable</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {showUnavailabilityFields && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg">
+                <div>
+                  <Label htmlFor="unavailability_reason">Reason for Unavailability</Label>
+                  <Select
+                    value={formData.unavailability_reason || ''}
+                    onValueChange={(value) => handleInputChange('unavailability_reason', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNAVAILABILITY_REASONS.map(reason => (
+                        <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="unavailable_from">Unavailable From</Label>
+                  <Input
+                    id="unavailable_from"
+                    type="date"
+                    value={formData.unavailable_from || ''}
+                    onChange={(e) => handleInputChange('unavailable_from', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="expected_return_date">Expected Return Date</Label>
+                  <Input
+                    id="expected_return_date"
+                    type="date"
+                    value={formData.expected_return_date || ''}
+                    onChange={(e) => handleInputChange('expected_return_date', e.target.value)}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <Label htmlFor="unavailability_notes">Additional Notes</Label>
+                  <Textarea
+                    id="unavailability_notes"
+                    value={formData.unavailability_notes || ''}
+                    onChange={(e) => handleInputChange('unavailability_notes', e.target.value)}
+                    placeholder="Any additional information about the unavailability..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="min_hours">Min Hours/Week</Label>
@@ -347,7 +454,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
                 checked={formData.is_active || false}
                 onCheckedChange={(checked) => handleInputChange('is_active', checked)}
               />
-              <span>Active</span>
+              <span>Active (Legacy)</span>
             </label>
 
             <label className="flex items-center space-x-2">

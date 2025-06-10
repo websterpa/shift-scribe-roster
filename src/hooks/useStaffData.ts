@@ -19,7 +19,7 @@ export function useStaffData() {
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("*")
-        .order("is_active", { ascending: false }) // Show active staff first
+        .order("availability_status", { ascending: true }) // Show active first, then temporarily unavailable, then inactive
         .order("last_name", { ascending: true }); // Then order by last name
 
       if (error) {
@@ -33,7 +33,7 @@ export function useStaffData() {
 
       const enriched = await Promise.all(
         data?.map(async (s) => {
-          console.log('👤 Processing staff member:', s.first_name, s.last_name, 'Active:', s.is_active);
+          console.log('👤 Processing staff member:', s.first_name, s.last_name, 'Status:', s.availability_status);
           
           // Count monthly leave requests for this staff member
           const { data: leaveData, error: leaveError } = await supabase
@@ -63,6 +63,11 @@ export function useStaffData() {
             phone: s.phone,
             hire_date: s.hire_date,
             is_active: s.is_active,
+            availability_status: s.availability_status || 'active',
+            unavailability_reason: s.unavailability_reason,
+            unavailable_from: s.unavailable_from,
+            expected_return_date: s.expected_return_date,
+            unavailability_notes: s.unavailability_notes,
             role: s.role || 'CCTV Operator',
             eligible_shifts: s.eligible_shifts || ['Early', 'Late', 'Night'],
             is_shift_worker: s.is_shift_worker ?? true,
@@ -80,8 +85,9 @@ export function useStaffData() {
       );
 
       console.log('✅ useStaffData: Processed staff list:', enriched.length, 'members');
-      console.log('📊 Active staff:', enriched.filter(s => s.is_active).length);
-      console.log('📊 Inactive staff:', enriched.filter(s => !s.is_active).length);
+      console.log('📊 Active staff:', enriched.filter(s => s.availability_status === 'active').length);
+      console.log('📊 Temporarily unavailable staff:', enriched.filter(s => s.availability_status === 'temporarily_unavailable').length);
+      console.log('📊 Inactive staff:', enriched.filter(s => s.availability_status === 'inactive').length);
       setStaffList(enriched);
     } catch (error) {
       console.error('❌ useStaffData: Exception in fetchStaffList:', error);

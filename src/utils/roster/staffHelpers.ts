@@ -15,7 +15,7 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
     const { data, error } = await supabase
       .from('staff_profiles')
       .select('*')
-      .eq('is_active', true);
+      .eq('is_active', true); // Keep filtering for active for roster generation
 
     if (error) {
       logger.error(new Error('Failed to fetch staff members'), { error });
@@ -33,6 +33,11 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
       phone: staff.phone,
       hire_date: staff.hire_date,
       is_active: staff.is_active,
+      availability_status: staff.availability_status || 'active',
+      unavailability_reason: staff.unavailability_reason,
+      unavailable_from: staff.unavailable_from,
+      expected_return_date: staff.expected_return_date,
+      unavailability_notes: staff.unavailability_notes,
       // Compute name field for backwards compatibility
       name: `${staff.first_name} ${staff.last_name}`,
       role: staff.role || 'CCTV Operator',
