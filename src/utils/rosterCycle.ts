@@ -1,4 +1,6 @@
 
+import { generateEnhancedRosterCycle } from './roster/enhancedCycleIntegration';
+
 type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
 
 interface CycleAssignment {
@@ -29,9 +31,6 @@ export function buildRosterCycle(
     staffingRequirements
   });
 
-  // Use the enhanced cycle integration for proper grouping
-  const { generateEnhancedRosterCycle } = require('./roster/enhancedCycleIntegration');
-  
   // Convert staff list to StaffMember format
   const staffMembers = staffList.map(staff => ({
     id: staff.id,
