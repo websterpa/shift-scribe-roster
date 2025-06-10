@@ -1,3 +1,4 @@
+
 import { StaffMember } from '@/types/roster';
 import { createLogger } from '../errorLogger';
 
@@ -593,121 +594,8 @@ function wouldViolateRules(
   
   // Quick rule checks
   if (hasAlternatingPattern(pattern)) return true;
-  if (hasInvalidWorkStreaks(pattern)) return true;
+  if (!hasValidWorkStreaks(pattern)) return true;
   if (violatesWeeklyLimit(pattern)) return true;
   
   return false;
-}
-
-/**
- * Filter shifts based on eligibility and mode
- */
-function filterEligibleShifts(eligibleShifts: string[], shiftType: '8h' | '12h'): string[] {
-  if (!Array.isArray(eligibleShifts) || eligibleShifts.length === 0) {
-    console.warn('filterEligibleShifts: eligibleShifts is not a valid array:', eligibleShifts);
-    return [];
-  }
-
-  const shiftMap: Record<string, string> = {
-    'Day': 'D', 'day': 'D', 'D': 'D',
-    'Night': 'N', 'night': 'N', 'N': 'N',
-    'Early': 'E', 'early': 'E', 'E': 'E',
-    'Late': 'L', 'late': 'L', 'L': 'L'
-  };
-
-  const normalizedShifts = eligibleShifts
-    .map(shift => shiftMap[shift])
-    .filter(Boolean);
-
-  if (shiftType === '12h') {
-    return normalizedShifts.filter(shift => ['D', 'N'].includes(shift));
-  } else {
-    return normalizedShifts.filter(shift => ['E', 'L', 'N'].includes(shift));
-  }
-}
-
-/**
- * Enforce Rule 6: Maximum 5 work days in any 7-day window
- */
-function enforceWeeklyWorkLimits(pattern: string[]): void {
-  for (let i = 0; i <= pattern.length - 7; i++) {
-    const weekSlice = pattern.slice(i, i + 7);
-    // good: spread into an array of single-char strings, then filter
-    const workDays = [...weekSlice].filter(day => day !== 'R').length;
-    if (workDays > 5) {
-      // Convert excess work days to rest, prioritizing isolated shifts
-      let converted = 0;
-      for (let j = 0; j < weekSlice.length && converted < (workDays - 5); j++) {
-        const globalIndex = i + j;
-        if (pattern[globalIndex] !== 'R') {
-          // Check if this is an isolated shift (good candidate for conversion)
-          const prevIsRest = globalIndex === 0 || pattern[globalIndex - 1] === 'R';
-          const nextIsRest = globalIndex === pattern.length - 1 || pattern[globalIndex + 1] === 'R';
-          
-          if (prevIsRest && nextIsRest) {
-            pattern[globalIndex] = 'R';
-            converted++;
-          }
-        }
-      }
-    }
-  }
-}
-
-/**
- * Optimize coverage while maintaining rule compliance
- */
-function optimizeCoverageWithRules(
-  cycle: Record<number, Record<number, Record<string, string>>>,
-  shiftWorkers: StaffMember[],
-  shiftType: '8h' | '12h'
-): Record<number, Record<number, Record<string, string>>> {
-  const optimized = JSON.parse(JSON.stringify(cycle));
-  const requiredShifts = shiftType === '12h' ? ['D', 'N'] : ['E', 'L', 'N'];
-  const minStaffPerShift = 1;
-
-  Object.keys(optimized).forEach(weekStr => {
-    const week = parseInt(weekStr);
-    Object.keys(optimized[week]).forEach(dayStr => {
-      const day = parseInt(dayStr);
-      
-      // Count current assignments
-      const shiftCounts: Record<string, number> = {};
-      requiredShifts.forEach(shift => { shiftCounts[shift] = 0; });
-      
-      Object.values(optimized[week][day]).forEach(shift => {
-        if (requiredShifts.includes(shift as string)) {
-          shiftCounts[shift as string]++;
-        }
-      });
-      
-      // Check for understaffing
-      requiredShifts.forEach(shiftCode => {
-        const shortage = minStaffPerShift - shiftCounts[shiftCode];
-        
-        if (shortage > 0) {
-          // Try to reassign staff from rest to this shift
-          const availableStaff = shiftWorkers.filter(staff => 
-            optimized[week][day][staff.id] === 'R' && 
-            canWorkShift(staff, shiftCode)
-          );
-          
-          const toReassign = Math.min(shortage, availableStaff.length);
-          for (let i = 0; i < toReassign; i++) {
-            const staff = availableStaff[i];
-            
-            // Validate this assignment doesn't break rules
-            if (wouldViolateRules(optimized, staff.id, week, day, shiftCode)) {
-              continue;
-            }
-            
-            optimized[week][day][staff.id] = shiftCode;
-            console.log(`📝 Reassigned ${staff.first_name} to ${shiftCode} shift for coverage`);
-          }
-        }
-      });
-    });
-  });
-
-  return optimized;
 }
