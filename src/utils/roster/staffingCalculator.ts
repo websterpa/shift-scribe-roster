@@ -1,4 +1,3 @@
-
 import { StaffMember, ConfigItem } from "@/types/roster";
 import { createLogger } from "../errorLogger";
 
@@ -138,8 +137,8 @@ function calculateShiftRequirement(
   
   const requiredStaff = baseStaffNeeded + handoverAdjustment;
   
-  // Buffer calculation for leave coverage
-  const bufferStaff = Math.ceil(requiredStaff * leaveRate);
+  // Buffer calculation for leave coverage - Changed from const to let
+  let bufferStaff = Math.ceil(requiredStaff * leaveRate);
   reasoning.push(`Leave buffer: ${requiredStaff} × ${(leaveRate * 100).toFixed(1)}% = +${bufferStaff} staff`);
   
   // Cycle coverage consideration
