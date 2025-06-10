@@ -8,14 +8,11 @@ export const LandingFooter = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">CR</span>
+                <span className="text-white font-bold text-sm">SC</span>
               </div>
-              <span className="text-xl font-bold">CCTV Roster</span>
+              <span className="text-xl font-bold">ShiftCraft</span>
             </div>
-            <p className="text-gray-400 mb-6 max-w-md">
-              Streamline your security operations with intelligent shift scheduling 
-              and compliance management for CCTV user groups.
-            </p>
+            <p className="text-gray-400 mb-6 max-w-md text-left">Master Your Staff Scheduling</p>
             <div className="flex space-x-4">
               <a href="mailto:support@cctvlevelentry.com" className="text-gray-400 hover:text-white transition-colors">
                 <Mail className="w-5 h-5" />
