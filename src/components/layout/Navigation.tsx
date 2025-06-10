@@ -2,32 +2,15 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, LogOut, TestTube, ChevronDown, User, FlaskConical } from 'lucide-react';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Calendar, Users, FileText, Settings, FolderOpen, Archive, Zap, TestTube, ChevronDown, User, FlaskConical } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
-  const { user, signOut } = useSupabaseAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
-
   return (
-    <nav className="bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 shadow-lg border-b border-blue-100/50 backdrop-blur-sm relative z-40">
+    <nav className="bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 shadow-lg border-b border-blue-100/50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
@@ -36,7 +19,7 @@ const Navigation = () => {
                 <img 
                   src="/lovable-uploads/4baad420-9f35-41c0-b679-bf3fb947409c.png" 
                   alt="ShiftCraft Logo" 
-                  className="h-40 w-auto"
+                  className="h-10 w-auto"
                 />
               </div>
             </div>
@@ -141,32 +124,6 @@ const Navigation = () => {
                 Test Pro
               </Link>
             </div>
-          </div>
-          <div className="flex items-center relative z-50">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="bg-white/80 hover:bg-white border-gray-200 hover:shadow-lg transition-all duration-300 hover:scale-105 relative z-50"
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  Profile
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-white/95 backdrop-blur-sm z-[100] shadow-xl border border-gray-200">
-                <div className="px-3 py-2 text-sm">
-                  <p className="font-medium text-gray-900">Signed in as</p>
-                  <p className="text-gray-600 truncate">{user?.email}</p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
