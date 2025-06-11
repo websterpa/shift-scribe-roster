@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { createLogger } from "./errorLogger";
 
@@ -10,6 +11,7 @@ export interface ConfigData {
   operational_hours_per_day: number;
   handshake_minutes: number;
   start_date: string;
+  pattern?: string[];
   staffing_requirements?: {
     day_shift_staff?: number;
     night_shift_staff?: number;
@@ -25,6 +27,7 @@ export async function saveConfig({
   operational_hours_per_day,
   handshake_minutes,
   start_date,
+  pattern = [],
   staffing_requirements
 }: ConfigData) {
   console.log('💾 ConfigHelpers: Saving configuration:', { 
@@ -33,6 +36,7 @@ export async function saveConfig({
     shift_type,
     operational_hours_per_day,
     handshake_minutes,
+    pattern,
     staffing_requirements
   });
   
@@ -53,6 +57,7 @@ export async function saveConfig({
         operational_hours_per_day,
         handshake_minutes: validHandshake,
         start_date,
+        pattern: pattern || [],
         staffing_requirements: staffing_requirements || {
           day_shift_staff: 2,
           night_shift_staff: 2,
@@ -81,7 +86,7 @@ export async function saveConfig({
 
 export async function updateConfig(
   configId: string,
-  fields: Partial<Omit<ConfigData, 'configName'> & { config_name: string }>
+  fields: Partial<Omit<ConfigData, 'configName'> & { config_name: string; pattern?: string[] }>
 ) {
   console.log('🔄 ConfigHelpers: Updating configuration:', { configId, fields });
   

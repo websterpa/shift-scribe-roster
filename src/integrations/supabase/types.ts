@@ -271,6 +271,7 @@ export type Database = {
           handshake_minutes: number | null
           id: string
           operational_hours_per_day: number
+          pattern: Json | null
           shift_type: string
           staffing_requirements: Json | null
           start_date: string
@@ -282,6 +283,7 @@ export type Database = {
           handshake_minutes?: number | null
           id?: string
           operational_hours_per_day: number
+          pattern?: Json | null
           shift_type: string
           staffing_requirements?: Json | null
           start_date: string
@@ -293,6 +295,7 @@ export type Database = {
           handshake_minutes?: number | null
           id?: string
           operational_hours_per_day?: number
+          pattern?: Json | null
           shift_type?: string
           staffing_requirements?: Json | null
           start_date?: string
