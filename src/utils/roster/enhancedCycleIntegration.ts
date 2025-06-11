@@ -1,9 +1,22 @@
+
 import { StaffMember } from "@/types/roster";
 
-type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
+export type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
 
 interface CycleAssignment {
   [weekIndex: number]: { [dayIndex: number]: { [staffId: string]: ShiftCode } };
+}
+
+export interface CycleValidationResult {
+  isValid: boolean;
+  overallScore: number;
+  violations: string[];
+  staffViolations: Record<string, string[]>;
+}
+
+// Helper function to validate shift codes
+function isValidShiftCode(code: string): code is ShiftCode {
+  return ["D", "E", "L", "N", "R", "S"].includes(code);
 }
 
 export function generateEnhancedRosterCycle(
@@ -68,7 +81,10 @@ export function generateEnhancedRosterCycle(
       for (let day = 0; day < 7; day++) {
         const absoluteDay = week * 7 + day;
         const patternIndex = (absoluteDay + staffOffset) % patternLength;
-        const shiftCode = patternToUse[patternIndex];
+        const shiftCodeFromPattern = patternToUse[patternIndex];
+        
+        // Validate that the shift code is a valid ShiftCode type - fix the type error
+        const shiftCode: ShiftCode = isValidShiftCode(shiftCodeFromPattern) ? shiftCodeFromPattern : "R";
         
         // Only assign if staff is eligible for this shift type
         if (staff.eligible_shifts && staff.eligible_shifts.includes(shiftCode)) {
@@ -143,4 +159,68 @@ function validatePatternCompliance(
   });
 
   return violations;
+}
+
+// Enhanced validation function for the test interface
+export function validateEnhancedCycle(
+  assignment: CycleAssignment,
+  staffList: StaffMember[],
+  shiftType: "8h" | "12h"
+): CycleValidationResult {
+  const violations: string[] = [];
+  const staffViolations: Record<string, string[]> = {};
+  const shiftWorkers = staffList.filter(staff => staff.is_shift_worker);
+
+  shiftWorkers.forEach(staff => {
+    const staffId = staff.id;
+    staffViolations[staffId] = [];
+
+    // Check weekly work limits
+    Object.keys(assignment).forEach(weekStr => {
+      const week = parseInt(weekStr);
+      let workShifts = 0;
+      let consecutiveDays = 0;
+      let maxConsecutive = 0;
+      
+      for (let day = 0; day < 7; day++) {
+        const shiftCode = assignment[week][day][staffId];
+        
+        if (shiftCode !== "R" && shiftCode !== "S") {
+          workShifts++;
+          consecutiveDays++;
+          maxConsecutive = Math.max(maxConsecutive, consecutiveDays);
+        } else {
+          consecutiveDays = 0;
+        }
+      }
+      
+      // Check maximum shifts per week
+      const maxShifts = shiftType === "12h" ? 4 : 5;
+      if (workShifts > maxShifts) {
+        const violation = `Week ${week + 1}: ${workShifts} shifts (max: ${maxShifts})`;
+        violations.push(`${staff.first_name} ${staff.last_name} - ${violation}`);
+        staffViolations[staffId].push(violation);
+      }
+      
+      // Check maximum consecutive days
+      const maxConsecutiveDays = shiftType === "12h" ? 3 : 4;
+      if (maxConsecutive > maxConsecutiveDays) {
+        const violation = `Week ${week + 1}: ${maxConsecutive} consecutive days (max: ${maxConsecutiveDays})`;
+        violations.push(`${staff.first_name} ${staff.last_name} - ${violation}`);
+        staffViolations[staffId].push(violation);
+      }
+    });
+  });
+
+  // Calculate overall score
+  const totalChecks = shiftWorkers.length * Object.keys(assignment).length * 2; // 2 checks per staff per week
+  const failedChecks = violations.length;
+  const overallScore = totalChecks > 0 ? Math.max(0, ((totalChecks - failedChecks) / totalChecks) * 100) : 100;
+
+  return {
+    isValid: violations.length === 0,
+    overallScore,
+    violations,
+    staffViolations
+  };
 }
