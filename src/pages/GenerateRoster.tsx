@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +24,8 @@ interface CustomPattern {
 const GenerateRoster = () => {
   const [activeTab, setActiveTab] = useState("settings");
   const [selectedPattern, setSelectedPattern] = useState<string[]>([]);
-  const [patternName, setPatternName] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [customPattern, setCustomPattern] = useState<string[]>([]);
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
   const [isLoadingPatterns, setIsLoadingPatterns] = useState(false);
   
@@ -120,13 +120,7 @@ const GenerateRoster = () => {
     });
 
     try {
-      // Create enhanced config with the selected pattern
-      const enhancedConfig = {
-        ...selectedConfig,
-        pattern: selectedPattern
-      };
-
-      // Call the original generation function with the enhanced config
+      // Call the original generation function - the hook will handle passing the pattern
       await originalHandleGenerateRoster();
       
       console.log('✅ GenerateRoster: Generation completed successfully');
@@ -140,15 +134,16 @@ const GenerateRoster = () => {
     }
   };
 
-  const handlePatternChange = (pattern: string[]) => {
-    console.log('📊 GenerateRoster: Pattern changed', pattern);
+  const handlePatternArrayChange = (pattern: string[]) => {
+    console.log('📊 GenerateRoster: Pattern array changed', pattern);
     setSelectedPattern(pattern);
   };
 
   const handleShiftLengthChange = (length: '8h' | '12h') => {
     console.log('⏰ GenerateRoster: Shift length changed, clearing pattern', length);
     setSelectedPattern([]);
-    setPatternName('');
+    setSelectedTemplate('');
+    setCustomPattern([]);
   };
 
   const isGenerateDisabled = !selectedConfig || selectedPattern.length === 0 || isGenerating || staffList.length === 0;
@@ -222,12 +217,12 @@ const GenerateRoster = () => {
                   <PatternSelector
                     shiftLength={selectedConfig.shift_type}
                     onShiftLengthChange={handleShiftLengthChange}
-                    selectedTemplate=""
-                    onTemplateChange={() => {}}
-                    customPattern={[]}
-                    onCustomPatternChange={() => {}}
+                    selectedTemplate={selectedTemplate}
+                    onTemplateChange={setSelectedTemplate}
+                    customPattern={customPattern}
+                    onCustomPatternChange={setCustomPattern}
                     patternArray={selectedPattern}
-                    onPatternArrayChange={handlePatternChange}
+                    onPatternArrayChange={handlePatternArrayChange}
                   />
                 </div>
               )}
@@ -253,6 +248,11 @@ const GenerateRoster = () => {
                   {selectedPattern.length === 0 && selectedConfig && (
                     <p className="text-sm text-muted-foreground mt-2 text-center">
                       Please select a shift pattern to enable generation
+                    </p>
+                  )}
+                  {selectedPattern.length > 0 && (
+                    <p className="text-sm text-muted-foreground mt-2 text-center">
+                      Ready to generate roster with pattern: {selectedPattern.join('-')}
                     </p>
                   )}
                 </div>

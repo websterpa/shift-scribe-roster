@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +21,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [generatedVersionId, setGeneratedVersionId] = useState<string | null>(null);
+  const [selectedPattern, setSelectedPattern] = useState<string[]>([]);
   const [errors, setErrors] = useState<{
     configs?: string;
     staff?: string;
@@ -168,7 +170,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     console.log('📊 Current state:', {
       selectedConfig: selectedConfig?.config_name,
       rosterName,
-      staffCount: staffList.length
+      staffCount: staffList.length,
+      selectedPattern: selectedPattern.length > 0 ? selectedPattern : 'none'
     });
 
     // Validation
@@ -228,7 +231,9 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
         shift_type: selectedConfig.shift_type,
         operational_hours_per_day: selectedConfig.operational_hours_per_day,
         handshake_minutes: selectedConfig.handshake_minutes,
-        start_date: selectedConfig.start_date
+        start_date: selectedConfig.start_date,
+        // Include the selected pattern if one is available
+        ...(selectedPattern.length > 0 && { pattern: selectedPattern })
       };
 
       console.log('📊 useRosterGeneration: Config for generation:', configForGeneration);
@@ -245,7 +250,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       
       toast({
         title: "Roster generated successfully",
-        description: `Generated roster: "${rosterName.trim()}"`,
+        description: `Generated roster: "${rosterName.trim()}"${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}`,
       });
       
     } catch (error: any) {
@@ -283,8 +288,10 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     isLoading,
     generatedVersionId,
     errors,
+    selectedPattern,
     setSelectedConfigId,
     setRosterName,
+    setSelectedPattern,
     handleGenerateRoster,
     refreshData,
     validationReport,

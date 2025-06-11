@@ -206,22 +206,34 @@ export default function PatternSelector({
       console.log('✅ PatternSelector: Loading custom pattern:', pattern);
       setSelectedCustomPattern(patternId);
       setPatternName(pattern.name);
-      onPatternArrayChange(pattern.pattern);
+      
+      // Clear any existing template selection
+      onTemplateChange('');
+      setIsCustomMode(false);
+      
+      // Update the pattern arrays
       onCustomPatternChange(pattern.pattern);
-      setIsCustomMode(true);
-      onTemplateChange('custom');
+      onPatternArrayChange(pattern.pattern);
+      
+      toast({
+        title: "Pattern loaded",
+        description: `"${pattern.name}" pattern is now selected`,
+      });
     }
   };
 
   const handleTemplateSelect = (template: string) => {
     console.log('📂 PatternSelector: Template selected', template);
+    
+    // Clear saved pattern selection when selecting a template
+    setSelectedCustomPattern('');
+    
     if (template === 'custom') {
       setIsCustomMode(true);
       onTemplateChange(template);
       onPatternArrayChange(customPattern);
     } else {
       setIsCustomMode(false);
-      setSelectedCustomPattern('');
       setPatternName('');
       onTemplateChange(template);
     }
