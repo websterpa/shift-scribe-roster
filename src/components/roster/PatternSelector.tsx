@@ -133,7 +133,8 @@ export default function PatternSelector({
       }
 
       console.log('✅ PatternSelector: Loaded custom patterns:', data);
-      setCustomPatterns(data || []);
+      // Type assertion is safe here because we know the database constraint ensures shift_type is '8h' | '12h'
+      setCustomPatterns((data || []) as CustomPattern[]);
     } catch (error) {
       console.error('❌ PatternSelector: Exception loading custom patterns:', error);
       toast({
