@@ -7,7 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { Trash2, RotateCcw, Save } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 interface PatternSelectorProps {
   shiftLength: '8h' | '12h';
@@ -18,6 +21,14 @@ interface PatternSelectorProps {
   onCustomPatternChange: (pattern: string[]) => void;
   patternArray: string[];
   onPatternArrayChange: (pattern: string[]) => void;
+}
+
+interface CustomPattern {
+  id: string;
+  name: string;
+  shift_type: '8h' | '12h';
+  pattern: string[];
+  created_at: string;
 }
 
 const SHIFT_TEMPLATES = {
@@ -60,9 +71,24 @@ export default function PatternSelector({
   console.log('🔄 PatternSelector rendered', { shiftLength, selectedTemplate, customPattern, patternArray });
 
   const [isCustomMode, setIsCustomMode] = useState(false);
+  const [patternName, setPatternName] = useState('');
+  const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
+  const [selectedCustomPattern, setSelectedCustomPattern] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { user, isAuthenticated } = useSupabaseAuth();
 
   const currentTemplates = SHIFT_TEMPLATES[shiftLength];
 
+  // Load custom patterns on component mount and when shift length changes
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadCustomPatterns();
+    }
+  }, [isAuthenticated, user, shiftLength]);
+
+  // Handle template selection
   useEffect(() => {
     console.log('📊 PatternSelector: Template changed', { selectedTemplate, isCustomMode });
     if (selectedTemplate && selectedTemplate !== 'custom' && !isCustomMode) {
@@ -74,12 +100,117 @@ export default function PatternSelector({
     }
   }, [selectedTemplate, currentTemplates, isCustomMode, onPatternArrayChange]);
 
+  // Handle custom pattern changes
   useEffect(() => {
     console.log('🎨 PatternSelector: Custom pattern changed', customPattern);
     if (isCustomMode) {
       onPatternArrayChange(customPattern);
     }
   }, [customPattern, isCustomMode, onPatternArrayChange]);
+
+  const loadCustomPatterns = async () => {
+    if (!user) return;
+    
+    console.log('📥 PatternSelector: Loading custom patterns for shift length:', shiftLength);
+    setIsLoading(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('custom_patterns')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('shift_type', shiftLength)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ PatternSelector: Error loading custom patterns:', error);
+        toast({
+          title: "Error loading patterns",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ PatternSelector: Loaded custom patterns:', data);
+      setCustomPatterns(data || []);
+    } catch (error) {
+      console.error('❌ PatternSelector: Exception loading custom patterns:', error);
+      toast({
+        title: "Error loading patterns",
+        description: "Failed to load custom patterns",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveCustomPattern = async () => {
+    if (!user || !patternName.trim() || patternArray.length === 0) return;
+
+    console.log('💾 PatternSelector: Saving custom pattern:', { patternName, patternArray, shiftLength });
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('custom_patterns')
+        .insert({
+          user_id: user.id,
+          name: patternName.trim(),
+          shift_type: shiftLength,
+          pattern: patternArray
+        });
+
+      if (error) {
+        console.error('❌ PatternSelector: Error saving pattern:', error);
+        toast({
+          title: "Error saving pattern",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ PatternSelector: Pattern saved successfully');
+      toast({
+        title: "Pattern saved",
+        description: `"${patternName}" has been saved to your patterns`,
+      });
+
+      setPatternName('');
+      await loadCustomPatterns(); // Reload the patterns list
+    } catch (error) {
+      console.error('❌ PatternSelector: Exception saving pattern:', error);
+      toast({
+        title: "Error saving pattern",
+        description: "Failed to save pattern",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCustomPatternSelect = (patternId: string) => {
+    console.log('📂 PatternSelector: Custom pattern selected:', patternId);
+    
+    if (!patternId) {
+      setSelectedCustomPattern('');
+      return;
+    }
+
+    const pattern = customPatterns.find(p => p.id === patternId);
+    if (pattern) {
+      console.log('✅ PatternSelector: Loading custom pattern:', pattern);
+      setSelectedCustomPattern(patternId);
+      setPatternName(pattern.name);
+      onPatternArrayChange(pattern.pattern);
+      onCustomPatternChange(pattern.pattern);
+      setIsCustomMode(true);
+      onTemplateChange('custom');
+    }
+  };
 
   const handleTemplateSelect = (template: string) => {
     console.log('📂 PatternSelector: Template selected', template);
@@ -89,6 +220,8 @@ export default function PatternSelector({
       onPatternArrayChange(customPattern);
     } else {
       setIsCustomMode(false);
+      setSelectedCustomPattern('');
+      setPatternName('');
       onTemplateChange(template);
     }
   };
@@ -108,6 +241,8 @@ export default function PatternSelector({
   const handleClear = () => {
     console.log('🗑️ PatternSelector: Clearing custom pattern');
     onCustomPatternChange([]);
+    setPatternName('');
+    setSelectedCustomPattern('');
   };
 
   const getShiftCodeColor = (code: string) => {
@@ -134,6 +269,8 @@ export default function PatternSelector({
               // Reset selections when changing shift length
               onTemplateChange('');
               setIsCustomMode(false);
+              setSelectedCustomPattern('');
+              setPatternName('');
               onPatternArrayChange([]);
             }}
             className="flex gap-6"
@@ -149,12 +286,31 @@ export default function PatternSelector({
           </RadioGroup>
         </div>
 
+        {/* My Patterns Section */}
+        {isAuthenticated && customPatterns.length > 0 && (
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">My Saved Patterns</Label>
+            <Select value={selectedCustomPattern} onValueChange={handleCustomPatternSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose from your saved patterns..." />
+              </SelectTrigger>
+              <SelectContent>
+                {customPatterns.map((pattern) => (
+                  <SelectItem key={pattern.id} value={pattern.id}>
+                    {pattern.name} ({pattern.pattern.length} days)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Template Dropdown */}
         <div className="space-y-3">
-          <Label className="text-sm font-medium">Shift Pattern Template</Label>
+          <Label className="text-sm font-medium">Standard Templates</Label>
           <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
             <SelectTrigger>
-              <SelectValue placeholder="Choose a pattern template..." />
+              <SelectValue placeholder="Choose a standard template..." />
             </SelectTrigger>
             <SelectContent>
               {Object.entries(currentTemplates).map(([key, template]) => (
@@ -162,7 +318,7 @@ export default function PatternSelector({
                   {template.name}
                 </SelectItem>
               ))}
-              <SelectItem value="custom">Custom Pattern</SelectItem>
+              <SelectItem value="custom">Build Custom Pattern</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -209,6 +365,38 @@ export default function PatternSelector({
                 Clear
               </Button>
             </div>
+
+            {/* Save Pattern Section */}
+            {isAuthenticated && patternArray.length > 0 && (
+              <div className="space-y-3 p-4 border rounded-md bg-gray-50">
+                <Label htmlFor="patternName" className="text-sm font-medium">Save This Pattern</Label>
+                <Input
+                  id="patternName"
+                  type="text"
+                  value={patternName}
+                  onChange={(e) => setPatternName(e.target.value)}
+                  placeholder="e.g. My Weekend Shift"
+                  className="bg-white"
+                />
+                <Button 
+                  onClick={saveCustomPattern} 
+                  disabled={!patternName.trim() || patternArray.length === 0 || isSaving}
+                  size="sm"
+                >
+                  {isSaving ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </div>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-1" />
+                      Save Pattern
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -235,6 +423,12 @@ export default function PatternSelector({
                 </span>
               )}
             </div>
+          </div>
+        )}
+
+        {!isAuthenticated && (
+          <div className="text-sm text-gray-500 italic">
+            Sign in to save and load your custom patterns
           </div>
         )}
       </CardContent>

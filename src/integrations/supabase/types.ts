@@ -33,6 +33,33 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_patterns: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          pattern: string[]
+          shift_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          pattern: string[]
+          shift_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          pattern?: string[]
+          shift_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leave_requests: {
         Row: {
           approved_at: string | null
