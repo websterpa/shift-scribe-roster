@@ -11,6 +11,7 @@ export interface ConfigFormData {
   operational_hours_per_day: number;
   handshake_minutes: 0 | 15 | 30 | 45 | 60;
   start_date: string;
+  pattern?: string[];
   staffing_requirements?: {
     day_shift_staff?: number;
     night_shift_staff?: number;
@@ -32,6 +33,7 @@ export function useConfigForm() {
     operational_hours_per_day: 24,
     handshake_minutes: 0,
     start_date: '',
+    pattern: [],
     staffing_requirements: {
       day_shift_staff: 2,
       night_shift_staff: 2,
@@ -91,6 +93,12 @@ export function useConfigForm() {
           late_shift_staff: parsed.late_shift_staff || 1
         };
       }
+
+      // Safely parse pattern data from JSON
+      let pattern: string[] = [];
+      if (data.pattern && Array.isArray(data.pattern)) {
+        pattern = data.pattern.filter((item): item is string => typeof item === 'string');
+      }
       
       setFormData({
         config_name: data.config_name,
@@ -99,6 +107,7 @@ export function useConfigForm() {
         operational_hours_per_day: data.operational_hours_per_day,
         handshake_minutes: closestValid,
         start_date: data.start_date,
+        pattern: pattern,
         staffing_requirements: staffingRequirements
       });
     } catch (error) {
