@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { buildRosterCycle } from "../rosterCycle";
 import { createLogger } from "../errorLogger";
@@ -17,6 +16,7 @@ export async function generateAndSaveRoster(
     operational_hours_per_day: number;
     handshake_minutes: number;
     start_date: string;
+    pattern?: string[]; // New optional pattern parameter
   },
   versionName?: string
 ) {
@@ -25,10 +25,17 @@ export async function generateAndSaveRoster(
     console.log('📊 Input parameters:', { 
       staffCount: staffList.length, 
       config, 
-      versionName 
+      versionName,
+      hasPattern: !!config.pattern,
+      patternLength: config.pattern?.length
     });
     
-    logger.info('Starting roster generation...', { staffCount: staffList.length, config, versionName });
+    logger.info('Starting roster generation...', { 
+      staffCount: staffList.length, 
+      config, 
+      versionName,
+      hasPattern: !!config.pattern 
+    });
 
     // Enhanced validation
     if (!staffList || staffList.length === 0) {
@@ -39,6 +46,13 @@ export async function generateAndSaveRoster(
 
     if (!config || !config.id) {
       const error = 'Invalid configuration provided for roster generation';
+      console.error('❌ Validation failed:', error);
+      throw new Error(error);
+    }
+
+    // Validate pattern if provided
+    if (config.pattern && config.pattern.length === 0) {
+      const error = 'Empty pattern provided - pattern must contain at least one shift code';
       console.error('❌ Validation failed:', error);
       throw new Error(error);
     }
@@ -61,18 +75,46 @@ export async function generateAndSaveRoster(
       throw new Error(error);
     }
 
-    console.log('✅ Validation passed', { eligibleStaff: eligibleStaff.length, minRequired: minStaffRequired });
-    logger.info('Validation passed', { eligibleStaff: eligibleStaff.length, minRequired: minStaffRequired });
+    console.log('✅ Validation passed', { 
+      eligibleStaff: eligibleStaff.length, 
+      minRequired: minStaffRequired,
+      usingCustomPattern: !!config.pattern 
+    });
+    logger.info('Validation passed', { 
+      eligibleStaff: eligibleStaff.length, 
+      minRequired: minStaffRequired,
+      usingCustomPattern: !!config.pattern 
+    });
 
-    // 1. Build cycle assignments
+    // 1. Build cycle assignments - use custom pattern if provided
     console.log('📋 Building roster cycle...');
-    const cycle = buildRosterCycle(
-      staffList,
-      config.cycle_length_weeks,
-      config.shift_type,
-      config.operational_hours_per_day,
-      config.handshake_minutes
-    );
+    let cycle;
+    
+    if (config.pattern && config.pattern.length > 0) {
+      console.log('🎨 Using custom pattern for cycle generation', config.pattern);
+      logger.info('Using custom pattern for cycle generation', { pattern: config.pattern });
+      
+      // Use the provided pattern directly instead of buildRosterCycle
+      cycle = createCycleFromPattern(
+        staffList,
+        config.pattern,
+        config.cycle_length_weeks,
+        config.shift_type,
+        config.operational_hours_per_day,
+        config.handshake_minutes
+      );
+    } else {
+      console.log('🔄 Using default cycle generation algorithm');
+      logger.info('Using default cycle generation algorithm');
+      
+      cycle = buildRosterCycle(
+        staffList,
+        config.cycle_length_weeks,
+        config.shift_type,
+        config.operational_hours_per_day,
+        config.handshake_minutes
+      );
+    }
 
     console.log('✅ Cycle assignments built successfully');
     logger.info('Cycle assignments built successfully');
@@ -128,6 +170,52 @@ export async function generateAndSaveRoster(
     logger.error(new Error('Failed to generate and save roster'), { error });
     throw new Error(`Roster generation failed: ${error.message}`);
   }
+}
+
+// New function to create cycle from custom pattern
+function createCycleFromPattern(
+  staffList: StaffMember[],
+  pattern: string[],
+  cycleLengthWeeks: number,
+  shiftType: "8h" | "12h",
+  operationalHoursPerDay: number,
+  handshakeMinutes: number
+) {
+  console.log('🎨 Creating cycle from custom pattern', { 
+    pattern, 
+    staffCount: staffList.length,
+    cycleLengthWeeks 
+  });
+
+  // Create a simple cycle structure based on the pattern
+  const totalDays = cycleLengthWeeks * 7;
+  const cycle = [];
+
+  for (let day = 0; day < totalDays; day++) {
+    const patternIndex = day % pattern.length;
+    const shiftCode = pattern[patternIndex];
+    
+    // Create assignments for each staff member for this day
+    staffList.forEach((staff, staffIndex) => {
+      // Rotate the pattern start for each staff member to distribute shifts
+      const staffPatternIndex = (day + staffIndex) % pattern.length;
+      const staffShiftCode = pattern[staffPatternIndex];
+      
+      cycle.push({
+        day,
+        staffId: staff.id,
+        shiftCode: staffShiftCode,
+        date: new Date(Date.now() + day * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+    });
+  }
+
+  console.log('✅ Custom pattern cycle created', { 
+    totalAssignments: cycle.length,
+    daysPerCycle: pattern.length 
+  });
+
+  return cycle;
 }
 
 function calculateMinimumStaffRequired(config: {
@@ -297,3 +385,5 @@ export { fetchStaffMembers } from "./staffHelpers";
 
 // Export the missing function that was referenced
 export const generateRosterAssignments = generateAndSaveRoster;
+
+export default generateAndSaveRoster;
