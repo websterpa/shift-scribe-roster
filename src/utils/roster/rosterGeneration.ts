@@ -94,8 +94,8 @@ export async function generateAndSaveRoster(
       console.log('🎨 Using custom pattern for cycle generation', config.pattern);
       logger.info('Using custom pattern for cycle generation', { pattern: config.pattern });
       
-      // Use the provided pattern directly instead of buildRosterCycle
-      cycle = createCycleFromPattern(
+      // Use the enhanced cycle generation with the custom pattern
+      cycle = await createCycleFromPatternEnhanced(
         staffList,
         config.pattern,
         config.cycle_length_weeks,
@@ -172,8 +172,8 @@ export async function generateAndSaveRoster(
   }
 }
 
-// New function to create cycle from custom pattern
-function createCycleFromPattern(
+// Enhanced function to create cycle from custom pattern with proper validation
+async function createCycleFromPatternEnhanced(
   staffList: StaffMember[],
   pattern: string[],
   cycleLengthWeeks: number,
@@ -181,38 +181,73 @@ function createCycleFromPattern(
   operationalHoursPerDay: number,
   handshakeMinutes: number
 ) {
-  console.log('🎨 Creating cycle from custom pattern', { 
+  console.log('🎨 Creating enhanced cycle from custom pattern', { 
     pattern, 
     staffCount: staffList.length,
     cycleLengthWeeks 
   });
 
-  // Create a simple cycle structure based on the pattern
-  const totalDays = cycleLengthWeeks * 7;
+  // Import the enhanced cycle generation
+  const { generateEnhancedRosterCycle } = await import('./enhancedCycleIntegration');
+  
+  // Convert staff list to the format expected by enhanced cycle generation
+  const enhancedStaffList = staffList.map(staff => ({
+    ...staff,
+    // Ensure all required fields are present
+    employee_id: staff.employee_id || staff.id,
+    first_name: staff.first_name || staff.id,
+    last_name: staff.last_name || '',
+    email: staff.email || `${staff.id}@company.com`,
+    phone: staff.phone || '',
+    hire_date: staff.hire_date || new Date().toISOString().split('T')[0],
+    is_active: staff.is_active !== undefined ? staff.is_active : true,
+    availability_status: staff.availability_status || 'active',
+    role: staff.role || 'CCTV Operator',
+    min_hours_per_week: staff.min_hours_per_week || 32,
+    max_hours_per_week: staff.max_hours_per_week || 48,
+    opted_out_wtd: staff.opted_out_wtd || false,
+    days_off_per_week: staff.days_off_per_week || 2,
+    hourly_rate: staff.hourly_rate || 15.50,
+    holiday_multiplier: staff.holiday_multiplier || 2,
+    leave_allowance_days: staff.leave_allowance_days || 28
+  }));
+
+  console.log('🔧 Using enhanced cycle generation with custom pattern');
+  
+  // Generate the enhanced cycle with the custom pattern as a guide
+  const enhancedCycle = generateEnhancedRosterCycle(
+    enhancedStaffList,
+    cycleLengthWeeks,
+    shiftType,
+    operationalHoursPerDay,
+    handshakeMinutes,
+    pattern // Pass the pattern as a guide
+  );
+
+  // Convert back to the expected format for the rest of the system
   const cycle = [];
+  const totalDays = cycleLengthWeeks * 7;
 
   for (let day = 0; day < totalDays; day++) {
-    const patternIndex = day % pattern.length;
-    const shiftCode = pattern[patternIndex];
+    const weekIndex = Math.floor(day / 7);
+    const dayIndex = day % 7;
     
-    // Create assignments for each staff member for this day
-    staffList.forEach((staff, staffIndex) => {
-      // Rotate the pattern start for each staff member to distribute shifts
-      const staffPatternIndex = (day + staffIndex) % pattern.length;
-      const staffShiftCode = pattern[staffPatternIndex];
-      
-      cycle.push({
-        day,
-        staffId: staff.id,
-        shiftCode: staffShiftCode,
-        date: new Date(Date.now() + day * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    if (enhancedCycle[weekIndex] && enhancedCycle[weekIndex][dayIndex]) {
+      Object.entries(enhancedCycle[weekIndex][dayIndex]).forEach(([staffId, shiftCode]) => {
+        cycle.push({
+          day,
+          staffId,
+          shiftCode,
+          date: new Date(Date.now() + day * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        });
       });
-    });
+    }
   }
 
-  console.log('✅ Custom pattern cycle created', { 
+  console.log('✅ Enhanced pattern cycle created', { 
     totalAssignments: cycle.length,
-    daysPerCycle: pattern.length 
+    patternLength: pattern.length,
+    cycleWeeks: cycleLengthWeeks
   });
 
   return cycle;
