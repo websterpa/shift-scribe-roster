@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,10 +96,12 @@ export default function RosterSettings({
       
       setStartDate(config.start_date || startDate);
       
-      // Load pattern data
+      // Load pattern data - safely cast Json[] to string[]
       if (config.pattern && Array.isArray(config.pattern)) {
         console.log('🎨 RosterSettings: Loading saved pattern:', config.pattern);
-        setPatternArray(config.pattern);
+        // Ensure all values are strings
+        const stringPattern = config.pattern.filter((item): item is string => typeof item === 'string');
+        setPatternArray(stringPattern);
       }
       
       toast({
