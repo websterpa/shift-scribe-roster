@@ -23,9 +23,6 @@ interface CustomPattern {
 
 const GenerateRoster = () => {
   const [activeTab, setActiveTab] = useState("settings");
-  const [selectedPattern, setSelectedPattern] = useState<string[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [customPattern, setCustomPattern] = useState<string[]>([]);
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
   const [isLoadingPatterns, setIsLoadingPatterns] = useState(false);
   
@@ -41,9 +38,11 @@ const GenerateRoster = () => {
     isLoading,
     generatedVersionId,
     errors,
+    selectedPattern,
     setSelectedConfigId,
     setRosterName,
-    handleGenerateRoster: originalHandleGenerateRoster,
+    setSelectedPattern,
+    handleGenerateRoster,
     refreshData,
     validationReport,
     isValidating
@@ -94,46 +93,6 @@ const GenerateRoster = () => {
     }
   };
 
-  // Enhanced roster generation that includes the selected pattern
-  const handleGenerateRosterWithPattern = async () => {
-    if (!selectedConfig) {
-      toast({
-        title: "No configuration selected",
-        description: "Please select a roster configuration first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (selectedPattern.length === 0) {
-      toast({
-        title: "No pattern selected",
-        description: "Please select a shift pattern before generating the roster",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log('🚀 GenerateRoster: Starting generation with pattern', { 
-      pattern: selectedPattern, 
-      patternLength: selectedPattern.length 
-    });
-
-    try {
-      // Call the original generation function - the hook will handle passing the pattern
-      await originalHandleGenerateRoster();
-      
-      console.log('✅ GenerateRoster: Generation completed successfully');
-    } catch (error: any) {
-      console.error('❌ GenerateRoster: Generation failed:', error);
-      toast({
-        title: "Generation failed",
-        description: error.message || "Failed to generate roster with selected pattern",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handlePatternArrayChange = (pattern: string[]) => {
     console.log('📊 GenerateRoster: Pattern array changed', pattern);
     setSelectedPattern(pattern);
@@ -142,8 +101,6 @@ const GenerateRoster = () => {
   const handleShiftLengthChange = (length: '8h' | '12h') => {
     console.log('⏰ GenerateRoster: Shift length changed, clearing pattern', length);
     setSelectedPattern([]);
-    setSelectedTemplate('');
-    setCustomPattern([]);
   };
 
   const isGenerateDisabled = !selectedConfig || selectedPattern.length === 0 || isGenerating || staffList.length === 0;
@@ -206,7 +163,7 @@ const GenerateRoster = () => {
                 errors={errors}
                 onSelectConfig={setSelectedConfigId}
                 onRosterNameChange={setRosterName}
-                onGenerateRoster={handleGenerateRosterWithPattern}
+                onGenerateRoster={handleGenerateRoster}
                 onRefresh={refreshData}
               />
 
@@ -217,21 +174,21 @@ const GenerateRoster = () => {
                   <PatternSelector
                     shiftLength={selectedConfig.shift_type}
                     onShiftLengthChange={handleShiftLengthChange}
-                    selectedTemplate={selectedTemplate}
-                    onTemplateChange={setSelectedTemplate}
-                    customPattern={customPattern}
-                    onCustomPatternChange={setCustomPattern}
+                    selectedTemplate=""
+                    onTemplateChange={() => {}}
+                    customPattern={[]}
+                    onCustomPatternChange={() => {}}
                     patternArray={selectedPattern}
                     onPatternArrayChange={handlePatternArrayChange}
                   />
                 </div>
               )}
 
-              {/* Generate Button Override */}
+              {/* Generate Button */}
               {selectedConfig && (
                 <div className="border-t pt-6">
                   <Button 
-                    onClick={handleGenerateRosterWithPattern}
+                    onClick={handleGenerateRoster}
                     disabled={isGenerateDisabled}
                     className="w-full"
                     size="lg"

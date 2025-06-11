@@ -232,7 +232,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
         operational_hours_per_day: selectedConfig.operational_hours_per_day,
         handshake_minutes: selectedConfig.handshake_minutes,
         start_date: selectedConfig.start_date,
-        // Include the selected pattern if one is available
+        // FIXED: Always include the selected pattern if one is available
         ...(selectedPattern.length > 0 && { pattern: selectedPattern })
       };
 
