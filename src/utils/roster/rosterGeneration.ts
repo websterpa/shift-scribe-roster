@@ -21,13 +21,25 @@ export async function generateAndSaveRoster(
   versionName?: string
 ) {
   try {
-    console.log('🚀 generateAndSaveRoster started');
-    console.log('📊 Input parameters:', { 
+    console.log('🚀 AUDIT: generateAndSaveRoster started');
+    console.log('📊 AUDIT: Input parameters:', { 
       staffCount: staffList.length, 
       config, 
       versionName,
       hasPattern: !!config.pattern,
       patternLength: config.pattern?.length
+    });
+
+    // Log detailed staff information for audit
+    console.log('👥 AUDIT: Staff list details:');
+    staffList.forEach((staff, index) => {
+      console.log(`  Staff ${index + 1}:`, {
+        id: staff.id,
+        name: `${staff.first_name} ${staff.last_name}`,
+        is_shift_worker: staff.is_shift_worker,
+        eligible_shifts: staff.eligible_shifts,
+        is_active: staff.is_active
+      });
     });
     
     logger.info('Starting roster generation...', { 
@@ -40,20 +52,20 @@ export async function generateAndSaveRoster(
     // Enhanced validation
     if (!staffList || staffList.length === 0) {
       const error = 'No staff members provided for roster generation';
-      console.error('❌ Validation failed:', error);
+      console.error('❌ AUDIT: Validation failed:', error);
       throw new Error(error);
     }
 
     if (!config || !config.id) {
       const error = 'Invalid configuration provided for roster generation';
-      console.error('❌ Validation failed:', error);
+      console.error('❌ AUDIT: Validation failed:', error);
       throw new Error(error);
     }
 
     // Validate pattern if provided
     if (config.pattern && config.pattern.length === 0) {
       const error = 'Empty pattern provided - pattern must contain at least one shift code';
-      console.error('❌ Validation failed:', error);
+      console.error('❌ AUDIT: Validation failed:', error);
       throw new Error(error);
     }
 
@@ -61,38 +73,38 @@ export async function generateAndSaveRoster(
     const minStaffRequired = calculateMinimumStaffRequired(config);
     if (staffList.length < minStaffRequired) {
       const error = `Insufficient staff: need at least ${minStaffRequired} staff members, but only ${staffList.length} available`;
-      console.error('❌ Validation failed:', error);
+      console.error('❌ AUDIT: Validation failed:', error);
       throw new Error(error);
     }
 
     // Validate shift eligibility
     const eligibleStaff = staffList.filter(staff => 
-      staff.eligible_shifts && staff.eligible_shifts.length > 0
+      staff.eligible_shifts && staff.eligible_shifts.length > 0 && staff.is_shift_worker
     );
+    
+    console.log('🔍 AUDIT: Eligible staff analysis:');
+    console.log(`  Total staff: ${staffList.length}`);
+    console.log(`  Shift workers: ${staffList.filter(s => s.is_shift_worker).length}`);
+    console.log(`  With eligible shifts: ${eligibleStaff.length}`);
+    
     if (eligibleStaff.length === 0) {
-      const error = 'No staff members have eligible shifts configured';
-      console.error('❌ Validation failed:', error);
+      const error = 'No shift worker staff members have eligible shifts configured';
+      console.error('❌ AUDIT: Validation failed:', error);
       throw new Error(error);
     }
 
-    console.log('✅ Validation passed', { 
-      eligibleStaff: eligibleStaff.length, 
-      minRequired: minStaffRequired,
-      usingCustomPattern: !!config.pattern 
-    });
-    logger.info('Validation passed', { 
+    console.log('✅ AUDIT: Validation passed', { 
       eligibleStaff: eligibleStaff.length, 
       minRequired: minStaffRequired,
       usingCustomPattern: !!config.pattern 
     });
 
     // 1. Build cycle assignments - use custom pattern if provided
-    console.log('📋 Building roster cycle...');
+    console.log('📋 AUDIT: Building roster cycle...');
     let cycle;
     
     if (config.pattern && config.pattern.length > 0) {
-      console.log('🎨 Using custom pattern for cycle generation', config.pattern);
-      logger.info('Using custom pattern for cycle generation', { pattern: config.pattern });
+      console.log('🎨 AUDIT: Using custom pattern for cycle generation', config.pattern);
       
       // Use the enhanced cycle generation with the custom pattern
       cycle = await createCycleFromPatternEnhanced(
@@ -104,8 +116,7 @@ export async function generateAndSaveRoster(
         config.handshake_minutes
       );
     } else {
-      console.log('🔄 Using default cycle generation algorithm');
-      logger.info('Using default cycle generation algorithm');
+      console.log('🔄 AUDIT: Using default cycle generation algorithm');
       
       cycle = buildRosterCycle(
         staffList,
@@ -116,57 +127,105 @@ export async function generateAndSaveRoster(
       );
     }
 
-    console.log('✅ Cycle assignments built successfully');
-    logger.info('Cycle assignments built successfully');
+    console.log('🔍 AUDIT: Cycle generation result:');
+    console.log(`  Cycle entries: ${cycle ? cycle.length : 'null'}`);
+    if (cycle && cycle.length > 0) {
+      console.log('  Sample cycle entries (first 10):');
+      cycle.slice(0, 10).forEach((entry, index) => {
+        console.log(`    ${index + 1}:`, entry);
+      });
+      
+      // Count non-rest assignments
+      const nonRestAssignments = cycle.filter(entry => entry.shiftCode !== 'R');
+      console.log(`  Non-rest assignments: ${nonRestAssignments.length}`);
+      
+      // Group by shift type
+      const shiftCounts = cycle.reduce((acc, entry) => {
+        acc[entry.shiftCode] = (acc[entry.shiftCode] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('  Shift distribution:', shiftCounts);
+    }
+
+    if (!cycle || cycle.length === 0) {
+      const error = 'Cycle generation failed - no assignments created';
+      console.error('❌ AUDIT: Cycle generation failed:', error);
+      throw new Error(error);
+    }
+
+    console.log('✅ AUDIT: Cycle assignments built successfully');
 
     // 2. Fetch approved leave requests
-    console.log('📅 Fetching leave requests...');
+    console.log('📅 AUDIT: Fetching leave requests...');
     const leaveMap = await fetchLeaveRequests();
-    console.log('✅ Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
-    logger.info('Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
+    console.log('✅ AUDIT: Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
 
     // 3. Fetch past weeks for rolling average
-    console.log('📈 Preparing past weeks data...');
+    console.log('📈 AUDIT: Preparing past weeks data...');
     const pastWeeksMap = await fetchPastWeeks(staffList, config.cycle_length_weeks);
-    console.log('✅ Past weeks data prepared');
-    logger.info('Past weeks data prepared');
+    console.log('✅ AUDIT: Past weeks data prepared');
 
     // 4. Create roster version
-    console.log('📄 Creating roster version...');
-    console.log('Calling supabase for roster version creation...');
+    console.log('📄 AUDIT: Creating roster version...');
     const versionId = await createRosterVersion(
       config.id, 
       versionName || `Generated ${new Date().toLocaleDateString()}`, 
       config.start_date, 
       config.cycle_length_weeks
     );
-    console.log('✅ Created roster version:', versionId);
-    logger.info('Created roster version:', versionId);
+    console.log('✅ AUDIT: Created roster version:', versionId);
 
     // 5. Generate assignments
-    console.log('⚙️ Generating assignments...');
+    console.log('⚙️ AUDIT: Generating assignments...');
+    console.log('📊 AUDIT: Assignment generation inputs:', {
+      staffListLength: staffList.length,
+      cycleLength: cycle.length,
+      config: config,
+      leaveMapKeys: Object.keys(leaveMap),
+      pastWeeksMapKeys: Object.keys(pastWeeksMap)
+    });
+    
     const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
+    
+    console.log('🔍 AUDIT: Assignment generation result:');
+    console.log(`  Generated assignments: ${assignments ? assignments.length : 'null'}`);
+    
+    if (assignments && assignments.length > 0) {
+      console.log('  Sample assignments (first 10):');
+      assignments.slice(0, 10).forEach((assignment, index) => {
+        console.log(`    ${index + 1}:`, assignment);
+      });
+      
+      // Count non-rest assignments
+      const nonRestAssignments = assignments.filter(assignment => assignment.shift_code !== 'R');
+      console.log(`  Non-rest assignments: ${nonRestAssignments.length}`);
+      
+      // Group by shift type
+      const assignmentShiftCounts = assignments.reduce((acc, assignment) => {
+        acc[assignment.shift_code] = (acc[assignment.shift_code] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('  Assignment shift distribution:', assignmentShiftCounts);
+    }
     
     if (!assignments || assignments.length === 0) {
       const error = 'Failed to generate any assignments';
-      console.error('❌ Assignment generation failed:', error);
+      console.error('❌ AUDIT: Assignment generation failed:', error);
       throw new Error(error);
     }
     
-    console.log('✅ Generated assignments', { count: assignments.length });
-    logger.info('Generated assignments', { count: assignments.length });
+    console.log('✅ AUDIT: Generated assignments', { count: assignments.length });
 
     // 6. Save assignments to database
-    console.log('💾 Saving assignments to database...');
-    console.log('Calling supabase.from("roster_assignments").insert...');
+    console.log('💾 AUDIT: Saving assignments to database...');
     await saveAssignments(assignments, versionId);
-    console.log('✅ Successfully saved roster assignments', { count: assignments.length, versionId });
-    logger.info('Successfully saved roster assignments', { count: assignments.length, versionId });
+    console.log('✅ AUDIT: Successfully saved roster assignments', { count: assignments.length, versionId });
 
-    console.log('🎉 generateAndSaveRoster completed successfully, returning version ID:', versionId);
+    console.log('🎉 AUDIT: generateAndSaveRoster completed successfully, returning version ID:', versionId);
     return versionId;
   } catch (error: any) {
-    console.error('❌ generateAndSaveRoster error:', error);
+    console.error('❌ AUDIT: generateAndSaveRoster error:', error);
+    console.error('❌ AUDIT: Error stack:', error.stack);
     logger.error(new Error('Failed to generate and save roster'), { error });
     throw new Error(`Roster generation failed: ${error.message}`);
   }
@@ -181,7 +240,7 @@ async function createCycleFromPatternEnhanced(
   operationalHoursPerDay: number,
   handshakeMinutes: number
 ) {
-  console.log('🎨 Creating enhanced cycle from custom pattern', { 
+  console.log('🎨 AUDIT: Creating enhanced cycle from custom pattern', { 
     pattern, 
     staffCount: staffList.length,
     cycleLengthWeeks 
@@ -199,7 +258,7 @@ async function createCycleFromPatternEnhanced(
     last_name: staff.last_name || '',
     email: staff.email || `${staff.id}@company.com`,
     phone: staff.phone || '',
-    hire_date: staff.hire_date || new Date().toISOString().split('T')[0],
+    hire_date: new Date().toISOString().split('T')[0],
     is_active: staff.is_active !== undefined ? staff.is_active : true,
     availability_status: staff.availability_status || 'active',
     role: staff.role || 'CCTV Operator',
@@ -212,7 +271,7 @@ async function createCycleFromPatternEnhanced(
     leave_allowance_days: staff.leave_allowance_days || 28
   }));
 
-  console.log('🔧 Using enhanced cycle generation with custom pattern');
+  console.log('🔧 AUDIT: Using enhanced cycle generation with custom pattern');
   
   // Generate the enhanced cycle with the custom pattern as a guide
   const enhancedCycle = generateEnhancedRosterCycle(
@@ -224,6 +283,11 @@ async function createCycleFromPatternEnhanced(
     pattern // Pass the pattern as a guide
   );
 
+  console.log('🔍 AUDIT: Enhanced cycle generation result:', {
+    cycleKeys: Object.keys(enhancedCycle),
+    totalWeeks: Object.keys(enhancedCycle).length
+  });
+
   // Convert back to the expected format for the rest of the system
   const cycle = [];
   const totalDays = cycleLengthWeeks * 7;
@@ -234,20 +298,27 @@ async function createCycleFromPatternEnhanced(
     
     if (enhancedCycle[weekIndex] && enhancedCycle[weekIndex][dayIndex]) {
       Object.entries(enhancedCycle[weekIndex][dayIndex]).forEach(([staffId, shiftCode]) => {
-        cycle.push({
+        const assignment = {
           day,
           staffId,
           shiftCode,
           date: new Date(Date.now() + day * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        });
+        };
+        cycle.push(assignment);
+        
+        // Log non-rest assignments for audit
+        if (shiftCode !== 'R') {
+          console.log(`🎯 AUDIT: Non-rest assignment created:`, assignment);
+        }
       });
     }
   }
 
-  console.log('✅ Enhanced pattern cycle created', { 
+  console.log('✅ AUDIT: Enhanced pattern cycle created', { 
     totalAssignments: cycle.length,
     patternLength: pattern.length,
-    cycleWeeks: cycleLengthWeeks
+    cycleWeeks: cycleLengthWeeks,
+    nonRestAssignments: cycle.filter(c => c.shiftCode !== 'R').length
   });
 
   return cycle;
@@ -357,8 +428,7 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
       throw new Error('Version ID is required to save assignments');
     }
 
-    console.log('📊 Preparing to save assignments', { count: assignments.length, versionId });
-    logger.info('Preparing to save assignments', { count: assignments.length, versionId });
+    console.log('📊 AUDIT: Preparing to save assignments', { count: assignments.length, versionId });
 
     // Validate and prepare assignments
     const validAssignments = assignments
@@ -384,32 +454,30 @@ async function saveAssignments(assignments: Assignment[], versionId: string): Pr
       throw new Error('No valid assignments to save after filtering');
     }
 
-    console.log('📊 Saving valid assignments', { validCount: validAssignments.length });
-    logger.info('Saving valid assignments', { validCount: validAssignments.length });
+    console.log('📊 AUDIT: Saving valid assignments', { validCount: validAssignments.length });
 
     // Save in batches to avoid potential query size limits
     const batchSize = 100;
     for (let i = 0; i < validAssignments.length; i += batchSize) {
       const batch = validAssignments.slice(i, i + batchSize);
       
-      console.log(`💾 Inserting batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
+      console.log(`💾 AUDIT: Inserting batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
       const { error } = await supabase
         .from("roster_assignments")
         .insert(batch);
         
       if (error) {
-        console.error(`❌ Error inserting assignment batch ${i / batchSize + 1}:`, error);
+        console.error(`❌ AUDIT: Error inserting assignment batch ${i / batchSize + 1}:`, error);
         logger.error(new Error(`Error inserting assignment batch ${i / batchSize + 1}`), { error });
         throw error;
       }
       
-      console.log(`✅ Saved batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
+      console.log(`✅ AUDIT: Saved batch ${i / batchSize + 1}/${Math.ceil(validAssignments.length / batchSize)}`);
     }
 
-    console.log('🎉 Successfully saved all assignments to database');
-    logger.info('Successfully saved all assignments to database');
+    console.log('🎉 AUDIT: Successfully saved all assignments to database');
   } catch (error: any) {
-    console.error('❌ Error in saveAssignments:', error);
+    console.error('❌ AUDIT: Error in saveAssignments:', error);
     logger.error(new Error('Error in saveAssignments'), { error });
     throw new Error(`Failed to save assignments: ${error.message}`);
   }

@@ -1,4 +1,3 @@
-
 import { StaffMember } from "@/types/roster";
 
 export type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
@@ -27,8 +26,8 @@ export function generateEnhancedRosterCycle(
   handshakeMinutes: number,
   customPattern?: string[] // New parameter for custom pattern
 ): CycleAssignment {
-  console.log('🚀 Enhanced cycle generation started with STRICT grouping rules');
-  console.log('📊 Parameters:', {
+  console.log('🚀 AUDIT: Enhanced cycle generation started with STRICT grouping rules');
+  console.log('📊 AUDIT: Parameters:', {
     staffCount: staffList.length,
     cycleWeeks,
     shiftType,
@@ -36,6 +35,21 @@ export function generateEnhancedRosterCycle(
     handshakeMinutes,
     hasCustomPattern: !!customPattern,
     customPatternLength: customPattern?.length
+  });
+
+  // Log detailed staff information for audit
+  console.log('👥 AUDIT: Staff analysis in enhanced cycle generation:');
+  const shiftWorkers = staffList.filter(staff => staff.is_shift_worker);
+  console.log(`  Total staff: ${staffList.length}`);
+  console.log(`  Shift workers: ${shiftWorkers.length}`);
+  
+  shiftWorkers.forEach((staff, index) => {
+    console.log(`  Staff ${index + 1}:`, {
+      id: staff.id,
+      name: `${staff.first_name} ${staff.last_name}`,
+      eligible_shifts: staff.eligible_shifts,
+      is_shift_worker: staff.is_shift_worker
+    });
   });
 
   // Use custom pattern if provided, otherwise use default patterns
@@ -49,14 +63,18 @@ export function generateEnhancedRosterCycle(
     }
   }
 
-  console.log('🎯 Using pattern:', patternToUse);
+  console.log('🎯 AUDIT: Using pattern:', patternToUse);
 
   const assignment: CycleAssignment = {};
-  const shiftWorkers = staffList.filter(staff => staff.is_shift_worker);
   const totalDays = cycleWeeks * 7;
   const patternLength = patternToUse.length;
 
-  console.log('👥 Shift workers to assign:', shiftWorkers.length);
+  console.log('👥 AUDIT: Shift workers to assign:', shiftWorkers.length);
+
+  if (shiftWorkers.length === 0) {
+    console.error('❌ AUDIT: No shift workers found to assign!');
+    return assignment;
+  }
 
   // Initialize all days with rest for all staff
   for (let week = 0; week < cycleWeeks; week++) {
@@ -69,13 +87,17 @@ export function generateEnhancedRosterCycle(
     }
   }
 
+  console.log('🔄 AUDIT: Starting pattern assignment for shift workers...');
+
   // Apply the pattern with proper rotation to ensure fair distribution
   shiftWorkers.forEach((staff, staffIndex) => {
-    console.log(`📋 Assigning pattern for staff ${staff.id} (index: ${staffIndex})`);
+    console.log(`📋 AUDIT: Assigning pattern for staff ${staff.id} (index: ${staffIndex})`);
     
     // Calculate offset to rotate pattern start for each staff member
     const staffOffset = Math.floor((staffIndex * patternLength) / shiftWorkers.length);
-    console.log(`🔄 Staff ${staff.id} pattern offset: ${staffOffset}`);
+    console.log(`🔄 AUDIT: Staff ${staff.id} pattern offset: ${staffOffset}`);
+    
+    let assignedShifts = 0;
     
     for (let week = 0; week < cycleWeeks; week++) {
       for (let day = 0; day < 7; day++) {
@@ -83,31 +105,56 @@ export function generateEnhancedRosterCycle(
         const patternIndex = (absoluteDay + staffOffset) % patternLength;
         const shiftCodeFromPattern = patternToUse[patternIndex];
         
-        // Validate that the shift code is a valid ShiftCode type - fix the type error
+        // Validate that the shift code is a valid ShiftCode type
         const shiftCode: ShiftCode = isValidShiftCode(shiftCodeFromPattern) ? shiftCodeFromPattern : "R";
         
         // Only assign if staff is eligible for this shift type
         if (staff.eligible_shifts && staff.eligible_shifts.includes(shiftCode)) {
           assignment[week][day][staff.id] = shiftCode;
+          if (shiftCode !== "R") {
+            assignedShifts++;
+            console.log(`✅ AUDIT: Assigned ${shiftCode} to ${staff.id} on week ${week}, day ${day}`);
+          }
         } else if (shiftCode !== "R") {
           // If not eligible for the assigned shift, give them rest
           assignment[week][day][staff.id] = "R";
-          console.log(`⚠️ Staff ${staff.id} not eligible for shift ${shiftCode}, assigned R instead`);
+          console.log(`⚠️ AUDIT: Staff ${staff.id} not eligible for shift ${shiftCode}, assigned R instead`);
         }
       }
     }
+    
+    console.log(`📊 AUDIT: Staff ${staff.id} total assigned shifts: ${assignedShifts}`);
   });
+
+  // Audit the final assignment
+  console.log('🔍 AUDIT: Final assignment analysis:');
+  let totalNonRestAssignments = 0;
+  const assignmentShiftCounts: Record<string, number> = {};
+  
+  for (let week = 0; week < cycleWeeks; week++) {
+    for (let day = 0; day < 7; day++) {
+      Object.values(assignment[week][day]).forEach(shiftCode => {
+        assignmentShiftCounts[shiftCode] = (assignmentShiftCounts[shiftCode] || 0) + 1;
+        if (shiftCode !== 'R') {
+          totalNonRestAssignments++;
+        }
+      });
+    }
+  }
+  
+  console.log('📊 AUDIT: Assignment distribution:', assignmentShiftCounts);
+  console.log(`📊 AUDIT: Total non-rest assignments: ${totalNonRestAssignments}`);
 
   // Validate the assignment meets pattern requirements
   const violations = validatePatternCompliance(assignment, staffList, patternToUse);
   if (violations.length > 0) {
-    console.error('❌ Generated cycle has violations:', violations);
+    console.error('❌ AUDIT: Generated cycle has violations:', violations);
     // Log violations but continue - the enhanced algorithm should handle most cases
     violations.forEach(violation => {
-      console.warn(`⚠️ Violation: ${violation}`);
+      console.warn(`⚠️ AUDIT: Violation: ${violation}`);
     });
   } else {
-    console.log('✅ Generated cycle passes all pattern compliance checks');
+    console.log('✅ AUDIT: Generated cycle passes all pattern compliance checks');
   }
 
   // Log the final pattern for each staff member for verification
@@ -118,10 +165,10 @@ export function generateEnhancedRosterCycle(
         pattern.push(assignment[week][day][staff.id]);
       }
     }
-    console.log(`👤 ${staff.first_name} ${staff.last_name} pattern (first 2 weeks): ${pattern.join('')}`);
+    console.log(`👤 AUDIT: ${staff.first_name} ${staff.last_name} pattern (first 2 weeks): ${pattern.join('')}`);
   });
 
-  console.log('🎉 Enhanced cycle generation completed with custom pattern support');
+  console.log('🎉 AUDIT: Enhanced cycle generation completed with custom pattern support');
   return assignment;
 }
 
