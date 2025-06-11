@@ -8,7 +8,7 @@ import { Settings, Users, Calendar, TestTube, TrendingUp } from 'lucide-react';
 import { RosterGenerationSettings } from '@/components/roster/RosterGenerationSettings';
 import { ShiftCycleTestInterface } from '@/components/roster/ShiftCycleTestInterface';
 import { CycleValidationTestInterface } from '@/components/roster/CycleValidationTestInterface';
-import { PatternSelector } from '@/components/roster/PatternSelector';
+import PatternSelector from '@/components/roster/PatternSelector';
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
