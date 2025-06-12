@@ -296,7 +296,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
                     <>
                       <Check className="h-4 w-4 mr-2" />
                       Generate Roster
-                    <//>
+                    </>
                   )}
                 </Button>
               )}
