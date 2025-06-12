@@ -1,6 +1,6 @@
 
 import { StaffMember, Assignment } from "@/types/roster";
-import { calculateShiftTimes, calculateShiftHours, calculateShiftCost } from "./shiftCalculator";
+import { calculateShiftDetails, calculateShiftCost } from "./shiftCalculator";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('AssignmentGenerator');
@@ -85,18 +85,29 @@ export function generateAssignments(
         finalShiftCode = 'R';
       }
 
-      // Calculate shift times and costs
-      const shiftTimes = calculateShiftTimes(finalShiftCode, config.shift_type);
-      const hours = calculateShiftHours(finalShiftCode, config.shift_type);
-      const cost = calculateShiftCost(hours, staff.hourly_rate || 15.50, assignmentDate);
+      // Calculate shift details using the correct function
+      const shiftDetails = calculateShiftDetails(
+        finalShiftCode, 
+        assignmentDate, 
+        config.shift_type, 
+        config.handshake_minutes
+      );
+
+      // Calculate cost with holiday multiplier (defaulting to 1.5 for public holidays)
+      const cost = calculateShiftCost(
+        shiftDetails.hours, 
+        staff.hourly_rate || 15.50, 
+        assignmentDate, 
+        1.5
+      );
 
       const assignment: Assignment = {
         staff_id: staff.id,
         date: dateString,
         shift_code: finalShiftCode,
-        shift_start: shiftTimes.start,
-        shift_end: shiftTimes.end,
-        hours,
+        shift_start: shiftDetails.shiftStart ? shiftDetails.shiftStart.toTimeString().slice(0, 5) : null,
+        shift_end: shiftDetails.shiftEnd ? shiftDetails.shiftEnd.toTimeString().slice(0, 5) : null,
+        hours: shiftDetails.hours,
         cost
       };
 
