@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import PatternSelector from './PatternSelector';
 
 interface RosterVersion {
   id: string;
@@ -149,6 +149,38 @@ export function RosterEditDialog({ roster, open, onClose, onRosterUpdated }: Pro
     }
   };
 
+  const updatePatternCode = (index: number, code: string) => {
+    const newPattern = [...pattern];
+    newPattern[index] = code;
+    setPattern(newPattern);
+  };
+
+  const addPatternDay = () => {
+    setPattern([...pattern, 'R']);
+  };
+
+  const removePatternDay = (index: number) => {
+    const newPattern = pattern.filter((_, i) => i !== index);
+    setPattern(newPattern);
+  };
+
+  const getShiftCodes = () => {
+    if (shiftType === '12h') {
+      return [
+        { value: 'D', label: 'Day (D)', description: '07:00 - 19:00' },
+        { value: 'N', label: 'Night (N)', description: '19:00 - 07:00' },
+        { value: 'R', label: 'Rest (R)', description: 'Day off' }
+      ];
+    } else {
+      return [
+        { value: 'E', label: 'Early (E)', description: '07:45 - 15:45' },
+        { value: 'L', label: 'Late (L)', description: '15:45 - 23:45' },
+        { value: 'N', label: 'Night (N)', description: '23:45 - 07:45' },
+        { value: 'R', label: 'Rest (R)', description: 'Day off' }
+      ];
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -173,20 +205,89 @@ export function RosterEditDialog({ roster, open, onClose, onRosterUpdated }: Pro
               />
             </div>
 
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-semibold mb-4">Shift Configuration</h3>
-              <PatternSelector
-                shiftLength={shiftType}
-                onShiftLengthChange={setShiftType}
-                selectedTemplate=""
-                onTemplateChange={() => {}}
-                customPattern={[]}
-                onCustomPatternChange={() => {}}
-                patternArray={pattern}
-                onPatternArrayChange={setPattern}
-                handoverMinutes={handoverMinutes}
-                onHandoverChange={setHandoverMinutes}
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Shift Type</Label>
+                <Select value={shiftType} onValueChange={(value: '8h' | '12h') => setShiftType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="8h">8-Hour Shifts</SelectItem>
+                    <SelectItem value="12h">12-Hour Shifts</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Handover Time (Minutes)</Label>
+                <Select value={handoverMinutes.toString()} onValueChange={(value) => setHandoverMinutes(parseInt(value))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">No handover (0 min)</SelectItem>
+                    <SelectItem value="15">15 minutes</SelectItem>
+                    <SelectItem value="30">30 minutes</SelectItem>
+                    <SelectItem value="45">45 minutes</SelectItem>
+                    <SelectItem value="60">60 minutes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Shift Pattern ({pattern.length} days)</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addPatternDay}>
+                    Add Day
+                  </Button>
+                </div>
+                
+                {pattern.length > 0 ? (
+                  <div className="grid grid-cols-7 gap-2">
+                    {pattern.map((code, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="text-xs text-center text-muted-foreground">
+                          Day {index + 1}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Select 
+                            value={code} 
+                            onValueChange={(value) => updatePatternCode(index, value)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getShiftCodes().map((shiftCode) => (
+                                <SelectItem key={shiftCode.value} value={shiftCode.value}>
+                                  <div className="text-xs">
+                                    <div>{shiftCode.label}</div>
+                                    <div className="text-muted-foreground">{shiftCode.description}</div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePatternDay(index)}
+                            className="h-6 px-1 text-xs text-red-600 hover:text-red-700"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No pattern set. Click "Add Day" to create a pattern.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -197,7 +298,7 @@ export function RosterEditDialog({ roster, open, onClose, onRosterUpdated }: Pro
           </Button>
           <Button 
             onClick={handleSave}
-            disabled={saving || loading || !rosterName.trim() || pattern.length === 0}
+            disabled={saving || loading || !rosterName.trim()}
           >
             {saving ? (
               <div className="flex items-center">

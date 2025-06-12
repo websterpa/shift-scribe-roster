@@ -5,6 +5,7 @@ import { StaffMember, Assignment } from "@/types/roster";
 import { generateAssignments } from "./assignmentGenerator";
 import { createRosterVersion } from "./rosterVersion";
 import { isStaffEligibleForShift, getEligibleShiftCodes } from "./shiftCodeMapping";
+import { enforceStaffingRequirements } from "./staffingEnforcement";
 
 const logger = createLogger('RosterGeneration');
 
@@ -17,7 +18,13 @@ export async function generateAndSaveRoster(
     operational_hours_per_day: number;
     handshake_minutes: number;
     start_date: string;
-    pattern?: string[]; // New optional pattern parameter
+    pattern?: string[];
+    staffing_requirements?: {
+      day_shift_staff?: number;
+      night_shift_staff?: number;
+      early_shift_staff?: number;
+      late_shift_staff?: number;
+    };
   },
   versionName?: string
 ) {
@@ -28,7 +35,8 @@ export async function generateAndSaveRoster(
       config, 
       versionName,
       hasPattern: !!config.pattern,
-      patternLength: config.pattern?.length
+      patternLength: config.pattern?.length,
+      hasStaffingRequirements: !!config.staffing_requirements
     });
 
     // Enhanced staff eligibility logging
@@ -111,7 +119,6 @@ export async function generateAndSaveRoster(
     if (config.pattern && config.pattern.length > 0) {
       console.log('🎨 AUDIT: Using custom pattern for cycle generation', config.pattern);
       
-      // Use the enhanced cycle generation with the custom pattern
       cycle = await createCycleFromPatternEnhanced(
         staffList,
         config.pattern,
@@ -130,6 +137,54 @@ export async function generateAndSaveRoster(
         config.operational_hours_per_day,
         config.handshake_minutes
       );
+    }
+
+    // 2. Apply staffing requirements enforcement if provided
+    if (config.staffing_requirements) {
+      console.log('🎯 AUDIT: Applying staffing requirements enforcement');
+      
+      // Convert cycle to day-based assignments
+      const dayAssignments: { [day: number]: { [staffId: string]: string } } = {};
+      const totalDays = config.cycle_length_weeks * 7;
+      
+      // Initialize all days
+      for (let day = 0; day < totalDays; day++) {
+        dayAssignments[day] = {};
+        staffList.forEach(staff => {
+          dayAssignments[day][staff.id] = 'R'; // Default to rest
+        });
+      }
+      
+      // Apply cycle assignments
+      cycle.forEach(assignment => {
+        if (dayAssignments[assignment.day]) {
+          dayAssignments[assignment.day][assignment.staffId] = assignment.shiftCode;
+        }
+      });
+      
+      // Enforce staffing requirements
+      const adjustedAssignments = enforceStaffingRequirements(
+        dayAssignments,
+        staffList,
+        config.shift_type,
+        config.staffing_requirements
+      );
+      
+      // Convert back to cycle format
+      cycle = [];
+      Object.keys(adjustedAssignments).forEach(dayStr => {
+        const day = parseInt(dayStr);
+        Object.entries(adjustedAssignments[day]).forEach(([staffId, shiftCode]) => {
+          cycle.push({
+            day,
+            staffId,
+            shiftCode,
+            date: new Date(Date.now() + day * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          });
+        });
+      });
+      
+      console.log('✅ AUDIT: Staffing requirements applied');
     }
 
     console.log('🔍 AUDIT: Cycle generation result:');

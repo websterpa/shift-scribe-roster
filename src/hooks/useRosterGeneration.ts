@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -233,7 +232,14 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
         handshake_minutes: selectedConfig.handshake_minutes,
         start_date: selectedConfig.start_date,
         // FIXED: Always include the selected pattern if one is available
-        ...(selectedPattern.length > 0 && { pattern: selectedPattern })
+        ...(selectedPattern.length > 0 && { pattern: selectedPattern }),
+        // Add staffing requirements from the selected config
+        staffing_requirements: {
+          day_shift_staff: selectedConfig.day_shift_staff,
+          night_shift_staff: selectedConfig.night_shift_staff,
+          early_shift_staff: selectedConfig.early_shift_staff,
+          late_shift_staff: selectedConfig.late_shift_staff,
+        }
       };
 
       console.log('📊 useRosterGeneration: Config for generation:', configForGeneration);
