@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, Check, Settings, Star } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Settings, Star, Users } from 'lucide-react';
 import { StaffMember } from '@/types/roster';
 import { generateAndSaveRoster } from '@/utils/roster/rosterGeneration';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +21,13 @@ interface NewRosterWizardProps {
   staffList: StaffMember[];
 }
 
+interface StaffingRequirements {
+  day_shift_staff: number;
+  night_shift_staff: number;
+  early_shift_staff?: number;
+  late_shift_staff?: number;
+}
+
 interface RosterConfig {
   shiftType: '8h' | '12h';
   operationalWindow: '16h' | '24h' | 'custom';
@@ -30,6 +37,7 @@ interface RosterConfig {
   cycleLength: number;
   startDate: string;
   rosterName: string;
+  staffingRequirements: StaffingRequirements;
 }
 
 interface CustomPattern {
@@ -62,7 +70,13 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
     staffCount: staffList.length,
     cycleLength: 7,
     startDate: new Date().toISOString().split('T')[0],
-    rosterName: ''
+    rosterName: '',
+    staffingRequirements: {
+      day_shift_staff: 2,
+      night_shift_staff: 2,
+      early_shift_staff: 1,
+      late_shift_staff: 1
+    }
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
@@ -146,12 +160,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
                                    config.customHours || 24,
         handshake_minutes: 15,
         start_date: config.startDate,
-        staffing_requirements: {
-          day_shift_staff: 2,
-          late_shift_staff: 1,
-          early_shift_staff: 1,
-          night_shift_staff: 2
-        }
+        staffing_requirements: config.staffingRequirements
       };
 
       const { data, error } = await supabase
@@ -203,7 +212,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
     }
   };
 
-  const handleGenerate = async () => {
+  const handleGenerateRoster = async () => {
     console.log('🚀 NewRosterWizard: Starting roster generation...', config);
     
     if (!config.template) {
@@ -280,13 +289,18 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
         setTempConfigId(null);
       }
     } finally {
-      // Remove immediate cleanup - now handled by parent after data loading
-      // if (tempConfigId) {
-      //   await cleanupTempConfig(tempConfigId);
-      //   setTempConfigId(null);
-      // }
       setIsGenerating(false);
     }
+  };
+
+  const updateStaffingRequirement = (field: keyof StaffingRequirements, value: number) => {
+    setConfig(prev => ({
+      ...prev,
+      staffingRequirements: {
+        ...prev.staffingRequirements,
+        [field]: value
+      }
+    }));
   };
 
   const isStepValid = () => {
@@ -382,39 +396,41 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
   const renderStep2 = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-4">Staff & Cycle</h3>
+        <h3 className="text-lg font-semibold mb-4">Staff & Cycle Configuration</h3>
         
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="staffCount" className="text-base font-medium">Number of Staff</Label>
-            <Input
-              id="staffCount"
-              type="number"
-              min="1"
-              max={staffList.length}
-              value={config.staffCount}
-              onChange={(e) => setConfig(prev => ({ ...prev, staffCount: parseInt(e.target.value) || 0 }))}
-              className="mt-1"
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              Available: {staffList.length} staff members
-            </p>
-          </div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="staffCount" className="text-base font-medium">Number of Staff</Label>
+              <Input
+                id="staffCount"
+                type="number"
+                min="1"
+                max={staffList.length}
+                value={config.staffCount}
+                onChange={(e) => setConfig(prev => ({ ...prev, staffCount: parseInt(e.target.value) || 0 }))}
+                className="mt-1"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Available: {staffList.length} staff members
+              </p>
+            </div>
 
-          <div>
-            <Label htmlFor="cycleLength" className="text-base font-medium">Cycle Length (Days)</Label>
-            <Select value={config.cycleLength.toString()} onValueChange={(value) => setConfig(prev => ({ ...prev, cycleLength: parseInt(value) }))}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">7 Days (1 Week)</SelectItem>
-                <SelectItem value="14">14 Days (2 Weeks)</SelectItem>
-                <SelectItem value="28">28 Days (4 Weeks)</SelectItem>
-                <SelectItem value="35">35 Days (5 Weeks)</SelectItem>
-                <SelectItem value="42">42 Days (6 Weeks)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div>
+              <Label htmlFor="cycleLength" className="text-base font-medium">Cycle Length (Days)</Label>
+              <Select value={config.cycleLength.toString()} onValueChange={(value) => setConfig(prev => ({ ...prev, cycleLength: parseInt(value) }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 Days (1 Week)</SelectItem>
+                  <SelectItem value="14">14 Days (2 Weeks)</SelectItem>
+                  <SelectItem value="28">28 Days (4 Weeks)</SelectItem>
+                  <SelectItem value="35">35 Days (5 Weeks)</SelectItem>
+                  <SelectItem value="42">42 Days (6 Weeks)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>
@@ -427,6 +443,85 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
               className="mt-1"
             />
           </div>
+
+          {/* Shift Staffing Requirements */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Shift Staffing Requirements
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {config.shiftType === '12h' ? (
+                  <>
+                    <div>
+                      <Label htmlFor="day_shift_staff">Day Shift Staff</Label>
+                      <Input
+                        id="day_shift_staff"
+                        type="number"
+                        min="1"
+                        value={config.staffingRequirements.day_shift_staff}
+                        onChange={(e) => updateStaffingRequirement('day_shift_staff', parseInt(e.target.value) || 1)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="night_shift_staff">Night Shift Staff</Label>
+                      <Input
+                        id="night_shift_staff"
+                        type="number"
+                        min="1"
+                        value={config.staffingRequirements.night_shift_staff}
+                        onChange={(e) => updateStaffingRequirement('night_shift_staff', parseInt(e.target.value) || 1)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="early_shift_staff">Early Shift Staff</Label>
+                      <Input
+                        id="early_shift_staff"
+                        type="number"
+                        min="1"
+                        value={config.staffingRequirements.early_shift_staff || 1}
+                        onChange={(e) => updateStaffingRequirement('early_shift_staff', parseInt(e.target.value) || 1)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="late_shift_staff">Late Shift Staff</Label>
+                      <Input
+                        id="late_shift_staff"
+                        type="number"
+                        min="1"
+                        value={config.staffingRequirements.late_shift_staff || 1}
+                        onChange={(e) => updateStaffingRequirement('late_shift_staff', parseInt(e.target.value) || 1)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="night_shift_staff_8h">Night Shift Staff</Label>
+                      <Input
+                        id="night_shift_staff_8h"
+                        type="number"
+                        min="1"
+                        value={config.staffingRequirements.night_shift_staff}
+                        onChange={(e) => updateStaffingRequirement('night_shift_staff', parseInt(e.target.value) || 1)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-3">
+                Set how many staff members are required to work each shift type to ensure adequate coverage.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -644,7 +739,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
                 </Button>
               ) : (
                 <Button
-                  onClick={handleGenerate}
+                  onClick={handleGenerateRoster}
                   disabled={!isStepValid() || isGenerating}
                 >
                   {isGenerating ? (
