@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Calendar, Eye, Download, FileText, Trash } from 'lucide-react';
+import { Calendar, Eye, Download, FileText, Trash, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { RosterEditDialog } from '@/components/roster/RosterEditDialog';
 
 interface RosterVersion {
   id: string;
@@ -25,6 +25,7 @@ const MyRosters = () => {
   const [rosters, setRosters] = useState<RosterVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingRosterId, setDeletingRosterId] = useState<string | null>(null);
+  const [editingRoster, setEditingRoster] = useState<RosterVersion | null>(null);
 
   useEffect(() => {
     loadRosters();
@@ -109,6 +110,11 @@ const MyRosters = () => {
     window.location.href = `/roster/${roster.id}`;
   };
 
+  const handleEditRoster = (roster: RosterVersion) => {
+    console.log('✏️ Editing roster:', roster.version_name);
+    setEditingRoster(roster);
+  };
+
   const handleExportRoster = (roster: RosterVersion) => {
     console.log('📄 Exporting roster:', roster.version_name);
     toast({
@@ -163,6 +169,11 @@ const MyRosters = () => {
     } finally {
       setDeletingRosterId(null);
     }
+  };
+
+  const handleRosterUpdated = () => {
+    setEditingRoster(null);
+    loadRosters(); // Reload the rosters list
   };
 
   if (loading) {
@@ -255,6 +266,14 @@ const MyRosters = () => {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => handleEditRoster(roster)}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleExportRoster(roster)}
                           >
                             <Download className="h-4 w-4 mr-1" />
@@ -299,6 +318,15 @@ const MyRosters = () => {
           )}
         </CardContent>
       </Card>
+
+      {editingRoster && (
+        <RosterEditDialog
+          roster={editingRoster}
+          open={!!editingRoster}
+          onClose={() => setEditingRoster(null)}
+          onRosterUpdated={handleRosterUpdated}
+        />
+      )}
     </div>
   );
 };
