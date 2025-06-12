@@ -4,6 +4,7 @@ import { createLogger } from "../errorLogger";
 import { StaffMember, Assignment } from "@/types/roster";
 import { generateAssignments } from "./assignmentGenerator";
 import { createRosterVersion } from "./rosterVersion";
+import { isStaffEligibleForShift, getEligibleShiftCodes } from "./shiftCodeMapping";
 
 const logger = createLogger('RosterGeneration');
 
@@ -30,14 +31,16 @@ export async function generateAndSaveRoster(
       patternLength: config.pattern?.length
     });
 
-    // Log detailed staff information for audit
-    console.log('👥 AUDIT: Staff list details:');
+    // Enhanced staff eligibility logging
+    console.log('👥 AUDIT: Staff eligibility analysis:');
     staffList.forEach((staff, index) => {
+      const eligibleCodes = getEligibleShiftCodes(staff.eligible_shifts);
       console.log(`  Staff ${index + 1}:`, {
         id: staff.id,
         name: `${staff.first_name} ${staff.last_name}`,
         is_shift_worker: staff.is_shift_worker,
-        eligible_shifts: staff.eligible_shifts,
+        eligible_shifts_names: staff.eligible_shifts,
+        eligible_shift_codes: eligibleCodes,
         is_active: staff.is_active
       });
     });
@@ -77,12 +80,14 @@ export async function generateAndSaveRoster(
       throw new Error(error);
     }
 
-    // Validate shift eligibility
-    const eligibleStaff = staffList.filter(staff => 
-      staff.eligible_shifts && staff.eligible_shifts.length > 0 && staff.is_shift_worker
-    );
+    // Validate shift eligibility with improved logging
+    const eligibleStaff = staffList.filter(staff => {
+      if (!staff.is_shift_worker) return false;
+      const eligibleCodes = getEligibleShiftCodes(staff.eligible_shifts);
+      return eligibleCodes.length > 0;
+    });
     
-    console.log('🔍 AUDIT: Eligible staff analysis:');
+    console.log('🔍 AUDIT: Enhanced eligible staff analysis:');
     console.log(`  Total staff: ${staffList.length}`);
     console.log(`  Shift workers: ${staffList.filter(s => s.is_shift_worker).length}`);
     console.log(`  With eligible shifts: ${eligibleStaff.length}`);
@@ -95,7 +100,7 @@ export async function generateAndSaveRoster(
 
     console.log('✅ AUDIT: Validation passed', { 
       eligibleStaff: eligibleStaff.length, 
-      minRequired: minStaffRequired,
+      minRequired: calculateMinimumStaffRequired(config),
       usingCustomPattern: !!config.pattern 
     });
 

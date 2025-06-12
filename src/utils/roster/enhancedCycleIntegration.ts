@@ -1,4 +1,5 @@
 import { StaffMember } from "@/types/roster";
+import { isStaffEligibleForShift, shiftCodeToName } from "./shiftCodeMapping";
 
 export type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
 
@@ -108,17 +109,17 @@ export function generateEnhancedRosterCycle(
         // Validate that the shift code is a valid ShiftCode type
         const shiftCode: ShiftCode = isValidShiftCode(shiftCodeFromPattern) ? shiftCodeFromPattern : "R";
         
-        // Only assign if staff is eligible for this shift type
-        if (staff.eligible_shifts && staff.eligible_shifts.includes(shiftCode)) {
+        // FIXED: Use the new mapping function to check eligibility
+        if (shiftCode === "R" || isStaffEligibleForShift(staff.eligible_shifts, shiftCode)) {
           assignment[week][day][staff.id] = shiftCode;
           if (shiftCode !== "R") {
             assignedShifts++;
-            console.log(`✅ AUDIT: Assigned ${shiftCode} to ${staff.id} on week ${week}, day ${day}`);
+            console.log(`✅ AUDIT: Assigned ${shiftCode} (${shiftCodeToName(shiftCode)}) to ${staff.id} on week ${week}, day ${day}`);
           }
-        } else if (shiftCode !== "R") {
+        } else {
           // If not eligible for the assigned shift, give them rest
           assignment[week][day][staff.id] = "R";
-          console.log(`⚠️ AUDIT: Staff ${staff.id} not eligible for shift ${shiftCode}, assigned R instead`);
+          console.log(`⚠️ AUDIT: Staff ${staff.id} not eligible for shift ${shiftCode} (${shiftCodeToName(shiftCode)}), assigned R instead`);
         }
       }
     }
