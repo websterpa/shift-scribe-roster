@@ -7,14 +7,6 @@ import AuthPage from '@/pages/AuthPage';
 import Dashboard from '@/pages/Dashboard';
 import Staff from '@/pages/Staff';
 import LeaveRequests from '@/pages/LeaveRequests';
-import GenerateRoster from '@/pages/GenerateRoster';
-import RosterConfig from '@/pages/RosterConfig';
-import MyConfigurations from '@/pages/MyConfigurations';
-import MyRosters from '@/pages/MyRosters';
-import TestPro from '@/pages/TestPro';
-import RosterTesting from '@/pages/RosterTesting';
-import RosterViewer from '@/pages/RosterViewer';
-import StaffingAnalysis from '@/pages/StaffingAnalysis';
 import ReportsPage from '@/pages/ReportsPage';
 import SupportPage from '@/pages/SupportPage';
 import TermsPage from '@/pages/TermsPage';
@@ -49,16 +41,8 @@ export const AppRouter: React.FC = () => {
           <Route path="/" element={<AuthenticatedLayout />}>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="staff" element={<Staff />} />
-            <Route path="generate-roster" element={<GenerateRoster />} />
             <Route path="leave-requests" element={<LeaveRequests />} />
-            <Route path="staffing-analysis" element={<StaffingAnalysis />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="roster-config" element={<RosterConfig />} />
-            <Route path="my-configurations" element={<MyConfigurations />} />
-            <Route path="my-rosters" element={<MyRosters />} />
-            <Route path="test-pro" element={<TestPro />} />
-            <Route path="roster-testing" element={<RosterTesting />} />
-            <Route path="roster/:rosterId" element={<RosterViewer />} />
           </Route>
           
           {/* Fallback route */}
