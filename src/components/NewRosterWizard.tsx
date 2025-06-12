@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -160,7 +161,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
                                    config.customHours || 24,
         handshake_minutes: 15,
         start_date: config.startDate,
-        staffing_requirements: config.staffingRequirements
+        staffing_requirements: config.staffingRequirements as any
       };
 
       const { data, error } = await supabase
