@@ -105,8 +105,8 @@ export function generateAssignments(
         staff_id: staff.id,
         date: dateString,
         shift_code: finalShiftCode,
-        shift_start: shiftDetails.shiftStart ? shiftDetails.shiftStart.toTimeString().slice(0, 5) : null,
-        shift_end: shiftDetails.shiftEnd ? shiftDetails.shiftEnd.toTimeString().slice(0, 5) : null,
+        shift_start: shiftDetails.shiftStart ? shiftDetails.shiftStart.toISOString() : null,
+        shift_end: shiftDetails.shiftEnd ? shiftDetails.shiftEnd.toISOString() : null,
         hours: shiftDetails.hours,
         cost
       };
