@@ -17,7 +17,7 @@ import { toast } from '@/hooks/use-toast';
 interface NewRosterWizardProps {
   isOpen: boolean;
   onClose: () => void;
-  onRosterGenerated: () => void;
+  onRosterGenerated: (tempConfigId?: string) => void;
   staffList: StaffMember[];
 }
 
@@ -264,7 +264,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
       );
 
       console.log('✅ NewRosterWizard: Roster generated successfully');
-      onRosterGenerated();
+      onRosterGenerated(configId); // Pass the temp config ID to parent for cleanup
       
     } catch (error: any) {
       console.error('❌ NewRosterWizard: Generation failed:', error);
@@ -273,12 +273,18 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
         description: error?.message || "Failed to generate roster",
         variant: "destructive",
       });
-    } finally {
-      // Cleanup temp config
+      
+      // Cleanup temp config on error
       if (tempConfigId) {
         await cleanupTempConfig(tempConfigId);
         setTempConfigId(null);
       }
+    } finally {
+      // Remove immediate cleanup - now handled by parent after data loading
+      // if (tempConfigId) {
+      //   await cleanupTempConfig(tempConfigId);
+      //   setTempConfigId(null);
+      // }
       setIsGenerating(false);
     }
   };

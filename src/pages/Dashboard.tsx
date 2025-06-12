@@ -107,10 +107,32 @@ const Dashboard = () => {
     return result;
   };
 
-  const handleRosterGenerated = () => {
+  const cleanupTempConfig = async (configId: string) => {
+    try {
+      console.log('🧹 Dashboard: Cleaning up temp config:', configId);
+      await supabase
+        .from('roster_config')
+        .delete()
+        .eq('id', configId);
+      console.log('✅ Dashboard: Temp config cleaned up');
+    } catch (error) {
+      console.error('❌ Dashboard: Error cleaning up temp config:', error);
+      // Non-critical error, don't throw
+    }
+  };
+
+  const handleRosterGenerated = async (tempConfigId?: string) => {
     console.log('🔄 Dashboard: Roster generated, reloading data...');
     setShowNewRosterWizard(false);
-    loadDashboardData();
+    
+    // First load the dashboard data to ensure UI is updated
+    await loadDashboardData();
+    
+    // Then cleanup the temporary config if provided
+    if (tempConfigId) {
+      await cleanupTempConfig(tempConfigId);
+    }
+    
     toast({
       title: "Roster generated successfully",
       description: "Your new roster is now available",
