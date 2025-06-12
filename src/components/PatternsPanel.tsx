@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -47,6 +46,9 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
   const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
   const [editName, setEditName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [newPatternName, setNewPatternName] = useState('');
+  const [newPatternCodes, setNewPatternCodes] = useState<string[]>(['D', 'D', 'R', 'R', 'R', 'N', 'N']);
   
   const { user, isAuthenticated } = useSupabaseAuth();
 
@@ -91,6 +93,89 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCreateNewPattern = () => {
+    console.log('📝 PatternsPanel: Starting new pattern creation');
+    setIsCreatingNew(true);
+    setNewPatternName('');
+    setNewPatternCodes(['D', 'D', 'R', 'R', 'R', 'N', 'N']);
+  };
+
+  const handleSaveNewPattern = async () => {
+    if (!newPatternName.trim() || !user) {
+      toast({
+        title: "Invalid input",
+        description: "Please enter a pattern name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('💾 PatternsPanel: Saving new pattern:', newPatternName);
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('custom_patterns')
+        .insert({
+          user_id: user.id,
+          name: newPatternName.trim(),
+          pattern: newPatternCodes,
+          shift_type: selectedShiftType
+        });
+
+      if (error) {
+        console.error('❌ PatternsPanel: Error creating pattern:', error);
+        toast({
+          title: "Error creating pattern",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ PatternsPanel: Pattern created successfully');
+      toast({
+        title: "Pattern created",
+        description: `"${newPatternName.trim()}" has been saved`,
+      });
+
+      setIsCreatingNew(false);
+      setNewPatternName('');
+      await loadCustomPatterns();
+    } catch (error) {
+      console.error('❌ PatternsPanel: Exception creating pattern:', error);
+      toast({
+        title: "Error creating pattern",
+        description: "Failed to create pattern",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelNewPattern = () => {
+    setIsCreatingNew(false);
+    setNewPatternName('');
+  };
+
+  const updatePatternCode = (index: number, code: string) => {
+    const newCodes = [...newPatternCodes];
+    newCodes[index] = code;
+    setNewPatternCodes(newCodes);
+  };
+
+  const addPatternDay = () => {
+    setNewPatternCodes([...newPatternCodes, 'D']);
+  };
+
+  const removePatternDay = (index: number) => {
+    if (newPatternCodes.length > 1) {
+      const newCodes = newPatternCodes.filter((_, i) => i !== index);
+      setNewPatternCodes(newCodes);
     }
   };
 
@@ -308,11 +393,87 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold">My Patterns</h3>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" onClick={handleCreateNewPattern}>
                     <Plus className="h-4 w-4 mr-1" />
                     New
                   </Button>
                 </div>
+
+                {/* New Pattern Creation Form */}
+                {isCreatingNew && (
+                  <Card className="mb-4 border-dashed">
+                    <CardContent className="p-4 space-y-4">
+                      <div>
+                        <Label htmlFor="new-pattern-name">Pattern Name</Label>
+                        <Input
+                          id="new-pattern-name"
+                          value={newPatternName}
+                          onChange={(e) => setNewPatternName(e.target.value)}
+                          placeholder="Enter pattern name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label>Pattern ({newPatternCodes.length} days)</Label>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {newPatternCodes.map((code, index) => (
+                            <div key={index} className="flex items-center gap-1">
+                              <select
+                                value={code}
+                                onChange={(e) => updatePatternCode(index, e.target.value)}
+                                className="text-xs border rounded px-1 py-1"
+                              >
+                                <option value="D">D (Day)</option>
+                                <option value="E">E (Early)</option>
+                                <option value="L">L (Late)</option>
+                                <option value="N">N (Night)</option>
+                                <option value="R">R (Rest)</option>
+                              </select>
+                              {newPatternCodes.length > 1 && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => removePatternDay(index)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={addPatternDay}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleSaveNewPattern}
+                          disabled={!newPatternName.trim() || isSaving}
+                          className="flex-1"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          {isSaving ? 'Saving...' : 'Save Pattern'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCancelNewPattern}
+                          disabled={isSaving}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
                 
                 {isLoading ? (
                   <div className="text-center py-8">
@@ -325,18 +486,18 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
                       <PatternCard key={pattern.id} pattern={pattern} isCustom={true} />
                     ))}
                   </div>
-                ) : (
+                ) : !isCreatingNew ? (
                   <Card>
                     <CardContent className="text-center py-8">
                       <Star className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                       <p className="text-sm text-muted-foreground">No custom patterns yet</p>
-                      <Button size="sm" variant="outline" className="mt-2">
+                      <Button size="sm" variant="outline" className="mt-2" onClick={handleCreateNewPattern}>
                         <Plus className="h-4 w-4 mr-1" />
                         Create Your First Pattern
                       </Button>
                     </CardContent>
                   </Card>
-                )}
+                ) : null}
               </div>
               
               <Separator />

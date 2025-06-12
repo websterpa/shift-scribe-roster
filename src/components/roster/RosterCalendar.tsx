@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StaffPersonalRoster } from './StaffPersonalRoster';
+import { toast } from '@/hooks/use-toast';
 
 interface Staff {
   id: string;
@@ -52,6 +52,7 @@ export function RosterCalendar({ week, staff }: RosterCalendarProps) {
   const loadAllWeeksData = async () => {
     try {
       setLoading(true);
+      console.log('📥 RosterCalendar: Loading all weeks data for staff:', selectedStaff?.name);
       
       // Fetch the latest roster version
       const { data: latestVersion, error: versionError } = await supabase
@@ -62,7 +63,12 @@ export function RosterCalendar({ week, staff }: RosterCalendarProps) {
         .single();
 
       if (versionError || !latestVersion) {
-        console.error('Error fetching roster version:', versionError);
+        console.error('❌ RosterCalendar: Error fetching roster version:', versionError);
+        toast({
+          title: "Error loading roster",
+          description: "Could not load roster version",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -80,7 +86,12 @@ export function RosterCalendar({ week, staff }: RosterCalendarProps) {
         .eq('version_id', latestVersion.id);
 
       if (assignmentsError) {
-        console.error('Error fetching assignments:', assignmentsError);
+        console.error('❌ RosterCalendar: Error fetching assignments:', assignmentsError);
+        toast({
+          title: "Error loading assignments",
+          description: assignmentsError.message,
+          variant: "destructive",
+        });
         return;
       }
 
@@ -129,15 +140,22 @@ export function RosterCalendar({ week, staff }: RosterCalendarProps) {
         }))
         .sort((a, b) => a.weekStart.getTime() - b.weekStart.getTime());
 
+      console.log('✅ RosterCalendar: Loaded weeks data:', weeksArray.length, 'weeks');
       setAllWeeksData(weeksArray);
     } catch (error) {
-      console.error('Error loading all weeks data:', error);
+      console.error('❌ RosterCalendar: Exception loading all weeks data:', error);
+      toast({
+        title: "Error loading data",
+        description: "Failed to load roster data",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleStaffClick = (staffMember: Staff) => {
+    console.log('👤 RosterCalendar: Staff clicked:', staffMember.name);
     setSelectedStaff(staffMember);
     setPersonalRosterOpen(true);
   };
