@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Edit, Play, Star } from 'lucide-react';
+import { Plus, Edit, Play, Star, Save, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
@@ -42,6 +44,9 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
   const [customPatterns, setCustomPatterns] = useState<Pattern[]>([]);
   const [selectedShiftType, setSelectedShiftType] = useState<'8h' | '12h'>('8h');
   const [isLoading, setIsLoading] = useState(false);
+  const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
+  const [editName, setEditName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   
   const { user, isAuthenticated } = useSupabaseAuth();
 
@@ -107,6 +112,60 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
     });
   };
 
+  const handleEditPattern = (pattern: Pattern) => {
+    console.log('✏️ PatternsPanel: Editing pattern:', pattern);
+    setEditingPattern(pattern);
+    setEditName(pattern.name);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPattern || !editName.trim()) return;
+    
+    console.log('💾 PatternsPanel: Saving pattern edit:', editingPattern.id);
+    setIsSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from('custom_patterns')
+        .update({ name: editName.trim() })
+        .eq('id', editingPattern.id);
+
+      if (error) {
+        console.error('❌ PatternsPanel: Error updating pattern:', error);
+        toast({
+          title: "Error updating pattern",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ PatternsPanel: Pattern updated successfully');
+      toast({
+        title: "Pattern updated",
+        description: `"${editName.trim()}" has been updated`,
+      });
+
+      setEditingPattern(null);
+      setEditName('');
+      await loadCustomPatterns(); // Reload patterns
+    } catch (error) {
+      console.error('❌ PatternsPanel: Exception updating pattern:', error);
+      toast({
+        title: "Error updating pattern",
+        description: "Failed to update pattern",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPattern(null);
+    setEditName('');
+  };
+
   const getShiftCodeColor = (code: string) => {
     const colors = {
       'D': 'bg-yellow-100 text-yellow-800',
@@ -118,55 +177,101 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
     return colors[code as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  const PatternCard = ({ pattern, isCustom = false, showActions = true }: { pattern: any; isCustom?: boolean; showActions?: boolean }) => (
-    <Card className="relative">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-base">{pattern.name}</CardTitle>
-            {pattern.description && (
-              <p className="text-sm text-muted-foreground mt-1">{pattern.description}</p>
+  const PatternCard = ({ pattern, isCustom = false, showActions = true }: { pattern: any; isCustom?: boolean; showActions?: boolean }) => {
+    const isEditing = editingPattern?.id === pattern.id;
+    
+    return (
+      <Card className="relative">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Pattern Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Enter pattern name"
+                  />
+                </div>
+              ) : (
+                <>
+                  <CardTitle className="text-base">{pattern.name}</CardTitle>
+                  {pattern.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{pattern.description}</p>
+                  )}
+                </>
+              )}
+            </div>
+            {isCustom && !isEditing && <Star className="h-4 w-4 text-yellow-500" />}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-1">
+            {pattern.pattern.slice(0, 14).map((code: string, index: number) => (
+              <Badge key={index} variant="outline" className={`text-xs ${getShiftCodeColor(code)}`}>
+                {code}
+              </Badge>
+            ))}
+            {pattern.pattern.length > 14 && (
+              <span className="text-xs text-muted-foreground">+{pattern.pattern.length - 14} more</span>
             )}
           </div>
-          {isCustom && <Star className="h-4 w-4 text-yellow-500" />}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-1">
-          {pattern.pattern.slice(0, 14).map((code: string, index: number) => (
-            <Badge key={index} variant="outline" className={`text-xs ${getShiftCodeColor(code)}`}>
-              {code}
-            </Badge>
-          ))}
-          {pattern.pattern.length > 14 && (
-            <span className="text-xs text-muted-foreground">+{pattern.pattern.length - 14} more</span>
+          
+          <div className="text-xs text-muted-foreground">
+            {pattern.pattern.length}-day cycle
+          </div>
+          
+          {showActions && (
+            <div className="flex gap-2 pt-2">
+              {isEditing ? (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveEdit}
+                    disabled={!editName.trim() || isSaving}
+                    className="flex-1"
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => handleUsePattern(pattern, isCustom)}
+                    className="flex-1"
+                  >
+                    <Play className="h-3 w-3 mr-1" />
+                    Use
+                  </Button>
+                  {isCustom && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditPattern(pattern)}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           )}
-        </div>
-        
-        <div className="text-xs text-muted-foreground">
-          {pattern.pattern.length}-day cycle
-        </div>
-        
-        {showActions && (
-          <div className="flex gap-2 pt-2">
-            <Button
-              size="sm"
-              onClick={() => handleUsePattern(pattern, isCustom)}
-              className="flex-1"
-            >
-              <Play className="h-3 w-3 mr-1" />
-              Use
-            </Button>
-            {isCustom && (
-              <Button size="sm" variant="outline">
-                <Edit className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
