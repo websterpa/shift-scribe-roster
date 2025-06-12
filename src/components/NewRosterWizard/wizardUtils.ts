@@ -58,11 +58,11 @@ export const cleanupTempConfig = async (configId: string) => {
 export const isStepValid = (currentStep: number, config: RosterConfig): boolean => {
   switch (currentStep) {
     case 1:
-      return config.shiftType && config.operationalWindow;
+      return Boolean(config.shiftType) && Boolean(config.operationalWindow);
     case 2:
       return config.staffCount > 0 && config.cycleLength > 0;
     case 3:
-      return config.template && config.rosterName.trim();
+      return Boolean(config.template) && Boolean(config.rosterName.trim());
     default:
       return false;
   }
