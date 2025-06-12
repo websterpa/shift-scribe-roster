@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Phone, MessageCircle, Book } from 'lucide-react';
+import { LiveChatWidget } from '@/components/support/LiveChatWidget';
+import { DocumentationModal } from '@/components/support/DocumentationModal';
+import { useToast } from '@/hooks/use-toast';
 
 const SupportPage = () => {
   const [formData, setFormData] = useState({
@@ -16,6 +19,9 @@ const SupportPage = () => {
     subject: '',
     message: ''
   });
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -26,9 +32,13 @@ const SupportPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would send the form data to your support system
     console.log('Support form submitted:', formData);
-    alert('Thank you for your message. We\'ll get back to you soon!');
+    
+    toast({
+      title: "Message Sent Successfully",
+      description: "Thank you for your message. We'll get back to you within 24 hours!",
+    });
+    
     setFormData({ name: '', email: '', subject: '', message: '' });
   };
 
@@ -76,7 +86,10 @@ const SupportPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center">
-                <Button variant="outline">
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsChatOpen(true)}
+                >
                   Start Chat
                 </Button>
               </CardContent>
@@ -91,7 +104,10 @@ const SupportPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center">
-                <Button variant="outline">
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsDocsOpen(true)}
+                >
                   View Docs
                 </Button>
               </CardContent>
@@ -172,6 +188,18 @@ const SupportPage = () => {
       </div>
       
       <LandingFooter />
+      
+      {/* Live Chat Widget */}
+      <LiveChatWidget 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+      />
+      
+      {/* Documentation Modal */}
+      <DocumentationModal 
+        isOpen={isDocsOpen} 
+        onClose={() => setIsDocsOpen(false)} 
+      />
     </div>
   );
 };
