@@ -67,6 +67,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
   const [isGenerating, setIsGenerating] = useState(false);
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
   const [isLoadingPatterns, setIsLoadingPatterns] = useState(false);
+  const [tempConfigId, setTempConfigId] = useState<string | null>(null);
   
   const { user, isAuthenticated } = useSupabaseAuth();
 
@@ -132,6 +133,64 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
     }
   };
 
+  const createTempConfig = async (): Promise<string> => {
+    console.log('📋 NewRosterWizard: Creating temporary config for wizard generation');
+    
+    try {
+      const tempConfig = {
+        config_name: `Wizard Temp Config - ${Date.now()}`,
+        cycle_length_weeks: Math.ceil(config.cycleLength / 7),
+        shift_type: config.shiftType,
+        operational_hours_per_day: config.operationalWindow === '24h' ? 24 : 
+                                   config.operationalWindow === '16h' ? 16 : 
+                                   config.customHours || 24,
+        handshake_minutes: 15,
+        start_date: config.startDate,
+        staffing_requirements: {
+          day_shift_staff: 2,
+          late_shift_staff: 1,
+          early_shift_staff: 1,
+          night_shift_staff: 2
+        }
+      };
+
+      const { data, error } = await supabase
+        .from('roster_config')
+        .insert(tempConfig)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('❌ NewRosterWizard: Error creating temp config:', error);
+        throw error;
+      }
+
+      if (!data?.id) {
+        throw new Error('Failed to get temp config ID');
+      }
+
+      console.log('✅ NewRosterWizard: Created temp config with ID:', data.id);
+      return data.id;
+    } catch (error: any) {
+      console.error('❌ NewRosterWizard: Failed to create temp config:', error);
+      throw new Error(`Failed to create temporary configuration: ${error.message}`);
+    }
+  };
+
+  const cleanupTempConfig = async (configId: string) => {
+    try {
+      console.log('🧹 NewRosterWizard: Cleaning up temp config:', configId);
+      await supabase
+        .from('roster_config')
+        .delete()
+        .eq('id', configId);
+      console.log('✅ NewRosterWizard: Temp config cleaned up');
+    } catch (error) {
+      console.error('❌ NewRosterWizard: Error cleaning up temp config:', error);
+      // Non-critical error, don't throw
+    }
+  };
+
   const handleNext = () => {
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
@@ -159,6 +218,10 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
     try {
       setIsGenerating(true);
 
+      // Create temporary config
+      const configId = await createTempConfig();
+      setTempConfigId(configId);
+
       // Get the selected template pattern
       let selectedTemplate;
       let patternToUse;
@@ -181,7 +244,7 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
 
       // Create a basic config for generation
       const generationConfig = {
-        id: 'wizard-generated',
+        id: configId, // Use the actual temp config ID
         cycle_length_weeks: Math.ceil(config.cycleLength / 7),
         shift_type: config.shiftType,
         operational_hours_per_day: config.operationalWindow === '24h' ? 24 : 
@@ -211,6 +274,11 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
         variant: "destructive",
       });
     } finally {
+      // Cleanup temp config
+      if (tempConfigId) {
+        await cleanupTempConfig(tempConfigId);
+        setTempConfigId(null);
+      }
       setIsGenerating(false);
     }
   };
