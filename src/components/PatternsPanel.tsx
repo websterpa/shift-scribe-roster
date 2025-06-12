@@ -1,15 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Edit, Play, Star, Save, X } from 'lucide-react';
+import { Plus, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
+import { PatternCard } from './patterns/PatternCard';
+import { NewPatternForm } from './patterns/NewPatternForm';
+import { COMMON_PATTERNS } from './patterns/constants';
+import { usePatternActions } from './patterns/hooks/usePatternActions';
 
 interface Pattern {
   id: string;
@@ -25,32 +27,31 @@ interface PatternsPanelProps {
   onPatternSelected: (pattern: Pattern) => void;
 }
 
-const COMMON_PATTERNS = {
-  '8h': [
-    { id: 'continental', name: 'Continental (7-day)', pattern: ['D', 'D', 'R', 'R', 'R', 'N', 'N'], description: 'Classic 7-day rotating pattern' },
-    { id: '4-on-4-off', name: '4-On/4-Off', pattern: ['D', 'D', 'D', 'D', 'R', 'R', 'R', 'R'], description: '4 days on, 4 days off' },
-    { id: '5-2-standard', name: '5-2 Standard', pattern: ['D', 'D', 'D', 'D', 'D', 'R', 'R'], description: 'Monday to Friday work pattern' },
-    { id: 'pitman', name: 'Pitman', pattern: ['D', 'D', 'R', 'N', 'N', 'R', 'R'], description: '2-2-3 rotation pattern' }
-  ],
-  '12h': [
-    { id: 'dupont', name: 'DuPont (14-day)', pattern: ['D', 'D', 'D', 'D', 'R', 'R', 'R', 'N', 'N', 'N', 'N', 'R', 'R', 'R'], description: 'Classic 12-hour DuPont pattern' },
-    { id: 'day-night-2-crew', name: 'Day/Night 2-Crew', pattern: ['D', 'D', 'D', 'D', 'R', 'R', 'R', 'R', 'N', 'N', 'N', 'N', 'R', 'R', 'R', 'R'], description: '16-day rotation for 2 crews' },
-    { id: '3-4-3-weekend', name: '3-4-3 Weekend-Balanced', pattern: ['D', 'D', 'D', 'R', 'R', 'R', 'R', 'N', 'N', 'N'], description: 'Weekend-friendly 10-day pattern' }
-  ]
-};
-
 export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPanelProps) {
   const [customPatterns, setCustomPatterns] = useState<Pattern[]>([]);
   const [selectedShiftType, setSelectedShiftType] = useState<'8h' | '12h'>('8h');
   const [isLoading, setIsLoading] = useState(false);
-  const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
-  const [editName, setEditName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [newPatternName, setNewPatternName] = useState('');
-  const [newPatternCodes, setNewPatternCodes] = useState<string[]>(['D', 'D', 'R', 'R', 'R', 'N', 'N']);
   
   const { user, isAuthenticated } = useSupabaseAuth();
+  const {
+    editingPattern,
+    editName,
+    setEditName,
+    isSaving,
+    isCreatingNew,
+    newPatternName,
+    setNewPatternName,
+    newPatternCodes,
+    handleCreateNewPattern,
+    handleSaveNewPattern,
+    handleCancelNewPattern,
+    updatePatternCode,
+    addPatternDay,
+    removePatternDay,
+    handleEditPattern,
+    handleSaveEdit,
+    handleCancelEdit
+  } = usePatternActions();
 
   useEffect(() => {
     if (isOpen && isAuthenticated && user) {
@@ -96,89 +97,6 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
     }
   };
 
-  const handleCreateNewPattern = () => {
-    console.log('📝 PatternsPanel: Starting new pattern creation');
-    setIsCreatingNew(true);
-    setNewPatternName('');
-    setNewPatternCodes(['D', 'D', 'R', 'R', 'R', 'N', 'N']);
-  };
-
-  const handleSaveNewPattern = async () => {
-    if (!newPatternName.trim() || !user) {
-      toast({
-        title: "Invalid input",
-        description: "Please enter a pattern name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log('💾 PatternsPanel: Saving new pattern:', newPatternName);
-    setIsSaving(true);
-
-    try {
-      const { error } = await supabase
-        .from('custom_patterns')
-        .insert({
-          user_id: user.id,
-          name: newPatternName.trim(),
-          pattern: newPatternCodes,
-          shift_type: selectedShiftType
-        });
-
-      if (error) {
-        console.error('❌ PatternsPanel: Error creating pattern:', error);
-        toast({
-          title: "Error creating pattern",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('✅ PatternsPanel: Pattern created successfully');
-      toast({
-        title: "Pattern created",
-        description: `"${newPatternName.trim()}" has been saved`,
-      });
-
-      setIsCreatingNew(false);
-      setNewPatternName('');
-      await loadCustomPatterns();
-    } catch (error) {
-      console.error('❌ PatternsPanel: Exception creating pattern:', error);
-      toast({
-        title: "Error creating pattern",
-        description: "Failed to create pattern",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCancelNewPattern = () => {
-    setIsCreatingNew(false);
-    setNewPatternName('');
-  };
-
-  const updatePatternCode = (index: number, code: string) => {
-    const newCodes = [...newPatternCodes];
-    newCodes[index] = code;
-    setNewPatternCodes(newCodes);
-  };
-
-  const addPatternDay = () => {
-    setNewPatternCodes([...newPatternCodes, 'D']);
-  };
-
-  const removePatternDay = (index: number) => {
-    if (newPatternCodes.length > 1) {
-      const newCodes = newPatternCodes.filter((_, i) => i !== index);
-      setNewPatternCodes(newCodes);
-    }
-  };
-
   const handleUsePattern = (pattern: any, isCustom: boolean = false) => {
     console.log('📋 PatternsPanel: Using pattern:', pattern);
     
@@ -195,167 +113,6 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
       title: "Pattern selected",
       description: `"${formattedPattern.name}" is now ready to use`,
     });
-  };
-
-  const handleEditPattern = (pattern: Pattern) => {
-    console.log('✏️ PatternsPanel: Editing pattern:', pattern);
-    setEditingPattern(pattern);
-    setEditName(pattern.name);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingPattern || !editName.trim()) return;
-    
-    console.log('💾 PatternsPanel: Saving pattern edit:', editingPattern.id);
-    setIsSaving(true);
-    
-    try {
-      const { error } = await supabase
-        .from('custom_patterns')
-        .update({ name: editName.trim() })
-        .eq('id', editingPattern.id);
-
-      if (error) {
-        console.error('❌ PatternsPanel: Error updating pattern:', error);
-        toast({
-          title: "Error updating pattern",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('✅ PatternsPanel: Pattern updated successfully');
-      toast({
-        title: "Pattern updated",
-        description: `"${editName.trim()}" has been updated`,
-      });
-
-      setEditingPattern(null);
-      setEditName('');
-      await loadCustomPatterns(); // Reload patterns
-    } catch (error) {
-      console.error('❌ PatternsPanel: Exception updating pattern:', error);
-      toast({
-        title: "Error updating pattern",
-        description: "Failed to update pattern",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingPattern(null);
-    setEditName('');
-  };
-
-  const getShiftCodeColor = (code: string) => {
-    const colors = {
-      'D': 'bg-yellow-100 text-yellow-800',
-      'E': 'bg-blue-100 text-blue-800',
-      'L': 'bg-orange-100 text-orange-800',
-      'N': 'bg-purple-100 text-purple-800',
-      'R': 'bg-gray-100 text-gray-800'
-    };
-    return colors[code as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const PatternCard = ({ pattern, isCustom = false, showActions = true }: { pattern: any; isCustom?: boolean; showActions?: boolean }) => {
-    const isEditing = editingPattern?.id === pattern.id;
-    
-    return (
-      <Card className="relative">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              {isEditing ? (
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Pattern Name</Label>
-                  <Input
-                    id="edit-name"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Enter pattern name"
-                  />
-                </div>
-              ) : (
-                <>
-                  <CardTitle className="text-base">{pattern.name}</CardTitle>
-                  {pattern.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{pattern.description}</p>
-                  )}
-                </>
-              )}
-            </div>
-            {isCustom && !isEditing && <Star className="h-4 w-4 text-yellow-500" />}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-1">
-            {pattern.pattern.slice(0, 14).map((code: string, index: number) => (
-              <Badge key={index} variant="outline" className={`text-xs ${getShiftCodeColor(code)}`}>
-                {code}
-              </Badge>
-            ))}
-            {pattern.pattern.length > 14 && (
-              <span className="text-xs text-muted-foreground">+{pattern.pattern.length - 14} more</span>
-            )}
-          </div>
-          
-          <div className="text-xs text-muted-foreground">
-            {pattern.pattern.length}-day cycle
-          </div>
-          
-          {showActions && (
-            <div className="flex gap-2 pt-2">
-              {isEditing ? (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={handleSaveEdit}
-                    disabled={!editName.trim() || isSaving}
-                    className="flex-1"
-                  >
-                    <Save className="h-3 w-3 mr-1" />
-                    {isSaving ? 'Saving...' : 'Save'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    disabled={isSaving}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() => handleUsePattern(pattern, isCustom)}
-                    className="flex-1"
-                  >
-                    <Play className="h-3 w-3 mr-1" />
-                    Use
-                  </Button>
-                  {isCustom && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditPattern(pattern)}
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
   };
 
   return (
@@ -400,80 +157,18 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
                 </div>
 
                 {/* New Pattern Creation Form */}
-                {isCreatingNew && (
-                  <Card className="mb-4 border-dashed">
-                    <CardContent className="p-4 space-y-4">
-                      <div>
-                        <Label htmlFor="new-pattern-name">Pattern Name</Label>
-                        <Input
-                          id="new-pattern-name"
-                          value={newPatternName}
-                          onChange={(e) => setNewPatternName(e.target.value)}
-                          placeholder="Enter pattern name"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Pattern ({newPatternCodes.length} days)</Label>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {newPatternCodes.map((code, index) => (
-                            <div key={index} className="flex items-center gap-1">
-                              <select
-                                value={code}
-                                onChange={(e) => updatePatternCode(index, e.target.value)}
-                                className="text-xs border rounded px-1 py-1"
-                              >
-                                <option value="D">D (Day)</option>
-                                <option value="E">E (Early)</option>
-                                <option value="L">L (Late)</option>
-                                <option value="N">N (Night)</option>
-                                <option value="R">R (Rest)</option>
-                              </select>
-                              {newPatternCodes.length > 1 && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => removePatternDay(index)}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={addPatternDay}
-                            className="h-6 w-6 p-0"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={handleSaveNewPattern}
-                          disabled={!newPatternName.trim() || isSaving}
-                          className="flex-1"
-                        >
-                          <Save className="h-3 w-3 mr-1" />
-                          {isSaving ? 'Saving...' : 'Save Pattern'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCancelNewPattern}
-                          disabled={isSaving}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                <NewPatternForm
+                  isVisible={isCreatingNew}
+                  patternName={newPatternName}
+                  patternCodes={newPatternCodes}
+                  isSaving={isSaving}
+                  onPatternNameChange={setNewPatternName}
+                  onPatternCodeChange={updatePatternCode}
+                  onAddDay={addPatternDay}
+                  onRemoveDay={removePatternDay}
+                  onSave={() => handleSaveNewPattern(user, selectedShiftType, loadCustomPatterns)}
+                  onCancel={handleCancelNewPattern}
+                />
                 
                 {isLoading ? (
                   <div className="text-center py-8">
@@ -483,7 +178,19 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
                 ) : customPatterns.length > 0 ? (
                   <div className="space-y-3">
                     {customPatterns.map((pattern) => (
-                      <PatternCard key={pattern.id} pattern={pattern} isCustom={true} />
+                      <PatternCard
+                        key={pattern.id}
+                        pattern={pattern}
+                        isCustom={true}
+                        isEditing={editingPattern?.id === pattern.id}
+                        editName={editName}
+                        isSaving={isSaving}
+                        onEdit={handleEditPattern}
+                        onUse={handleUsePattern}
+                        onSaveEdit={() => handleSaveEdit(loadCustomPatterns)}
+                        onCancelEdit={handleCancelEdit}
+                        onEditNameChange={setEditName}
+                      />
                     ))}
                   </div>
                 ) : !isCreatingNew ? (
@@ -509,7 +216,11 @@ export function PatternsPanel({ isOpen, onClose, onPatternSelected }: PatternsPa
             <h3 className="font-semibold mb-4">Common Patterns</h3>
             <div className="space-y-3">
               {COMMON_PATTERNS[selectedShiftType].map((pattern) => (
-                <PatternCard key={pattern.id} pattern={pattern} />
+                <PatternCard
+                  key={pattern.id}
+                  pattern={pattern}
+                  onUse={handleUsePattern}
+                />
               ))}
             </div>
           </div>
