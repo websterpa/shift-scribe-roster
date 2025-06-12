@@ -53,9 +53,10 @@ export function calculateShiftDetails(
     hours = 8;
   }
 
-  // Apply handshake if configured
-  if (handshakeMinutes === 15) {
-    shiftEnd = new Date(shiftEnd.getTime() + 15 * 60 * 1000);
+  // Apply handshake only if configured (greater than 0)
+  if (handshakeMinutes > 0) {
+    shiftEnd = new Date(shiftEnd.getTime() + handshakeMinutes * 60 * 1000);
+    console.log(`🤝 Applied ${handshakeMinutes} minute handover to shift ending at ${shiftEnd.toLocaleTimeString()}`);
   }
 
   return { shiftStart, shiftEnd, hours };

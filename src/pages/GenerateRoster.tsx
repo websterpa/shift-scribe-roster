@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ const GenerateRoster = () => {
   const [activeTab, setActiveTab] = useState("settings");
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
   const [isLoadingPatterns, setIsLoadingPatterns] = useState(false);
+  const [handoverMinutes, setHandoverMinutes] = useState(0);
   
   const { user, isAuthenticated } = useSupabaseAuth();
   
@@ -101,6 +103,11 @@ const GenerateRoster = () => {
   const handleShiftLengthChange = (length: '8h' | '12h') => {
     console.log('⏰ GenerateRoster: Shift length changed, clearing pattern', length);
     setSelectedPattern([]);
+  };
+
+  const handleHandoverChange = (minutes: number) => {
+    console.log('🤝 GenerateRoster: Handover minutes changed:', minutes);
+    setHandoverMinutes(minutes);
   };
 
   const isGenerateDisabled = !selectedConfig || selectedPattern.length === 0 || isGenerating || staffList.length === 0;
@@ -180,6 +187,8 @@ const GenerateRoster = () => {
                     onCustomPatternChange={() => {}}
                     patternArray={selectedPattern}
                     onPatternArrayChange={handlePatternArrayChange}
+                    handoverMinutes={handoverMinutes}
+                    onHandoverChange={handleHandoverChange}
                   />
                 </div>
               )}
@@ -199,7 +208,7 @@ const GenerateRoster = () => {
                         Generating Roster...
                       </div>
                     ) : (
-                      `Generate Roster${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}`
+                      `Generate Roster${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}${handoverMinutes > 0 ? ` (${handoverMinutes}min handover)` : ''}`
                     )}
                   </Button>
                   {selectedPattern.length === 0 && selectedConfig && (
@@ -210,6 +219,7 @@ const GenerateRoster = () => {
                   {selectedPattern.length > 0 && (
                     <p className="text-sm text-muted-foreground mt-2 text-center">
                       Ready to generate roster with pattern: {selectedPattern.join('-')}
+                      {handoverMinutes > 0 && ` (${handoverMinutes} minute handover)`}
                     </p>
                   )}
                 </div>

@@ -276,6 +276,11 @@ export default function RosterSettings({
     }
   };
 
+  const handlePatternHandoverChange = (minutes: number) => {
+    console.log('🤝 RosterSettings: Pattern handover changed:', minutes);
+    setHandshakeMinutes(minutes as 0 | 15 | 30 | 45 | 60);
+  };
+
   if (isLoading) {
     console.log('⏳ RosterSettings: Showing loading state');
     return (
@@ -443,6 +448,8 @@ export default function RosterSettings({
         onCustomPatternChange={setCustomPattern}
         patternArray={patternArray}
         onPatternArrayChange={setPatternArray}
+        handoverMinutes={handshakeMinutes}
+        onHandoverChange={handlePatternHandoverChange}
       />
 
       {/* Save Button */}

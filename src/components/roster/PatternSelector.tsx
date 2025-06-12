@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +20,8 @@ interface PatternSelectorProps {
   onCustomPatternChange: (pattern: string[]) => void;
   patternArray: string[];
   onPatternArrayChange: (pattern: string[]) => void;
+  handoverMinutes?: number;
+  onHandoverChange?: (minutes: number) => void;
 }
 
 interface CustomPattern {
@@ -66,9 +67,11 @@ export default function PatternSelector({
   customPattern,
   onCustomPatternChange,
   patternArray,
-  onPatternArrayChange
+  onPatternArrayChange,
+  handoverMinutes = 0,
+  onHandoverChange
 }: PatternSelectorProps) {
-  console.log('🔄 PatternSelector rendered', { shiftLength, selectedTemplate, customPattern, patternArray });
+  console.log('🔄 PatternSelector rendered', { shiftLength, selectedTemplate, customPattern, patternArray, handoverMinutes });
 
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [patternName, setPatternName] = useState('');
@@ -263,6 +266,14 @@ export default function PatternSelector({
     return shiftCode?.color || 'bg-gray-100 text-gray-800';
   };
 
+  const handleHandoverChange = (value: string) => {
+    const numValue = Number(value);
+    console.log('🤝 PatternSelector: Handover minutes changed:', numValue);
+    if (onHandoverChange) {
+      onHandoverChange(numValue);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -297,6 +308,29 @@ export default function PatternSelector({
               <Label htmlFor="12h">12-Hour Shifts</Label>
             </div>
           </RadioGroup>
+        </div>
+
+        {/* Handover Selection */}
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">Handover Time</Label>
+          <Select 
+            value={handoverMinutes.toString()} 
+            onValueChange={handleHandoverChange}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">No handover (0 minutes)</SelectItem>
+              <SelectItem value="15">15 minutes</SelectItem>
+              <SelectItem value="30">30 minutes</SelectItem>
+              <SelectItem value="45">45 minutes</SelectItem>
+              <SelectItem value="60">60 minutes</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Time for shift handover between operators. This will extend shift end times.
+          </p>
         </div>
 
         {/* My Patterns Section */}
