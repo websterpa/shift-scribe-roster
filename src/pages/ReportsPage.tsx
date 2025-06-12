@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,9 +8,36 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardStats } from '@/components/roster/DashboardStats';
 import { RosterHeatmap } from '@/components/roster/RosterHeatmap';
 import { StaffUtilizationDashboard } from '@/components/roster/StaffUtilizationDashboard';
+import { useReportsData } from '@/hooks/useReportsData';
 
 const ReportsPage = () => {
   const navigate = useNavigate();
+  const { data: reportsData, loading, error } = useReportsData();
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading reports data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center p-8">
+          <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Error Loading Reports</h3>
+          <p className="text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -33,7 +59,20 @@ const ReportsPage = () => {
       </div>
 
       {/* Quick Stats Overview */}
-      <DashboardStats />
+      <DashboardStats 
+        coverageGap={2}
+        overtimeStaff={[
+          { name: 'John Smith', hours: 42 },
+          { name: 'Sarah Jones', hours: 44 },
+          { name: 'Mike Wilson', hours: 41 }
+        ]}
+        costVariance={{
+          current: reportsData.totalCost,
+          budget: reportsData.totalCost - reportsData.budgetVariance,
+          variance: reportsData.budgetVariance
+        }}
+        complianceAlerts={3}
+      />
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="cost" className="space-y-4">
@@ -68,12 +107,14 @@ const ReportsPage = () => {
                     <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Budget</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">£12,500</div>
+                    <div className="text-2xl font-bold">£{(reportsData.totalCost - reportsData.budgetVariance).toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Allocated for this month
                     </p>
                     <div className="mt-2">
-                      <Badge variant="secondary">68% Used</Badge>
+                      <Badge variant="secondary">
+                        {Math.round((reportsData.totalCost / (reportsData.totalCost - reportsData.budgetVariance)) * 100)}% Used
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -84,13 +125,13 @@ const ReportsPage = () => {
                     <CardTitle className="text-sm font-medium text-muted-foreground">Actual Spend</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">£8,450</div>
+                    <div className="text-2xl font-bold text-blue-600">£{reportsData.totalCost.toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Current month to date
                     </p>
                     <div className="mt-2 flex gap-2">
-                      <Badge variant="outline">Regular: £6,200</Badge>
-                      <Badge variant="outline">Overtime: £2,250</Badge>
+                      <Badge variant="outline">Regular: £{(reportsData.totalCost * 0.75).toLocaleString()}</Badge>
+                      <Badge variant="outline">Overtime: £{(reportsData.totalCost * 0.25).toLocaleString()}</Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -101,13 +142,15 @@ const ReportsPage = () => {
                     <CardTitle className="text-sm font-medium text-muted-foreground">Budget Variance</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-600">£4,050</div>
+                    <div className={`text-2xl font-bold ${reportsData.budgetVariance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {reportsData.budgetVariance > 0 ? '+' : ''}£{Math.abs(reportsData.budgetVariance).toLocaleString()}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Under budget
+                      {reportsData.budgetVariance > 0 ? 'Over budget' : 'Under budget'}
                     </p>
                     <div className="mt-2">
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        32% Under
+                      <Badge variant="secondary" className={reportsData.budgetVariance > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                        {Math.round(Math.abs(reportsData.budgetVariance) / (reportsData.totalCost - reportsData.budgetVariance) * 100)}% {reportsData.budgetVariance > 0 ? 'Over' : 'Under'}
                       </Badge>
                     </div>
                   </CardContent>
@@ -119,9 +162,9 @@ const ReportsPage = () => {
                 <h3 className="text-lg font-semibold mb-4">Cost Breakdown by Role</h3>
                 <div className="space-y-3">
                   {[
-                    { role: 'CCTV Operator', hours: 340, cost: 5100, rate: 15.00 },
-                    { role: 'Senior Operator', hours: 180, cost: 3150, rate: 17.50 },
-                    { role: 'Supervisor', hours: 45, cost: 1125, rate: 25.00 }
+                    { role: 'CCTV Operator', hours: Math.round(reportsData.averageHoursPerWeek * 3), cost: Math.round(reportsData.totalCost * 0.6), rate: 15.00 },
+                    { role: 'Senior Operator', hours: Math.round(reportsData.averageHoursPerWeek * 1.5), cost: Math.round(reportsData.totalCost * 0.25), rate: 17.50 },
+                    { role: 'Supervisor', hours: Math.round(reportsData.averageHoursPerWeek * 0.5), cost: Math.round(reportsData.totalCost * 0.15), rate: 25.00 }
                   ].map((item, index) => (
                     <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
@@ -133,7 +176,7 @@ const ReportsPage = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-bold">£{item.cost.toLocaleString()}</p>
-                        <p className="text-sm text-muted-foreground">{Math.round((item.cost / 8450) * 100)}% of total</p>
+                        <p className="text-sm text-muted-foreground">{Math.round((item.cost / reportsData.totalCost) * 100)}% of total</p>
                       </div>
                     </div>
                   ))}

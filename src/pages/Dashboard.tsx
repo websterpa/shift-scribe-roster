@@ -9,6 +9,7 @@ import { NewRosterWizard } from '@/components/NewRosterWizard';
 import { PatternsPanel } from '@/components/PatternsPanel';
 import { ComplianceDrawer } from '@/components/ComplianceDrawer';
 import { ActionsFAB } from '@/components/ActionsFAB';
+import { RosterDetailsDialog } from '@/components/roster/RosterDetailsDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchStaffMembers } from '@/utils/roster/rosterGeneration';
 import { StaffMember } from '@/types/roster';
@@ -224,9 +225,14 @@ const Dashboard = () => {
                     Generated {new Date(latestRoster.generated_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Button variant="outline" size="sm">
-                  View Details
-                </Button>
+                <RosterDetailsDialog 
+                  rosterId={latestRoster.id}
+                  rosterName={latestRoster.version_name}
+                >
+                  <Button variant="outline" size="sm">
+                    View Details
+                  </Button>
+                </RosterDetailsDialog>
               </div>
               
               <MultiWeekRoster 

@@ -2,11 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Plus, Check, X } from 'lucide-react';
+import { NewLeaveRequestDialog } from './NewLeaveRequestDialog';
+import { LeaveApprovalActions } from './LeaveApprovalActions';
 
 interface LeaveRequest {
   id: string;
@@ -31,6 +31,7 @@ const LeaveRequestsList = () => {
 
   const fetchRequests = async () => {
     try {
+      console.log('🔄 LeaveRequestsList: Fetching leave requests...');
       const { data, error } = await supabase
         .from('leave_requests')
         .select(`
@@ -51,18 +52,18 @@ const LeaveRequestsList = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
+        console.error('❌ LeaveRequestsList: Supabase error:', error);
         toast({
           title: "Error",
           description: "Failed to load leave requests",
           variant: "destructive",
         });
       } else {
-        console.log('Fetched requests:', data);
+        console.log('✅ LeaveRequestsList: Fetched requests:', data?.length || 0);
         setRequests(data || []);
       }
     } catch (error) {
-      console.error('Error fetching leave requests:', error);
+      console.error('❌ LeaveRequestsList: Error fetching leave requests:', error);
       toast({
         title: "Error",
         description: "Failed to load leave requests",
@@ -108,7 +109,14 @@ const LeaveRequestsList = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center p-8">Loading leave requests...</div>;
+    return (
+      <div className="flex justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading leave requests...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,10 +124,7 @@ const LeaveRequestsList = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Leave Requests</CardTitle>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Leave Request
-          </Button>
+          <NewLeaveRequestDialog onRequestSubmitted={fetchRequests} />
         </div>
       </CardHeader>
       <CardContent>
@@ -172,15 +177,11 @@ const LeaveRequestsList = () => {
                 </div>
               </div>
               {request.status === 'pending' && (
-                <div className="flex justify-end space-x-2 mt-4">
-                  <Button variant="outline" size="sm">
-                    <X className="w-4 h-4 mr-1" />
-                    Reject
-                  </Button>
-                  <Button size="sm">
-                    <Check className="w-4 h-4 mr-1" />
-                    Approve
-                  </Button>
+                <div className="flex justify-end mt-4">
+                  <LeaveApprovalActions
+                    requestId={request.id}
+                    onStatusChange={fetchRequests}
+                  />
                 </div>
               )}
             </div>
