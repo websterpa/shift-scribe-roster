@@ -7,6 +7,11 @@ export interface ConfigItem {
   handshake_minutes: number;
   start_date: string;
   created_at?: string;
+  // Add staffing requirements properties
+  day_shift_staff?: number;
+  night_shift_staff?: number;
+  early_shift_staff?: number;
+  late_shift_staff?: number;
 }
 
 // Updated StaffMember interface to include new availability tracking fields

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -98,7 +99,12 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       
       const typedConfig: ConfigItem = {
         ...config,
-        shift_type: config.shift_type as "8h" | "12h"
+        shift_type: config.shift_type as "8h" | "12h",
+        // Extract staffing requirements from the staffing_requirements JSON field
+        day_shift_staff: config.staffing_requirements?.day_shift_staff,
+        night_shift_staff: config.staffing_requirements?.night_shift_staff,
+        early_shift_staff: config.staffing_requirements?.early_shift_staff,
+        late_shift_staff: config.staffing_requirements?.late_shift_staff,
       };
       setSelectedConfig(typedConfig);
       
@@ -235,10 +241,10 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
         ...(selectedPattern.length > 0 && { pattern: selectedPattern }),
         // Add staffing requirements from the selected config
         staffing_requirements: {
-          day_shift_staff: selectedConfig.day_shift_staff,
-          night_shift_staff: selectedConfig.night_shift_staff,
-          early_shift_staff: selectedConfig.early_shift_staff,
-          late_shift_staff: selectedConfig.late_shift_staff,
+          day_shift_staff: selectedConfig.day_shift_staff || 0,
+          night_shift_staff: selectedConfig.night_shift_staff || 0,
+          early_shift_staff: selectedConfig.early_shift_staff || 0,
+          late_shift_staff: selectedConfig.late_shift_staff || 0,
         }
       };
 
