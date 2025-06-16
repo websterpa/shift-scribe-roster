@@ -136,7 +136,6 @@ export default function PatternSelector({
       }
 
       console.log('✅ PatternSelector: Loaded custom patterns:', data);
-      // Type assertion is safe here because we know the database constraint ensures shift_type is '8h' | '12h'
       setCustomPatterns((data || []) as CustomPattern[]);
     } catch (error) {
       console.error('❌ PatternSelector: Exception loading custom patterns:', error);
@@ -183,7 +182,7 @@ export default function PatternSelector({
       });
 
       setPatternName('');
-      await loadCustomPatterns(); // Reload the patterns list
+      await loadCustomPatterns();
     } catch (error) {
       console.error('❌ PatternSelector: Exception saving pattern:', error);
       toast({
@@ -210,9 +209,9 @@ export default function PatternSelector({
       setSelectedCustomPattern(patternId);
       setPatternName(pattern.name);
       
-      // Clear any existing template selection
-      onTemplateChange('');
-      setIsCustomMode(false);
+      // Clear any existing template selection and enable custom mode for editing
+      onTemplateChange('custom');
+      setIsCustomMode(true);
       
       // Update the pattern arrays
       onCustomPatternChange(pattern.pattern);
@@ -220,7 +219,7 @@ export default function PatternSelector({
       
       toast({
         title: "Pattern loaded",
-        description: `"${pattern.name}" pattern is now selected`,
+        description: `"${pattern.name}" pattern is now loaded and ready for editing`,
       });
     }
   };
