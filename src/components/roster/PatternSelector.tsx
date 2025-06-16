@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,9 +72,15 @@ export default function PatternSelector({
   handoverMinutes = 0,
   onHandoverChange
 }: PatternSelectorProps) {
-  console.log('🔄 PatternSelector rendered', { shiftLength, selectedTemplate, customPattern, patternArray, handoverMinutes });
+  console.log('🔄 PatternSelector rendered', { 
+    shiftLength, 
+    selectedTemplate, 
+    customPattern, 
+    patternArray, 
+    handoverMinutes,
+    showCustomBuilder: selectedTemplate === 'custom'
+  });
 
-  const [isCustomMode, setIsCustomMode] = useState(false);
   const [patternName, setPatternName] = useState('');
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
   const [selectedCustomPattern, setSelectedCustomPattern] = useState('');
@@ -91,35 +98,20 @@ export default function PatternSelector({
     }
   }, [isAuthenticated, user, shiftLength]);
 
-  // Handle template selection and custom mode
+  // Handle template selection - load the pattern when a standard template is selected
   useEffect(() => {
-    console.log('📊 PatternSelector: Template/mode sync', { selectedTemplate, isCustomMode });
-    if (selectedTemplate === 'custom') {
-      setIsCustomMode(true);
-    } else if (selectedTemplate && selectedTemplate !== 'custom') {
-      setIsCustomMode(false);
-    }
-  }, [selectedTemplate]);
-
-  // Handle template selection
-  useEffect(() => {
-    console.log('📊 PatternSelector: Template changed', { selectedTemplate, isCustomMode });
-    if (selectedTemplate && selectedTemplate !== 'custom' && !isCustomMode) {
+    console.log('📊 PatternSelector: Template changed', { selectedTemplate });
+    if (selectedTemplate && selectedTemplate !== 'custom') {
       const template = currentTemplates[selectedTemplate];
       if (template) {
         console.log('✅ PatternSelector: Loading template pattern', template.pattern);
         onPatternArrayChange(template.pattern);
       }
-    }
-  }, [selectedTemplate, currentTemplates, isCustomMode, onPatternArrayChange]);
-
-  // Handle custom pattern changes
-  useEffect(() => {
-    console.log('🎨 PatternSelector: Custom pattern changed', customPattern);
-    if (isCustomMode) {
+    } else if (selectedTemplate === 'custom') {
+      console.log('🎨 PatternSelector: Custom mode selected, using custom pattern');
       onPatternArrayChange(customPattern);
     }
-  }, [customPattern, isCustomMode, onPatternArrayChange]);
+  }, [selectedTemplate, currentTemplates, customPattern, onPatternArrayChange]);
 
   const loadCustomPatterns = async () => {
     if (!user) return;
@@ -219,11 +211,8 @@ export default function PatternSelector({
       setSelectedCustomPattern(patternId);
       setPatternName(pattern.name);
       
-      // Force custom mode and template selection
-      setIsCustomMode(true);
+      // Switch to custom mode and update patterns
       onTemplateChange('custom');
-      
-      // Update the pattern arrays
       onCustomPatternChange(pattern.pattern);
       onPatternArrayChange(pattern.pattern);
       
@@ -241,11 +230,11 @@ export default function PatternSelector({
     setSelectedCustomPattern('');
     
     if (template === 'custom') {
-      setIsCustomMode(true);
+      console.log('🎨 PatternSelector: Switching to custom mode');
       onTemplateChange(template);
       onPatternArrayChange(customPattern);
     } else {
-      setIsCustomMode(false);
+      console.log('📋 PatternSelector: Switching to template mode');
       setPatternName('');
       onTemplateChange(template);
     }
@@ -255,12 +244,20 @@ export default function PatternSelector({
     console.log('➕ PatternSelector: Adding shift code', code);
     const newPattern = [...customPattern, code];
     onCustomPatternChange(newPattern);
+    // Update pattern array immediately if in custom mode
+    if (selectedTemplate === 'custom') {
+      onPatternArrayChange(newPattern);
+    }
   };
 
   const handleBackspace = () => {
     console.log('⬅️ PatternSelector: Removing last shift code');
     const newPattern = customPattern.slice(0, -1);
     onCustomPatternChange(newPattern);
+    // Update pattern array immediately if in custom mode
+    if (selectedTemplate === 'custom') {
+      onPatternArrayChange(newPattern);
+    }
   };
 
   const handleClear = () => {
@@ -268,6 +265,10 @@ export default function PatternSelector({
     onCustomPatternChange([]);
     setPatternName('');
     setSelectedCustomPattern('');
+    // Update pattern array immediately if in custom mode
+    if (selectedTemplate === 'custom') {
+      onPatternArrayChange([]);
+    }
   };
 
   const getShiftCodeColor = (code: string) => {
@@ -283,8 +284,9 @@ export default function PatternSelector({
     }
   };
 
-  // Determine if custom builder should be visible
-  const showCustomBuilder = isCustomMode || selectedTemplate === 'custom';
+  // Simple logic: show custom builder when template is 'custom'
+  const showCustomBuilder = selectedTemplate === 'custom';
+  console.log('🔍 PatternSelector: showCustomBuilder =', showCustomBuilder, 'selectedTemplate =', selectedTemplate);
 
   return (
     <Card>
@@ -304,7 +306,6 @@ export default function PatternSelector({
               onShiftLengthChange(value);
               // Reset selections when changing shift length
               onTemplateChange('');
-              setIsCustomMode(false);
               setSelectedCustomPattern('');
               setPatternName('');
               onPatternArrayChange([]);
@@ -384,8 +385,9 @@ export default function PatternSelector({
 
         {/* Custom Pattern Builder */}
         {showCustomBuilder && (
-          <div className="space-y-4">
-            <Label className="text-sm font-medium">Custom Pattern Builder</Label>
+          <div className="space-y-4 border-2 border-dashed border-blue-300 p-4 rounded-md bg-blue-50">
+            <Label className="text-sm font-medium text-blue-900">Custom Pattern Builder</Label>
+            <p className="text-sm text-blue-700">Build your own shift pattern by clicking the codes below:</p>
             
             {/* Shift Code Buttons */}
             <div className="flex flex-wrap gap-2">
@@ -426,8 +428,8 @@ export default function PatternSelector({
             </div>
 
             {/* Save Pattern Section */}
-            {isAuthenticated && patternArray.length > 0 && (
-              <div className="space-y-3 p-4 border rounded-md bg-gray-50">
+            {isAuthenticated && customPattern.length > 0 && (
+              <div className="space-y-3 p-4 border rounded-md bg-white">
                 <Label htmlFor="patternName" className="text-sm font-medium">Save This Pattern</Label>
                 <Input
                   id="patternName"
@@ -439,7 +441,7 @@ export default function PatternSelector({
                 />
                 <Button 
                   onClick={saveCustomPattern} 
-                  disabled={!patternName.trim() || patternArray.length === 0 || isSaving}
+                  disabled={!patternName.trim() || customPattern.length === 0 || isSaving}
                   size="sm"
                 >
                   {isSaving ? (
