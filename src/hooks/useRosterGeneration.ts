@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,13 @@ import { createLogger } from '@/utils/errorLogger';
 import { useSearchParams } from 'react-router-dom';
 
 const logger = createLogger('useRosterGeneration');
+
+interface StaffingRequirements {
+  day_shift_staff?: number;
+  night_shift_staff?: number;
+  early_shift_staff?: number;
+  late_shift_staff?: number;
+}
 
 export const useRosterGeneration = (configIdFromUrl: string | null) => {
   console.log('🔄 useRosterGeneration hook initialized with configId:', configIdFromUrl);
@@ -97,14 +103,17 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       const config = await fetchConfigById(configId);
       console.log('✅ useRosterGeneration: Loaded config:', config.config_name);
       
+      // Safely cast the staffing_requirements JSON to our interface
+      const staffingReqs = config.staffing_requirements as StaffingRequirements | null;
+      
       const typedConfig: ConfigItem = {
         ...config,
         shift_type: config.shift_type as "8h" | "12h",
         // Extract staffing requirements from the staffing_requirements JSON field
-        day_shift_staff: config.staffing_requirements?.day_shift_staff,
-        night_shift_staff: config.staffing_requirements?.night_shift_staff,
-        early_shift_staff: config.staffing_requirements?.early_shift_staff,
-        late_shift_staff: config.staffing_requirements?.late_shift_staff,
+        day_shift_staff: staffingReqs?.day_shift_staff,
+        night_shift_staff: staffingReqs?.night_shift_staff,
+        early_shift_staff: staffingReqs?.early_shift_staff,
+        late_shift_staff: staffingReqs?.late_shift_staff,
       };
       setSelectedConfig(typedConfig);
       
