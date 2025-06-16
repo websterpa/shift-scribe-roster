@@ -91,6 +91,16 @@ export default function PatternSelector({
     }
   }, [isAuthenticated, user, shiftLength]);
 
+  // Handle template selection and custom mode
+  useEffect(() => {
+    console.log('📊 PatternSelector: Template/mode sync', { selectedTemplate, isCustomMode });
+    if (selectedTemplate === 'custom') {
+      setIsCustomMode(true);
+    } else if (selectedTemplate && selectedTemplate !== 'custom') {
+      setIsCustomMode(false);
+    }
+  }, [selectedTemplate]);
+
   // Handle template selection
   useEffect(() => {
     console.log('📊 PatternSelector: Template changed', { selectedTemplate, isCustomMode });
@@ -209,9 +219,9 @@ export default function PatternSelector({
       setSelectedCustomPattern(patternId);
       setPatternName(pattern.name);
       
-      // Clear any existing template selection and enable custom mode for editing
-      onTemplateChange('custom');
+      // Force custom mode and template selection
       setIsCustomMode(true);
+      onTemplateChange('custom');
       
       // Update the pattern arrays
       onCustomPatternChange(pattern.pattern);
@@ -272,6 +282,9 @@ export default function PatternSelector({
       onHandoverChange(numValue);
     }
   };
+
+  // Determine if custom builder should be visible
+  const showCustomBuilder = isCustomMode || selectedTemplate === 'custom';
 
   return (
     <Card>
@@ -370,7 +383,7 @@ export default function PatternSelector({
         </div>
 
         {/* Custom Pattern Builder */}
-        {isCustomMode && (
+        {showCustomBuilder && (
           <div className="space-y-4">
             <Label className="text-sm font-medium">Custom Pattern Builder</Label>
             
