@@ -1,221 +1,173 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { createLogger } from "./errorLogger";
+import { supabase } from '@/integrations/supabase/client';
+import { createLogger } from './errorLogger';
 
-const logger = createLogger('ConfigHelpers');
+const logger = createLogger('configHelpers');
 
-export interface ConfigData {
-  configName: string;
-  cycle_length_weeks: number;
-  shift_type: "8h" | "12h";
-  operational_hours_per_day: number;
-  handshake_minutes: number;
-  start_date: string;
-  pattern?: string[];
-  staffing_requirements?: {
-    day_shift_staff?: number;
-    night_shift_staff?: number;
-    early_shift_staff?: number;
-    late_shift_staff?: number;
-  };
-}
-
-export async function saveConfig({
-  configName,
-  cycle_length_weeks,
-  shift_type,
-  operational_hours_per_day,
-  handshake_minutes,
-  start_date,
-  pattern = [],
-  staffing_requirements
-}: ConfigData) {
-  console.log('💾 ConfigHelpers: Saving configuration:', { 
-    configName, 
-    cycle_length_weeks, 
-    shift_type,
-    operational_hours_per_day,
-    handshake_minutes,
-    pattern,
-    staffing_requirements
-  });
+export const fetchAllConfigs = async () => {
+  console.log('📥 configHelpers: Fetching all configurations...');
   
-  // Ensure handshake_minutes is a valid value
-  const validHandshakeValues = [0, 15, 30, 45, 60];
-  const validHandshake = validHandshakeValues.includes(handshake_minutes) ? handshake_minutes : 0;
-  if (validHandshake !== handshake_minutes) {
-    console.warn('⚠️ ConfigHelpers: Invalid handshake minutes value, using 0 instead:', handshake_minutes);
+  const { data, error } = await supabase
+    .from('roster_config')
+    .select('*')
+    .not('config_name', 'like', 'Wizard Temp Config%') // Filter out wizard temp configs
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('❌ configHelpers: Error fetching configurations:', error);
+    throw error;
   }
   
-  try {
+  console.log('✅ configHelpers: Successfully fetched configurations:', data?.length || 0);
+  return data || [];
+};
+
+export const fetchConfigById = async (configId: string) => {
+  console.log('📥 configHelpers: Fetching configuration by ID:', configId);
+  
+  const { data, error } = await supabase
+    .from('roster_config')
+    .select('*')
+    .eq('id', configId)
+    .single();
+  
+  if (error) {
+    console.error('❌ configHelpers: Error fetching configuration:', error);
+    throw error;
+  }
+  
+  console.log('✅ configHelpers: Successfully fetched configuration:', data?.config_name);
+  return data;
+};
+
+export const saveConfig = async (configData: any) => {
+  console.log('💾 configHelpers: Saving configuration...', configData.config_name);
+  
+  if (configData.id) {
+    // Update existing config
     const { data, error } = await supabase
-      .from("roster_config")
-      .insert({
-        config_name: configName,
-        cycle_length_weeks,
-        shift_type,
-        operational_hours_per_day,
-        handshake_minutes: validHandshake,
-        start_date,
-        pattern: pattern || [],
-        staffing_requirements: staffing_requirements || {
-          day_shift_staff: 2,
-          night_shift_staff: 2,
-          early_shift_staff: 1,
-          late_shift_staff: 1
-        }
+      .from('roster_config')
+      .update({
+        config_name: configData.config_name,
+        cycle_length_weeks: configData.cycle_length_weeks,
+        shift_type: configData.shift_type,
+        operational_hours_per_day: configData.operational_hours_per_day,
+        handshake_minutes: configData.handshake_minutes,
+        start_date: configData.start_date,
+        staffing_requirements: configData.staffing_requirements
       })
-      .select("id")
+      .eq('id', configData.id)
+      .select()
       .single();
-      
+    
     if (error) {
-      console.error('❌ ConfigHelpers: Failed to save config:', error);
-      logger.error(new Error(`Failed to save config: ${error.message}`), { error });
+      console.error('❌ configHelpers: Error updating configuration:', error);
       throw error;
     }
     
-    console.log('✅ ConfigHelpers: Configuration saved successfully with ID:', data.id);
-    logger.info('Configuration saved successfully', { id: data.id });
-    return data.id;
-  } catch (error: any) {
-    console.error('❌ ConfigHelpers: Exception saving configuration:', error);
-    logger.error(new Error('Exception saving configuration'), { originalError: error });
-    throw error;
-  }
-}
-
-export async function updateConfig(
-  configId: string,
-  fields: Partial<Omit<ConfigData, 'configName'> & { config_name: string; pattern?: string[] }>
-) {
-  console.log('🔄 ConfigHelpers: Updating configuration:', { configId, fields });
-  
-  // Ensure handshake_minutes is a valid value if it's being updated
-  if (fields.handshake_minutes !== undefined) {
-    const validHandshakeValues = [0, 15, 30, 45, 60];
-    const validHandshake = validHandshakeValues.includes(fields.handshake_minutes) ? fields.handshake_minutes : 0;
-    if (validHandshake !== fields.handshake_minutes) {
-      console.warn('⚠️ ConfigHelpers: Invalid handshake minutes value in update, using 0 instead:', fields.handshake_minutes);
-      fields.handshake_minutes = validHandshake;
-    }
-  }
-  
-  try {
-    const { error } = await supabase
-      .from("roster_config")
-      .update(fields)
-      .eq("id", configId);
-      
-    if (error) {
-      console.error('❌ ConfigHelpers: Failed to update config:', error);
-      logger.error(new Error(`Failed to update config: ${error.message}`), { error });
-      throw error;
-    }
-    
-    console.log('✅ ConfigHelpers: Configuration updated successfully');
-    logger.info('Configuration updated successfully', { configId });
-    return true;
-  } catch (error: any) {
-    console.error('❌ ConfigHelpers: Exception updating configuration:', error);
-    logger.error(new Error('Exception updating configuration'), { originalError: error });
-    throw error;
-  }
-}
-
-export async function fetchConfigById(configId: string) {
-  console.log('📥 ConfigHelpers: Fetching configuration by ID:', configId);
-  
-  try {
-    const { data, error } = await supabase
-      .from("roster_config")
-      .select("*")
-      .eq("id", configId)
-      .single();
-      
-    if (error) {
-      console.error('❌ ConfigHelpers: Failed to fetch config:', error);
-      logger.error(new Error(`Failed to fetch config: ${error.message}`), { error });
-      throw error;
-    }
-    
-    console.log('✅ ConfigHelpers: Configuration fetched successfully:', data.config_name);
-    logger.info('Configuration fetched successfully', { configId });
+    console.log('✅ configHelpers: Successfully updated configuration');
     return data;
-  } catch (error: any) {
-    console.error('❌ ConfigHelpers: Exception fetching configuration:', error);
-    logger.error(new Error('Exception fetching configuration'), { originalError: error });
-    throw error;
-  }
-}
-
-export async function fetchAllConfigs() {
-  console.log('📥 ConfigHelpers: Fetching all configurations');
-  
-  try {
+  } else {
+    // Create new config
     const { data, error } = await supabase
-      .from("roster_config")
-      .select("*")
-      .order("created_at", { ascending: false });
-      
+      .from('roster_config')
+      .insert({
+        config_name: configData.config_name,
+        cycle_length_weeks: configData.cycle_length_weeks,
+        shift_type: configData.shift_type,
+        operational_hours_per_day: configData.operational_hours_per_day,
+        handshake_minutes: configData.handshake_minutes,
+        start_date: configData.start_date,
+        staffing_requirements: configData.staffing_requirements
+      })
+      .select()
+      .single();
+    
     if (error) {
-      console.error('❌ ConfigHelpers: Failed to fetch configs:', error);
-      logger.error(new Error(`Failed to fetch configs: ${error.message}`), { error });
+      console.error('❌ configHelpers: Error creating configuration:', error);
       throw error;
     }
     
-    console.log('✅ ConfigHelpers: Configurations fetched successfully, count:', data?.length || 0);
-    logger.info('Configurations fetched successfully', { count: data?.length || 0 });
-    return data || [];
-  } catch (error: any) {
-    console.error('❌ ConfigHelpers: Exception fetching all configurations:', error);
-    logger.error(new Error('Exception fetching all configurations'), { originalError: error });
-    throw error;
+    console.log('✅ configHelpers: Successfully created configuration');
+    return data;
   }
-}
+};
 
-// Create a default configuration if none exists
-export async function ensureDefaultConfig() {
-  console.log('🔍 ConfigHelpers: Checking for existing configurations...');
+// Helper function to clean up temporary wizard configurations
+export const cleanupTempConfigs = async () => {
+  console.log('🧹 configHelpers: Cleaning up temporary wizard configurations...');
   
   try {
-    const configs = await fetchAllConfigs();
+    // First get all temp configs
+    const { data: tempConfigs, error: fetchError } = await supabase
+      .from('roster_config')
+      .select('id')
+      .like('config_name', 'Wizard Temp Config%');
     
-    if (configs.length === 0) {
-      console.log('➕ ConfigHelpers: No configurations found, creating default...');
-      
-      const defaultConfig = {
-        configName: "Default CCTV Configuration",
-        cycle_length_weeks: 4,
-        shift_type: "8h" as "8h" | "12h",
-        operational_hours_per_day: 24,
-        handshake_minutes: 15, // Valid handshake value
-        start_date: getNextMonday(),
-        staffing_requirements: {
-          day_shift_staff: 2,
-          night_shift_staff: 2,
-          early_shift_staff: 1,
-          late_shift_staff: 1
-        }
-      };
-      
-      const configId = await saveConfig(defaultConfig);
-      console.log('✅ ConfigHelpers: Default configuration created with ID:', configId);
-      return configId;
-    } else {
-      console.log('✅ ConfigHelpers: Existing configurations found, no default needed');
-      return null;
+    if (fetchError) {
+      console.error('❌ configHelpers: Error fetching temp configs:', fetchError);
+      return;
     }
-  } catch (error: any) {
-    console.error('❌ ConfigHelpers: Error ensuring default config:', error);
+    
+    if (!tempConfigs || tempConfigs.length === 0) {
+      console.log('✅ configHelpers: No temporary configurations to clean up');
+      return;
+    }
+    
+    console.log(`🧹 configHelpers: Found ${tempConfigs.length} temporary configurations to clean up`);
+    
+    // Delete associated roster data for each temp config
+    for (const config of tempConfigs) {
+      // Get roster versions for this config
+      const { data: versions, error: versionsError } = await supabase
+        .from('roster_versions')
+        .select('id')
+        .eq('config_id', config.id);
+      
+      if (versionsError) {
+        console.error('❌ configHelpers: Error fetching roster versions:', versionsError);
+        continue;
+      }
+      
+      // Delete roster assignments for all versions
+      if (versions && versions.length > 0) {
+        for (const version of versions) {
+          const { error: assignmentsError } = await supabase
+            .from('roster_assignments')
+            .delete()
+            .eq('version_id', version.id);
+          
+          if (assignmentsError) {
+            console.error('❌ configHelpers: Error deleting assignments:', assignmentsError);
+          }
+        }
+        
+        // Delete roster versions
+        const { error: versionsDeleteError } = await supabase
+          .from('roster_versions')
+          .delete()
+          .eq('config_id', config.id);
+        
+        if (versionsDeleteError) {
+          console.error('❌ configHelpers: Error deleting roster versions:', versionsDeleteError);
+        }
+      }
+    }
+    
+    // Finally delete the temp configs
+    const { error: deleteError } = await supabase
+      .from('roster_config')
+      .delete()
+      .like('config_name', 'Wizard Temp Config%');
+    
+    if (deleteError) {
+      console.error('❌ configHelpers: Error deleting temp configurations:', deleteError);
+      throw deleteError;
+    }
+    
+    console.log('✅ configHelpers: Successfully cleaned up temporary configurations');
+  } catch (error) {
+    console.error('❌ configHelpers: Exception during cleanup:', error);
     throw error;
   }
-}
-
-function getNextMonday() {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-  const nextMonday = new Date(today);
-  nextMonday.setDate(today.getDate() + daysUntilMonday);
-  return nextMonday.toISOString().split('T')[0];
-}
+};

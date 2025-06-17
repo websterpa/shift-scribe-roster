@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { fetchAllConfigs } from '@/utils/configHelpers';
+import { fetchAllConfigs, cleanupTempConfigs } from '@/utils/configHelpers';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Search, Settings, Calendar, Edit, Trash2 } from 'lucide-react';
+import { Search, Settings, Calendar, Edit, Trash2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ConfigItem {
@@ -28,6 +27,7 @@ const MyConfigurations = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingConfigId, setDeletingConfigId] = useState<string | null>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,6 +39,10 @@ const MyConfigurations = () => {
     try {
       console.log('📥 MyConfigurations: Loading configurations...');
       setLoading(true);
+      
+      // Clean up temp configs first
+      await cleanupTempConfigs();
+      
       const data = await fetchAllConfigs();
       setConfigs(data);
       console.log('✅ MyConfigurations: Loaded configurations:', data.length);
@@ -51,6 +55,28 @@ const MyConfigurations = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCleanupTempConfigs = async () => {
+    console.log('🧹 MyConfigurations: Manual cleanup triggered');
+    try {
+      setIsCleaningUp(true);
+      await cleanupTempConfigs();
+      await loadConfigurations();
+      toast({
+        title: "Cleanup completed",
+        description: "Temporary configurations have been removed",
+      });
+    } catch (error: any) {
+      console.error('❌ MyConfigurations: Error during cleanup:', error);
+      toast({
+        title: "Cleanup failed",
+        description: error.message || "Failed to clean up temporary configurations",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCleaningUp(false);
     }
   };
 
@@ -181,10 +207,20 @@ const MyConfigurations = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">My Configurations</h1>
-        <Button onClick={handleCreateNew}>
-          <Settings className="h-4 w-4 mr-2" />
-          Create New Configuration
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleCleanupTempConfigs}
+            variant="outline"
+            disabled={isCleaningUp}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isCleaningUp ? 'animate-spin' : ''}`} />
+            {isCleaningUp ? 'Cleaning...' : 'Cleanup Temp'}
+          </Button>
+          <Button onClick={handleCreateNew}>
+            <Settings className="h-4 w-4 mr-2" />
+            Create New Configuration
+          </Button>
+        </div>
       </div>
 
       <Card>
