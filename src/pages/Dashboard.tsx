@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Settings, BarChart3 } from 'lucide-react';
+import { Plus, FileText, Settings, BarChart3, Edit, Star } from 'lucide-react';
 import { MultiWeekRoster } from '@/components/roster/MultiWeekRoster';
 import { NewRosterWizard } from '@/components/NewRosterWizard';
 import { PatternsPanel } from '@/components/PatternsPanel';
+import { ImprovedPatternsPanel } from '@/components/patterns/ImprovedPatternsPanel';
 import { ComplianceDrawer } from '@/components/ComplianceDrawer';
 import { ActionsFAB } from '@/components/ActionsFAB';
 import { RosterDetailsDialog } from '@/components/roster/RosterDetailsDialog';
@@ -29,6 +30,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showNewRosterWizard, setShowNewRosterWizard] = useState(false);
   const [showPatternsPanel, setShowPatternsPanel] = useState(false);
+  const [showImprovedPatternsPanel, setShowImprovedPatternsPanel] = useState(false);
   const [showComplianceDrawer, setShowComplianceDrawer] = useState(false);
 
   useEffect(() => {
@@ -140,6 +142,15 @@ const Dashboard = () => {
     });
   };
 
+  const handlePatternSelected = (pattern: any) => {
+    console.log('📋 Dashboard: Pattern selected for use:', pattern);
+    toast({
+      title: "Pattern ready to use",
+      description: `"${pattern.name}" can now be used in roster generation`,
+    });
+    setShowImprovedPatternsPanel(false);
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -171,37 +182,86 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Primary Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Primary Action Cards - Enhanced with Pattern Management */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Button
           onClick={() => setShowNewRosterWizard(true)}
-          className="h-16 flex flex-col items-center justify-center gap-2"
+          className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
           size="lg"
         >
           <Plus className="h-6 w-6" />
-          <span>New Roster</span>
+          <span className="text-sm font-medium">New Roster</span>
         </Button>
+        
+        {/* PROMINENT PATTERN MANAGEMENT CARD */}
+        <Card className="relative overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer group" 
+              onClick={() => setShowImprovedPatternsPanel(true)}>
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
+          <CardContent className="h-20 flex items-center justify-center p-4">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+                <Star className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-sm font-medium text-center group-hover:text-emerald-600 transition-colors">
+                Shift Patterns
+              </span>
+            </div>
+          </CardContent>
+        </Card>
         
         <Button
           variant="outline"
           onClick={() => setShowPatternsPanel(true)}
-          className="h-16 flex flex-col items-center justify-center gap-2"
+          className="h-20 flex flex-col items-center justify-center gap-2"
           size="lg"
         >
           <Settings className="h-6 w-6" />
-          <span>Saved Patterns</span>
+          <span className="text-sm font-medium">Legacy Patterns</span>
         </Button>
         
         <Button
           variant="outline"
           onClick={() => setShowComplianceDrawer(true)}
-          className="h-16 flex flex-col items-center justify-center gap-2"
+          className="h-20 flex flex-col items-center justify-center gap-2"
           size="lg"
         >
           <FileText className="h-6 w-6" />
-          <span>Compliance & Reports</span>
+          <span className="text-sm font-medium">Compliance</span>
         </Button>
       </div>
+
+      {/* Pattern Management Shortcut Section */}
+      <Card className="border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-emerald-700">
+            <Star className="h-5 w-5" />
+            Quick Pattern Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div>
+              <p className="text-sm text-emerald-600 mb-2">
+                Create, edit, and manage custom shift patterns for optimal roster generation
+              </p>
+              <div className="flex gap-2 text-xs text-emerald-500">
+                <span>• Create custom patterns</span>
+                <span>• Edit existing patterns</span>
+                <span>• Pattern templates</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setShowImprovedPatternsPanel(true)}
+                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Manage Patterns
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Current Roster Section */}
       <Card>
@@ -267,13 +327,18 @@ const Dashboard = () => {
         staffList={staffList}
       />
 
+      {/* Legacy Patterns Panel */}
       <PatternsPanel
         isOpen={showPatternsPanel}
         onClose={() => setShowPatternsPanel(false)}
-        onPatternSelected={(pattern) => {
-          console.log('📋 Dashboard: Pattern selected:', pattern);
-          // Could open new roster wizard with pattern pre-selected
-        }}
+        onPatternSelected={handlePatternSelected}
+      />
+
+      {/* NEW IMPROVED PATTERNS PANEL - Main Feature */}
+      <ImprovedPatternsPanel
+        isOpen={showImprovedPatternsPanel}
+        onClose={() => setShowImprovedPatternsPanel(false)}
+        onPatternSelected={handlePatternSelected}
       />
 
       <ComplianceDrawer
@@ -285,7 +350,7 @@ const Dashboard = () => {
       {/* Floating Action Button */}
       <ActionsFAB
         onNewRoster={() => setShowNewRosterWizard(true)}
-        onOpenPatterns={() => setShowPatternsPanel(true)}
+        onOpenPatterns={() => setShowImprovedPatternsPanel(true)}
         onOpenCompliance={() => setShowComplianceDrawer(true)}
       />
     </div>

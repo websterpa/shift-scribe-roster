@@ -2,13 +2,14 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Clock, DollarSign, Shield } from 'lucide-react';
+import { AlertTriangle, Clock, DollarSign, Shield, Star } from 'lucide-react';
 
 interface DashboardStatsProps {
   coverageGap?: number;
   overtimeStaff?: Array<{ name: string; hours: number }>;
   costVariance?: { current: number; budget: number; variance: number };
   complianceAlerts?: number;
+  customPatterns?: number;
 }
 
 export function DashboardStats({
@@ -19,13 +20,14 @@ export function DashboardStats({
     { name: 'Mike Wilson', hours: 41 }
   ],
   costVariance = { current: 8450, budget: 8000, variance: 450 },
-  complianceAlerts = 3
+  complianceAlerts = 3,
+  customPatterns = 0
 }: DashboardStatsProps) {
   const formatCurrency = (amount: number) => `£${amount.toLocaleString()}`;
   const getVarianceColor = (variance: number) => variance > 0 ? 'text-red-600' : 'text-green-600';
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       {/* Coverage Gap Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -94,6 +96,28 @@ export function DashboardStats({
               <span>Budget:</span>
               <span className="font-medium">{formatCurrency(costVariance.budget)}</span>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Custom Patterns Card - NEW */}
+      <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-emerald-700">Custom Patterns</CardTitle>
+          <Star className="h-4 w-4 text-emerald-600" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-emerald-600">{customPatterns}</div>
+          <p className="text-xs text-emerald-600">
+            Saved shift patterns ready for roster generation
+          </p>
+          <div className="mt-2">
+            <Badge 
+              variant="outline" 
+              className="border-emerald-300 text-emerald-700 bg-emerald-100"
+            >
+              {customPatterns > 0 ? 'Patterns ready' : 'Create patterns'}
+            </Badge>
           </div>
         </CardContent>
       </Card>

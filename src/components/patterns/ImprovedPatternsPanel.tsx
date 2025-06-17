@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Star } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Star, TestTube } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
 import { PatternLibrary } from './PatternLibrary';
 import { PatternEditor } from './PatternEditor';
+import { PatternTestingInterface } from './PatternTestingInterface';
 import { COMMON_PATTERNS } from './constants';
 
 interface Pattern {
@@ -25,7 +27,7 @@ interface ImprovedPatternsPanelProps {
   onPatternSelected?: (pattern: Pattern) => void;
 }
 
-type ViewMode = 'library' | 'edit' | 'create';
+type ViewMode = 'library' | 'edit' | 'create' | 'testing';
 
 export function ImprovedPatternsPanel({ isOpen, onClose, onPatternSelected }: ImprovedPatternsPanelProps) {
   const [customPatterns, setCustomPatterns] = useState<Pattern[]>([]);
@@ -229,6 +231,16 @@ export function ImprovedPatternsPanel({ isOpen, onClose, onPatternSelected }: Im
     created_at: new Date().toISOString()
   }));
 
+  const getViewTitle = () => {
+    switch (viewMode) {
+      case 'library': return 'Shift Patterns';
+      case 'create': return 'Create Pattern';
+      case 'edit': return 'Edit Pattern';
+      case 'testing': return 'Pattern Testing';
+      default: return 'Shift Patterns';
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="w-[95vw] sm:w-[80vw] max-w-6xl overflow-y-auto">
@@ -242,8 +254,7 @@ export function ImprovedPatternsPanel({ isOpen, onClose, onPatternSelected }: Im
               )}
               <SheetTitle className="flex items-center gap-2">
                 <Star className="h-5 w-5" />
-                {viewMode === 'library' ? 'Shift Patterns' : 
-                 viewMode === 'create' ? 'Create Pattern' : 'Edit Pattern'}
+                {getViewTitle()}
               </SheetTitle>
             </div>
             {viewMode === 'library' && (
@@ -269,17 +280,33 @@ export function ImprovedPatternsPanel({ isOpen, onClose, onPatternSelected }: Im
 
         <div className="mt-6">
           {viewMode === 'library' ? (
-            <PatternLibrary
-              customPatterns={customPatterns}
-              commonPatterns={commonPatterns}
-              selectedShiftType={selectedShiftType}
-              onCreateNew={handleCreateNew}
-              onEditPattern={handleEditPattern}
-              onDuplicatePattern={handleDuplicatePattern}
-              onDeletePattern={handleDeletePattern}
-              onUsePattern={handleUsePattern}
-              isLoading={isLoading}
-            />
+            <Tabs defaultValue="patterns" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="patterns">Pattern Library</TabsTrigger>
+                <TabsTrigger value="testing" className="flex items-center gap-2">
+                  <TestTube className="h-4 w-4" />
+                  Testing Suite
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="patterns" className="mt-6">
+                <PatternLibrary
+                  customPatterns={customPatterns}
+                  commonPatterns={commonPatterns}
+                  selectedShiftType={selectedShiftType}
+                  onCreateNew={handleCreateNew}
+                  onEditPattern={handleEditPattern}
+                  onDuplicatePattern={handleDuplicatePattern}
+                  onDeletePattern={handleDeletePattern}
+                  onUsePattern={handleUsePattern}
+                  isLoading={isLoading}
+                />
+              </TabsContent>
+              
+              <TabsContent value="testing" className="mt-6">
+                <PatternTestingInterface />
+              </TabsContent>
+            </Tabs>
           ) : (
             <PatternEditor
               pattern={editingPattern || undefined}

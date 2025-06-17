@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Plus, FileText, Settings, CheckCircle, X } from 'lucide-react';
+import { Fab, Action } from 'react-tiny-fab';
+import { Plus, Settings, FileText, Star } from 'lucide-react';
+import 'react-tiny-fab/dist/styles.css';
 
 interface ActionsFABProps {
   onNewRoster: () => void;
@@ -11,74 +11,45 @@ interface ActionsFABProps {
 }
 
 export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: ActionsFABProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const actions = [
-    {
-      label: "New Roster",
-      icon: Plus,
-      onClick: () => {
-        onNewRoster();
-        setIsOpen(false);
-      },
-      color: "bg-primary text-primary-foreground"
-    },
-    {
-      label: "Patterns",
-      icon: Settings,
-      onClick: () => {
-        onOpenPatterns();
-        setIsOpen(false);
-      },
-      color: "bg-secondary text-secondary-foreground"
-    },
-    {
-      label: "Compliance",
-      icon: CheckCircle,
-      onClick: () => {
-        onOpenCompliance();
-        setIsOpen(false);
-      },
-      color: "bg-muted text-muted-foreground"
-    }
-  ];
-
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      {/* Action Menu */}
-      {isOpen && (
-        <Card className="mb-4 shadow-lg">
-          <CardContent className="p-2">
-            <div className="space-y-2">
-              {actions.map((action, index) => (
-                <Button
-                  key={index}
-                  variant="ghost"
-                  size="sm"
-                  onClick={action.onClick}
-                  className="w-full justify-start gap-3"
-                >
-                  <div className={`p-1.5 rounded ${action.color}`}>
-                    <action.icon className="h-3 w-3" />
-                  </div>
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Main FAB Button */}
-      <Button
-        size="icon"
-        className={`h-12 w-12 rounded-full shadow-lg transition-transform ${
-          isOpen ? 'rotate-45' : 'hover:scale-110'
-        }`}
-        onClick={() => setIsOpen(!isOpen)}
+    <Fab
+      mainButtonStyles={{
+        backgroundColor: '#3b82f6',
+        color: 'white'
+      }}
+      actionButtonStyles={{
+        backgroundColor: '#1f2937',
+        color: 'white'
+      }}
+      style={{ bottom: 20, right: 20 }}
+      icon={<Plus />}
+      event="hover"
+    >
+      <Action
+        text="New Roster"
+        onClick={onNewRoster}
       >
-        {isOpen ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-      </Button>
-    </div>
+        <Plus />
+      </Action>
+      
+      {/* PROMINENT PATTERN MANAGEMENT ACTION */}
+      <Action
+        text="Manage Patterns"
+        onClick={onOpenPatterns}
+        style={{
+          backgroundColor: '#059669',
+          color: 'white'
+        }}
+      >
+        <Star />
+      </Action>
+      
+      <Action
+        text="Compliance"
+        onClick={onOpenCompliance}
+      >
+        <FileText />
+      </Action>
+    </Fab>
   );
 }
