@@ -10,6 +10,6 @@ interface SubscriptionGateProps {
 export const SubscriptionGate: React.FC<SubscriptionGateProps> = ({ 
   children
 }) => {
-  // Always render children - no more subscription gating
+  // All users have Pro access - no gating needed
   return <>{children}</>;
 };

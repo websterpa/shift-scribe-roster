@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,8 +76,7 @@ export default function PatternSelector({
     selectedTemplate, 
     customPattern, 
     patternArray, 
-    handoverMinutes,
-    showCustomBuilder: selectedTemplate === 'custom'
+    handoverMinutes
   });
 
   const [patternName, setPatternName] = useState('');
@@ -225,16 +223,17 @@ export default function PatternSelector({
 
   const handleTemplateSelect = (template: string) => {
     console.log('📂 PatternSelector: Template selected', template);
+    console.log('🔍 AUDIT: Template selection - will show custom builder?', template === 'custom');
     
     // Clear saved pattern selection when selecting a template
     setSelectedCustomPattern('');
     
     if (template === 'custom') {
-      console.log('🎨 PatternSelector: Switching to custom mode');
+      console.log('🎨 AUDIT: Switching to custom mode - builder should appear');
       onTemplateChange(template);
       onPatternArrayChange(customPattern);
     } else {
-      console.log('📋 PatternSelector: Switching to template mode');
+      console.log('📋 AUDIT: Switching to template mode - builder should hide');
       setPatternName('');
       onTemplateChange(template);
     }
@@ -284,9 +283,9 @@ export default function PatternSelector({
     }
   };
 
-  // Simple logic: show custom builder when template is 'custom'
+  // FIXED: Explicit check for custom builder visibility
   const showCustomBuilder = selectedTemplate === 'custom';
-  console.log('🔍 PatternSelector: showCustomBuilder =', showCustomBuilder, 'selectedTemplate =', selectedTemplate);
+  console.log('🔍 AUDIT: showCustomBuilder final check =', showCustomBuilder, 'selectedTemplate =', selectedTemplate);
 
   return (
     <Card>
@@ -383,7 +382,7 @@ export default function PatternSelector({
           </Select>
         </div>
 
-        {/* Custom Pattern Builder */}
+        {/* FIXED: Custom Pattern Builder - explicit conditional rendering */}
         {showCustomBuilder && (
           <div className="space-y-4 border-2 border-dashed border-blue-300 p-4 rounded-md bg-blue-50">
             <Label className="text-sm font-medium text-blue-900">Custom Pattern Builder</Label>

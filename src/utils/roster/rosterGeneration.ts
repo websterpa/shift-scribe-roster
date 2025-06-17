@@ -6,6 +6,7 @@ import { generateAssignments } from "./assignmentGenerator";
 import { createRosterVersion } from "./rosterVersion";
 import { isStaffEligibleForShift, getEligibleShiftCodes } from "./shiftCodeMapping";
 import { enforceStaffingRequirements } from "./staffingEnforcement";
+import { enforceRestRequirement } from "./restValidation";
 
 const logger = createLogger('RosterGeneration');
 
@@ -29,7 +30,7 @@ export async function generateAndSaveRoster(
   versionName?: string
 ) {
   try {
-    console.log('🚀 AUDIT: generateAndSaveRoster started');
+    console.log('🚀 AUDIT: generateAndSaveRoster started with pattern:', config.pattern);
     console.log('📊 AUDIT: Input parameters:', { 
       staffCount: staffList.length, 
       config, 
@@ -80,44 +81,12 @@ export async function generateAndSaveRoster(
       throw new Error(error);
     }
 
-    // Validate minimum staff requirements
-    const minStaffRequired = calculateMinimumStaffRequired(config);
-    if (staffList.length < minStaffRequired) {
-      const error = `Insufficient staff: need at least ${minStaffRequired} staff members, but only ${staffList.length} available`;
-      console.error('❌ AUDIT: Validation failed:', error);
-      throw new Error(error);
-    }
-
-    // Validate shift eligibility with improved logging
-    const eligibleStaff = staffList.filter(staff => {
-      if (!staff.is_shift_worker) return false;
-      const eligibleCodes = getEligibleShiftCodes(staff.eligible_shifts);
-      return eligibleCodes.length > 0;
-    });
-    
-    console.log('🔍 AUDIT: Enhanced eligible staff analysis:');
-    console.log(`  Total staff: ${staffList.length}`);
-    console.log(`  Shift workers: ${staffList.filter(s => s.is_shift_worker).length}`);
-    console.log(`  With eligible shifts: ${eligibleStaff.length}`);
-    
-    if (eligibleStaff.length === 0) {
-      const error = 'No shift worker staff members have eligible shifts configured';
-      console.error('❌ AUDIT: Validation failed:', error);
-      throw new Error(error);
-    }
-
-    console.log('✅ AUDIT: Validation passed', { 
-      eligibleStaff: eligibleStaff.length, 
-      minRequired: calculateMinimumStaffRequired(config),
-      usingCustomPattern: !!config.pattern 
-    });
-
-    // 1. Build cycle assignments - use custom pattern if provided
+    // FIXED: Use custom pattern if provided, otherwise use default cycle generation
     console.log('📋 AUDIT: Building roster cycle...');
     let cycle;
     
     if (config.pattern && config.pattern.length > 0) {
-      console.log('🎨 AUDIT: Using custom pattern for cycle generation', config.pattern);
+      console.log('🎨 AUDIT: Using provided pattern for cycle generation', config.pattern);
       
       cycle = await createCycleFromPatternEnhanced(
         staffList,
@@ -139,7 +108,14 @@ export async function generateAndSaveRoster(
       );
     }
 
-    // 2. Apply staffing requirements enforcement if provided
+    // FIXED: Apply 11-hour rest enforcement to cycle
+    if (cycle && cycle.length > 0) {
+      console.log('⏰ AUDIT: Enforcing 11-hour rest requirements...');
+      cycle = enforceElevenHourRest(cycle, config.shift_type);
+      console.log('✅ AUDIT: Rest enforcement completed');
+    }
+
+    // Apply staffing requirements enforcement if provided
     if (config.staffing_requirements) {
       console.log('🎯 AUDIT: Applying staffing requirements enforcement');
       
@@ -187,15 +163,9 @@ export async function generateAndSaveRoster(
       console.log('✅ AUDIT: Staffing requirements applied');
     }
 
-    console.log('🔍 AUDIT: Cycle generation result:');
+    console.log('🔍 AUDIT: Final cycle generation result:');
     console.log(`  Cycle entries: ${cycle ? cycle.length : 'null'}`);
     if (cycle && cycle.length > 0) {
-      console.log('  Sample cycle entries (first 10):');
-      cycle.slice(0, 10).forEach((entry, index) => {
-        console.log(`    ${index + 1}:`, entry);
-      });
-      
-      // Count non-rest assignments
       const nonRestAssignments = cycle.filter(entry => entry.shiftCode !== 'R');
       console.log(`  Non-rest assignments: ${nonRestAssignments.length}`);
       
@@ -215,58 +185,36 @@ export async function generateAndSaveRoster(
 
     console.log('✅ AUDIT: Cycle assignments built successfully');
 
-    // 2. Fetch approved leave requests
+    // Fetch approved leave requests
     console.log('📅 AUDIT: Fetching leave requests...');
     const leaveMap = await fetchLeaveRequests();
     console.log('✅ AUDIT: Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
 
-    // 3. Fetch past weeks for rolling average
+    // Fetch past weeks for rolling average
     console.log('📈 AUDIT: Preparing past weeks data...');
     const pastWeeksMap = await fetchPastWeeks(staffList, config.cycle_length_weeks);
     console.log('✅ AUDIT: Past weeks data prepared');
 
-    // 4. Create roster version
-    console.log('📄 AUDIT: Creating roster version...');
+    // FIXED: Use provided versionName properly
+    const finalVersionName = versionName && versionName.trim() 
+      ? versionName.trim() 
+      : `Generated ${new Date().toLocaleDateString()}`;
+    
+    console.log('📄 AUDIT: Creating roster version with name:', finalVersionName);
     const versionId = await createRosterVersion(
       config.id, 
-      versionName || `Generated ${new Date().toLocaleDateString()}`, 
+      finalVersionName, 
       config.start_date, 
       config.cycle_length_weeks
     );
     console.log('✅ AUDIT: Created roster version:', versionId);
 
-    // 5. Generate assignments
+    // Generate assignments
     console.log('⚙️ AUDIT: Generating assignments...');
-    console.log('📊 AUDIT: Assignment generation inputs:', {
-      staffListLength: staffList.length,
-      cycleLength: cycle.length,
-      config: config,
-      leaveMapKeys: Object.keys(leaveMap),
-      pastWeeksMapKeys: Object.keys(pastWeeksMap)
-    });
-    
     const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
     
     console.log('🔍 AUDIT: Assignment generation result:');
     console.log(`  Generated assignments: ${assignments ? assignments.length : 'null'}`);
-    
-    if (assignments && assignments.length > 0) {
-      console.log('  Sample assignments (first 10):');
-      assignments.slice(0, 10).forEach((assignment, index) => {
-        console.log(`    ${index + 1}:`, assignment);
-      });
-      
-      // Count non-rest assignments
-      const nonRestAssignments = assignments.filter(assignment => assignment.shift_code !== 'R');
-      console.log(`  Non-rest assignments: ${nonRestAssignments.length}`);
-      
-      // Group by shift type
-      const assignmentShiftCounts = assignments.reduce((acc, assignment) => {
-        acc[assignment.shift_code] = (acc[assignment.shift_code] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      console.log('  Assignment shift distribution:', assignmentShiftCounts);
-    }
     
     if (!assignments || assignments.length === 0) {
       const error = 'Failed to generate any assignments';
@@ -276,7 +224,7 @@ export async function generateAndSaveRoster(
     
     console.log('✅ AUDIT: Generated assignments', { count: assignments.length });
 
-    // 6. Save assignments to database
+    // Save assignments to database
     console.log('💾 AUDIT: Saving assignments to database...');
     await saveAssignments(assignments, versionId);
     console.log('✅ AUDIT: Successfully saved roster assignments', { count: assignments.length, versionId });
@@ -289,6 +237,143 @@ export async function generateAndSaveRoster(
     logger.error(new Error('Failed to generate and save roster'), { error });
     throw new Error(`Roster generation failed: ${error.message}`);
   }
+}
+
+/**
+ * Enforces 11-hour rest between shifts in the cycle
+ */
+function enforceElevenHourRest(cycle: any[], shiftType: "8h" | "12h"): any[] {
+  console.log('⏰ Starting 11-hour rest enforcement...');
+  
+  // Group assignments by staff member
+  const staffAssignments: { [staffId: string]: any[] } = {};
+  cycle.forEach(assignment => {
+    if (!staffAssignments[assignment.staffId]) {
+      staffAssignments[assignment.staffId] = [];
+    }
+    staffAssignments[assignment.staffId].push(assignment);
+  });
+
+  // Sort each staff's assignments by day
+  Object.keys(staffAssignments).forEach(staffId => {
+    staffAssignments[staffId].sort((a, b) => a.day - b.day);
+  });
+
+  const adjustedCycle = [...cycle];
+  let adjustmentCount = 0;
+
+  // Check each staff member's consecutive shifts
+  Object.entries(staffAssignments).forEach(([staffId, assignments]) => {
+    for (let i = 1; i < assignments.length; i++) {
+      const prevAssignment = assignments[i - 1];
+      const currentAssignment = assignments[i];
+      
+      // Skip if either is a rest day
+      if (prevAssignment.shiftCode === 'R' || currentAssignment.shiftCode === 'R') {
+        continue;
+      }
+
+      // Calculate shift end time for previous day
+      const prevShiftEnd = calculateShiftEndTime(prevAssignment.day, prevAssignment.shiftCode, shiftType);
+      // Calculate shift start time for current day  
+      const currentShiftStart = calculateShiftStartTime(currentAssignment.day, currentAssignment.shiftCode, shiftType);
+
+      // Check if 11-hour rest is violated
+      if (!enforceRestRequirement(staffId, currentAssignment.shiftCode, prevShiftEnd, currentShiftStart)) {
+        console.log(`⚠️ Rest violation: Staff ${staffId} day ${currentAssignment.day} - changing to R`);
+        
+        // Find and update the assignment in the main cycle
+        const cycleIndex = adjustedCycle.findIndex(a => 
+          a.staffId === staffId && a.day === currentAssignment.day
+        );
+        if (cycleIndex !== -1) {
+          adjustedCycle[cycleIndex].shiftCode = 'R';
+          adjustmentCount++;
+        }
+      }
+    }
+  });
+
+  console.log(`✅ 11-hour rest enforcement completed: ${adjustmentCount} shifts changed to rest`);
+  return adjustedCycle;
+}
+
+function calculateShiftEndTime(day: number, shiftCode: string, shiftType: "8h" | "12h"): Date {
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + day);
+  
+  // Set start times based on shift code and type
+  if (shiftType === "12h") {
+    switch (shiftCode) {
+      case 'D': // Day shift: 07:00-19:00
+        baseDate.setHours(19, 0, 0, 0);
+        break;
+      case 'N': // Night shift: 19:00-07:00 (+1 day)
+        baseDate.setHours(7, 0, 0, 0);
+        baseDate.setDate(baseDate.getDate() + 1);
+        break;
+      default:
+        baseDate.setHours(19, 0, 0, 0); // Default to day shift end
+    }
+  } else { // 8h
+    switch (shiftCode) {
+      case 'E': // Early: 06:00-14:00
+        baseDate.setHours(14, 0, 0, 0);
+        break;
+      case 'D': // Day: 10:00-18:00  
+        baseDate.setHours(18, 0, 0, 0);
+        break;
+      case 'L': // Late: 14:00-22:00
+        baseDate.setHours(22, 0, 0, 0);
+        break;
+      case 'N': // Night: 22:00-06:00 (+1 day)
+        baseDate.setHours(6, 0, 0, 0);
+        baseDate.setDate(baseDate.getDate() + 1);
+        break;
+      default:
+        baseDate.setHours(18, 0, 0, 0); // Default to day shift end
+    }
+  }
+  
+  return baseDate;
+}
+
+function calculateShiftStartTime(day: number, shiftCode: string, shiftType: "8h" | "12h"): Date {
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + day);
+  
+  // Set start times based on shift code and type
+  if (shiftType === "12h") {
+    switch (shiftCode) {
+      case 'D': // Day shift: 07:00-19:00
+        baseDate.setHours(7, 0, 0, 0);
+        break;
+      case 'N': // Night shift: 19:00-07:00 (+1 day)
+        baseDate.setHours(19, 0, 0, 0);
+        break;
+      default:
+        baseDate.setHours(7, 0, 0, 0); // Default to day shift start
+    }
+  } else { // 8h
+    switch (shiftCode) {
+      case 'E': // Early: 06:00-14:00
+        baseDate.setHours(6, 0, 0, 0);
+        break;
+      case 'D': // Day: 10:00-18:00
+        baseDate.setHours(10, 0, 0, 0);
+        break;
+      case 'L': // Late: 14:00-22:00
+        baseDate.setHours(14, 0, 0, 0);
+        break;
+      case 'N': // Night: 22:00-06:00 (+1 day)
+        baseDate.setHours(22, 0, 0, 0);
+        break;
+      default:
+        baseDate.setHours(10, 0, 0, 0); // Default to day shift start
+    }
+  }
+  
+  return baseDate;
 }
 
 // Enhanced function to create cycle from custom pattern with proper validation

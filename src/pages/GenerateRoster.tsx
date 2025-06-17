@@ -110,6 +110,42 @@ const GenerateRoster = () => {
     setHandoverMinutes(minutes);
   };
 
+  // Enhanced generate handler that properly passes the pattern
+  const handleEnhancedGenerate = async () => {
+    console.log('🚀 Enhanced generate with pattern:', selectedPattern);
+    console.log('🏷️ Using roster name:', rosterName);
+    
+    if (!selectedConfig) {
+      toast({
+        title: "Cannot generate roster",
+        description: "Please select a configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!rosterName.trim()) {
+      toast({
+        title: "Cannot generate roster", 
+        description: "Roster name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedPattern.length === 0) {
+      toast({
+        title: "Cannot generate roster",
+        description: "Please select a shift pattern",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Call the existing handler which will now properly use the pattern
+    await handleGenerateRoster();
+  };
+
   const isGenerateDisabled = !selectedConfig || selectedPattern.length === 0 || isGenerating || staffList.length === 0;
 
   return (
@@ -170,7 +206,7 @@ const GenerateRoster = () => {
                 errors={errors}
                 onSelectConfig={setSelectedConfigId}
                 onRosterNameChange={setRosterName}
-                onGenerateRoster={handleGenerateRoster}
+                onGenerateRoster={handleEnhancedGenerate}
                 onRefresh={refreshData}
               />
 
@@ -197,7 +233,7 @@ const GenerateRoster = () => {
               {selectedConfig && (
                 <div className="border-t pt-6">
                   <Button 
-                    onClick={handleGenerateRoster}
+                    onClick={handleEnhancedGenerate}
                     disabled={isGenerateDisabled}
                     className="w-full"
                     size="lg"
@@ -208,7 +244,7 @@ const GenerateRoster = () => {
                         Generating Roster...
                       </div>
                     ) : (
-                      `Generate Roster${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}${handoverMinutes > 0 ? ` (${handoverMinutes}min handover)` : ''}`
+                      `Generate "${rosterName}"${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}${handoverMinutes > 0 ? ` (${handoverMinutes}min handover)` : ''}`
                     )}
                   </Button>
                   {selectedPattern.length === 0 && selectedConfig && (

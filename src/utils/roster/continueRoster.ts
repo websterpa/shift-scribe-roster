@@ -16,7 +16,7 @@ export async function continueRoster(configId: string): Promise<string> {
     // 1. Fetch the roster_config record
     const { data: configRow, error: configError } = await supabase
       .from("roster_config")
-      .select("id, config_name, start_date, cycle_length_weeks, shift_type, operational_hours_per_day, handshake_minutes")
+      .select("id, config_name, start_date, cycle_length_weeks, shift_type, operational_hours_per_day, handshake_minutes, pattern")
       .eq("id", configId)
       .single();
 
@@ -31,10 +31,10 @@ export async function continueRoster(configId: string): Promise<string> {
 
     logger.info('Fetched config:', configRow);
 
-    // 2. Fetch the last version_number for this config
-    const { data: lastVer, error: versionError } = await supabase
+    // 2. Find the last assignment date from the most recent version
+    const { data: lastVersionData, error: versionError } = await supabase
       .from("roster_versions")
-      .select("version_number")
+      .select("id, version_number")
       .eq("config_id", configId)
       .order("version_number", { ascending: false })
       .limit(1)
@@ -45,39 +45,58 @@ export async function continueRoster(configId: string): Promise<string> {
       throw versionError;
     }
 
-    if (!lastVer) {
+    if (!lastVersionData) {
       throw new Error('No previous roster version found for this configuration');
     }
 
-    const nextVersionNumber = lastVer.version_number + 1;
-    logger.info('Next version number:', nextVersionNumber);
+    // 3. Find the last assignment date from the most recent version
+    const { data: lastAssignment, error: assignmentError } = await supabase
+      .from("roster_assignments")
+      .select("date")
+      .eq("version_id", lastVersionData.id)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single();
 
-    // 3. Compute newStartDate = oldStart + cycle_length_weeks * 7 * (nextVersionNumber - 1)
-    const oldStart = new Date(configRow.start_date);
-    const newStart = new Date(oldStart);
-    newStart.setDate(
-      oldStart.getDate() + configRow.cycle_length_weeks * 7 * (nextVersionNumber - 1)
-    );
-    const newStartDateStr = newStart.toISOString().split("T")[0];
+    if (assignmentError || !lastAssignment) {
+      logger.warn('No assignments found, using config start date + cycle length');
+      // Fallback to calculating from config start date
+      const oldStart = new Date(configRow.start_date);
+      const newStart = new Date(oldStart);
+      newStart.setDate(oldStart.getDate() + configRow.cycle_length_weeks * 7 * lastVersionData.version_number);
+      var newStartDateStr = newStart.toISOString().split("T")[0];
+    } else {
+      // Calculate new start date as the day after the last assignment
+      const lastDate = new Date(lastAssignment.date);
+      lastDate.setDate(lastDate.getDate() + 1);
+      var newStartDateStr = lastDate.toISOString().split("T")[0];
+    }
     
     logger.info('Calculated new start date:', newStartDateStr);
+
+    const nextVersionNumber = lastVersionData.version_number + 1;
+    logger.info('Next version number:', nextVersionNumber);
 
     // 4. Fetch staff members
     const staffList = await fetchStaffMembers();
     logger.info('Fetched staff members:', { count: staffList.length });
 
-    // 5. Prepare config for generation with new start date
+    // 5. Prepare config for generation with new start date and preserved pattern
     const configForGeneration = {
       id: configRow.id,
       cycle_length_weeks: configRow.cycle_length_weeks,
       shift_type: configRow.shift_type as "8h" | "12h",
       operational_hours_per_day: configRow.operational_hours_per_day,
       handshake_minutes: configRow.handshake_minutes,
-      start_date: newStartDateStr
+      start_date: newStartDateStr,
+      // Preserve the original pattern if it exists
+      ...(configRow.pattern && Array.isArray(configRow.pattern) && configRow.pattern.length > 0 && { 
+        pattern: configRow.pattern 
+      })
     };
 
     // 6. Generate and save roster with auto-generated version name
-    const versionName = `Auto-Continued v${nextVersionNumber} - ${configRow.config_name}`;
+    const versionName = `Continued v${nextVersionNumber} - ${configRow.config_name}`;
     const newVersionId = await generateAndSaveRoster(
       staffList,
       configForGeneration,
