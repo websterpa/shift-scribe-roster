@@ -127,7 +127,16 @@ export function PatternTestingInterface() {
         return;
       }
       
-      setTestPattern(createdPattern);
+      // Properly type the created pattern to match our Pattern interface
+      const typedCreatedPattern: Pattern = {
+        id: createdPattern.id,
+        name: createdPattern.name,
+        pattern: createdPattern.pattern,
+        shift_type: createdPattern.shift_type as '8h' | '12h',
+        created_at: createdPattern.created_at
+      };
+      
+      setTestPattern(typedCreatedPattern);
       updateTestStatus('create-pattern', 'passed', 'Pattern created successfully', `ID: ${createdPattern.id}`);
 
       // Test 3: Edit Pattern
