@@ -8,6 +8,8 @@ import { CheckCircle, XCircle, AlertCircle, Play, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
+import { validatePattern, validatePatternName } from '@/utils/patterns/patternValidation';
+import { runAllUITests } from '@/utils/testing/uiIntegrationTests';
 
 interface TestResult {
   id: string;
@@ -62,13 +64,13 @@ export function PatternTestingInterface() {
         id: 'pattern-validation',
         name: 'Pattern Validation',
         status: 'pending',
-        message: 'Test pattern validation rules'
+        message: 'Test real pattern validation rules'
       },
       {
         id: 'ui-integration',
         name: 'UI Integration',
         status: 'pending',
-        message: 'Test integration with roster generation'
+        message: 'Test real UI component integration'
       },
       {
         id: 'cleanup',
@@ -127,7 +129,6 @@ export function PatternTestingInterface() {
         return;
       }
       
-      // Properly type the created pattern to match our Pattern interface
       const typedCreatedPattern: Pattern = {
         id: createdPattern.id,
         name: createdPattern.name,
@@ -174,32 +175,59 @@ export function PatternTestingInterface() {
       }
       updateTestStatus('duplicate-pattern', 'passed', 'Pattern duplicated successfully');
 
-      // Test 5: Pattern Validation
-      updateTestStatus('pattern-validation', 'running', 'Testing pattern validation...');
+      // Test 5: Real Pattern Validation
+      updateTestStatus('pattern-validation', 'running', 'Testing real pattern validation...');
+      
       const validationTests = [
-        { pattern: ['D', 'D', 'R'], valid: true, reason: 'Valid basic pattern' },
-        { pattern: [], valid: false, reason: 'Empty pattern should fail' },
-        { pattern: ['X', 'Y', 'Z'], valid: false, reason: 'Invalid shift codes should fail' }
+        { pattern: ['D', 'D', 'R'], shiftType: '8h' as const, expectedValid: true },
+        { pattern: [], shiftType: '8h' as const, expectedValid: false },
+        { pattern: ['X', 'Y', 'Z'], shiftType: '8h' as const, expectedValid: false },
+        { pattern: ['L', 'E', 'R'], shiftType: '8h' as const, expectedValid: false }, // Late before Early
+        { pattern: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'], shiftType: '8h' as const, expectedValid: false } // Too many consecutive
       ];
 
       let validationPassed = true;
-      for (const validation of validationTests) {
-        // This would test actual validation logic in a real implementation
-        console.log(`Testing pattern: ${validation.pattern.join('')} - Expected ${validation.valid ? 'valid' : 'invalid'}`);
+      let validationDetails = '';
+      
+      for (const test of validationTests) {
+        const result = validatePattern(test.pattern, test.shiftType);
+        const actualValid = result.isValid;
+        
+        if (actualValid !== test.expectedValid) {
+          validationPassed = false;
+          validationDetails += `Pattern ${test.pattern.join('')}: expected ${test.expectedValid ? 'valid' : 'invalid'}, got ${actualValid ? 'valid' : 'invalid'}. `;
+        }
       }
       
-      updateTestStatus('pattern-validation', 'passed', 'Pattern validation tests passed');
+      if (validationPassed) {
+        updateTestStatus('pattern-validation', 'passed', 'All pattern validation tests passed');
+      } else {
+        updateTestStatus('pattern-validation', 'failed', 'Pattern validation tests failed', validationDetails);
+        return;
+      }
 
-      // Test 6: UI Integration
-      updateTestStatus('ui-integration', 'running', 'Testing UI integration...');
-      // Simulate UI integration test
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      updateTestStatus('ui-integration', 'passed', 'UI components integrated successfully');
+      // Test 6: Real UI Integration
+      updateTestStatus('ui-integration', 'running', 'Testing real UI integration...');
+      
+      try {
+        const uiTestResults = await runAllUITests();
+        const failedUITests = uiTestResults.filter(result => !result.passed);
+        
+        if (failedUITests.length === 0) {
+          updateTestStatus('ui-integration', 'passed', `All ${uiTestResults.length} UI tests passed`);
+        } else {
+          const failureDetails = failedUITests.map(test => `${test.testName}: ${test.message}`).join('; ');
+          updateTestStatus('ui-integration', 'failed', `${failedUITests.length}/${uiTestResults.length} UI tests failed`, failureDetails);
+          return;
+        }
+      } catch (error: any) {
+        updateTestStatus('ui-integration', 'failed', 'UI integration test threw exception', error.message);
+        return;
+      }
 
       // Test 7: Cleanup
       updateTestStatus('cleanup', 'running', 'Cleaning up test data...');
       
-      // Delete test patterns
       const { error: deleteError1 } = await supabase
         .from('custom_patterns')
         .delete()
@@ -219,7 +247,7 @@ export function PatternTestingInterface() {
 
       toast({
         title: "All tests passed! ✅",
-        description: "Pattern editing feature is working correctly",
+        description: "Pattern editing feature is working correctly with real validation",
       });
 
     } catch (error: any) {
