@@ -89,9 +89,9 @@ export async function continueRoster(configId: string): Promise<string> {
       operational_hours_per_day: configRow.operational_hours_per_day,
       handshake_minutes: configRow.handshake_minutes,
       start_date: newStartDateStr,
-      // Preserve the original pattern if it exists
+      // FIXED: Properly convert Json[] to string[] with validation
       ...(configRow.pattern && Array.isArray(configRow.pattern) && configRow.pattern.length > 0 && { 
-        pattern: configRow.pattern 
+        pattern: configRow.pattern.filter((item): item is string => typeof item === 'string')
       })
     };
 
