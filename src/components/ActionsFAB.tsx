@@ -17,10 +17,6 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
         backgroundColor: '#3b82f6',
         color: 'white'
       }}
-      actionButtonStyles={{
-        backgroundColor: '#1f2937',
-        color: 'white'
-      }}
       style={{ bottom: 20, right: 20 }}
       icon={<Plus />}
       event="hover"
@@ -28,6 +24,10 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
       <Action
         text="New Roster"
         onClick={onNewRoster}
+        style={{
+          backgroundColor: '#1f2937',
+          color: 'white'
+        }}
       >
         <Plus />
       </Action>
@@ -47,6 +47,10 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
       <Action
         text="Compliance"
         onClick={onOpenCompliance}
+        style={{
+          backgroundColor: '#1f2937',
+          color: 'white'
+        }}
       >
         <FileText />
       </Action>
