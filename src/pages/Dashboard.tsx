@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,12 +23,24 @@ import { NewRosterWizard } from '@/components/NewRosterWizard';
 import { ComplianceDrawer } from '@/components/ComplianceDrawer';
 import { DashboardStats } from '@/components/roster/DashboardStats';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useStaffData } from '@/hooks/useStaffData';
+import { toast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
   const [showNewRosterWizard, setShowNewRosterWizard] = useState(false);
   const [showComplianceDrawer, setShowComplianceDrawer] = useState(false);
   const navigate = useNavigate();
   const { user } = useSupabaseAuth();
+  const { staffMembers } = useStaffData();
+
+  const handleRosterGenerated = (tempConfigId?: string) => {
+    setShowNewRosterWizard(false);
+    toast({
+      title: "Roster Generated",
+      description: "Your new roster has been created successfully!",
+    });
+    navigate('/my-rosters');
+  };
 
   const quickActions = [
     {
@@ -291,6 +302,8 @@ export default function Dashboard() {
       <NewRosterWizard 
         isOpen={showNewRosterWizard}
         onClose={() => setShowNewRosterWizard(false)}
+        onRosterGenerated={handleRosterGenerated}
+        staffList={staffMembers}
       />
       
       <ComplianceDrawer 
