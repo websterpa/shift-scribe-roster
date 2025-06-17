@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -177,7 +178,14 @@ export default function RosterSettings({
         shift_type: shiftType,
         operational_hours_per_day: opsHours,
         handshake_minutes: handshakeMinutes,
-        start_date: startDate
+        start_date: startDate,
+        pattern: patternArray,
+        staffing_requirements: {
+          day_shift_staff: 2,
+          night_shift_staff: 2,
+          early_shift_staff: 1,
+          late_shift_staff: 1
+        }
       };
 
       let savedConfigId: string;
@@ -185,14 +193,15 @@ export default function RosterSettings({
       if (configId) {
         console.log('🔄 RosterSettings: Updating existing configuration');
         // Update existing configuration
-        await updateConfig(configId, {
+        const updatedConfig = await updateConfig(configId, {
           config_name: configData.configName,
           cycle_length_weeks: configData.cycle_length_weeks,
           shift_type: configData.shift_type,
           operational_hours_per_day: configData.operational_hours_per_day,
           handshake_minutes: configData.handshake_minutes,
           start_date: configData.start_date,
-          pattern: patternArray
+          pattern: patternArray,
+          staffing_requirements: configData.staffing_requirements
         });
         savedConfigId = configId;
         
@@ -203,10 +212,7 @@ export default function RosterSettings({
       } else {
         console.log('➕ RosterSettings: Creating new configuration');
         // Save new configuration
-        savedConfigId = await saveConfig({
-          ...configData,
-          pattern: patternArray
-        });
+        savedConfigId = await saveConfig(configData);
         
         toast({
           title: "Configuration saved",

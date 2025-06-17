@@ -1,14 +1,10 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ensureDefaultConfig } from "./configHelpers";
 
 export async function seedInitialData() {
   console.log('🌱 DataSeeder: Starting initial data seeding...');
   
   try {
-    // Ensure default configuration exists
-    await ensureDefaultConfig();
-    
     // Check if staff exists
     const { data: existingStaff, error: staffError } = await supabase
       .from('staff_profiles')

@@ -4,6 +4,22 @@ import { createLogger } from './errorLogger';
 
 const logger = createLogger('configHelpers');
 
+export interface ConfigData {
+  configName: string;
+  cycle_length_weeks: number;
+  shift_type: '8h' | '12h';
+  operational_hours_per_day: number;
+  handshake_minutes: 0 | 15 | 30 | 45 | 60;
+  start_date: string;
+  pattern?: string[];
+  staffing_requirements?: {
+    day_shift_staff?: number;
+    night_shift_staff?: number;
+    early_shift_staff?: number;
+    late_shift_staff?: number;
+  };
+}
+
 export const fetchAllConfigs = async () => {
   console.log('📥 configHelpers: Fetching all configurations...');
   
@@ -40,57 +56,121 @@ export const fetchConfigById = async (configId: string) => {
   return data;
 };
 
-export const saveConfig = async (configData: any) => {
-  console.log('💾 configHelpers: Saving configuration...', configData.config_name);
+export const saveConfig = async (configData: ConfigData): Promise<string> => {
+  console.log('💾 configHelpers: Saving configuration...', configData.configName);
   
-  if (configData.id) {
-    // Update existing config
-    const { data, error } = await supabase
-      .from('roster_config')
-      .update({
-        config_name: configData.config_name,
-        cycle_length_weeks: configData.cycle_length_weeks,
-        shift_type: configData.shift_type,
-        operational_hours_per_day: configData.operational_hours_per_day,
-        handshake_minutes: configData.handshake_minutes,
-        start_date: configData.start_date,
-        staffing_requirements: configData.staffing_requirements
-      })
-      .eq('id', configData.id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('❌ configHelpers: Error updating configuration:', error);
-      throw error;
-    }
-    
-    console.log('✅ configHelpers: Successfully updated configuration');
-    return data;
-  } else {
-    // Create new config
-    const { data, error } = await supabase
-      .from('roster_config')
-      .insert({
-        config_name: configData.config_name,
-        cycle_length_weeks: configData.cycle_length_weeks,
-        shift_type: configData.shift_type,
-        operational_hours_per_day: configData.operational_hours_per_day,
-        handshake_minutes: configData.handshake_minutes,
-        start_date: configData.start_date,
-        staffing_requirements: configData.staffing_requirements
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('❌ configHelpers: Error creating configuration:', error);
-      throw error;
-    }
-    
-    console.log('✅ configHelpers: Successfully created configuration');
-    return data;
+  // Create new config
+  const { data, error } = await supabase
+    .from('roster_config')
+    .insert({
+      config_name: configData.configName,
+      cycle_length_weeks: configData.cycle_length_weeks,
+      shift_type: configData.shift_type,
+      operational_hours_per_day: configData.operational_hours_per_day,
+      handshake_minutes: configData.handshake_minutes,
+      start_date: configData.start_date,
+      staffing_requirements: configData.staffing_requirements || {
+        day_shift_staff: 2,
+        night_shift_staff: 2,
+        early_shift_staff: 1,
+        late_shift_staff: 1
+      },
+      pattern: configData.pattern || []
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('❌ configHelpers: Error creating configuration:', error);
+    throw error;
   }
+  
+  console.log('✅ configHelpers: Successfully created configuration');
+  return data.id;
+};
+
+export const updateConfig = async (configId: string, configData: any) => {
+  console.log('🔄 configHelpers: Updating configuration...', configId);
+  
+  const { data, error } = await supabase
+    .from('roster_config')
+    .update({
+      config_name: configData.config_name,
+      cycle_length_weeks: configData.cycle_length_weeks,
+      shift_type: configData.shift_type,
+      operational_hours_per_day: configData.operational_hours_per_day,
+      handshake_minutes: configData.handshake_minutes,
+      start_date: configData.start_date,
+      staffing_requirements: configData.staffing_requirements,
+      pattern: configData.pattern
+    })
+    .eq('id', configId)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('❌ configHelpers: Error updating configuration:', error);
+    throw error;
+  }
+  
+  console.log('✅ configHelpers: Successfully updated configuration');
+  return data;
+};
+
+export const ensureDefaultConfig = async () => {
+  console.log('🔍 configHelpers: Ensuring default configuration exists...');
+  
+  try {
+    // Check if any configuration exists (excluding wizard temp configs)
+    const { data: existingConfigs, error: fetchError } = await supabase
+      .from('roster_config')
+      .select('id')
+      .not('config_name', 'like', 'Wizard Temp Config%')
+      .limit(1);
+    
+    if (fetchError) {
+      console.error('❌ configHelpers: Error checking existing configs:', fetchError);
+      throw fetchError;
+    }
+    
+    if (!existingConfigs || existingConfigs.length === 0) {
+      console.log('➕ configHelpers: No configurations found, creating default...');
+      
+      // Create default configuration
+      const defaultConfig: ConfigData = {
+        configName: 'Default CCTV Configuration',
+        cycle_length_weeks: 4,
+        shift_type: '8h',
+        operational_hours_per_day: 24,
+        handshake_minutes: 0,
+        start_date: getNextMonday(),
+        staffing_requirements: {
+          day_shift_staff: 2,
+          night_shift_staff: 2,
+          early_shift_staff: 1,
+          late_shift_staff: 1
+        },
+        pattern: []
+      };
+      
+      await saveConfig(defaultConfig);
+      console.log('✅ configHelpers: Default configuration created');
+    } else {
+      console.log('✅ configHelpers: Configuration already exists, skipping default creation');
+    }
+  } catch (error) {
+    console.error('❌ configHelpers: Exception ensuring default config:', error);
+    throw error;
+  }
+};
+
+const getNextMonday = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysUntilMonday);
+  return nextMonday.toISOString().split('T')[0];
 };
 
 // Helper function to clean up temporary wizard configurations
