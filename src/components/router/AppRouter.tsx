@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
 import Index from '@/pages/Index';
 import LandingPage from '@/pages/LandingPage';
 import PricingPage from '@/pages/PricingPage';
@@ -41,27 +42,34 @@ export function AppRouter() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/auth" element={<AuthPage />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/staff" element={<Staff />} />
-            <Route path="/roster-config" element={<RosterConfig />} />
-            <Route path="/generate-roster" element={<GenerateRoster />} />
-            <Route path="/roster-viewer" element={<RosterViewer />} />
-            <Route path="/my-rosters" element={<MyRosters />} />
-            <Route path="/my-configurations" element={<MyConfigurations />} />
-            <Route path="/manage-leave" element={<ManageLeave />} />
-            <Route path="/leave-requests" element={<LeaveRequests />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/staffing-analysis" element={<StaffingAnalysis />} />
-            <Route path="/roster-testing" element={<RosterTesting />} />
-            <Route path="/test-pro" element={<TestPro />} />
-            <Route path="/support" element={<SupportPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/patterns" element={<PatternManagement />} />
+            
+            {/* Authenticated routes with layout */}
+            <Route path="/" element={<AuthenticatedLayout />}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="staff" element={<Staff />} />
+              <Route path="roster-config" element={<RosterConfig />} />
+              <Route path="generate-roster" element={<GenerateRoster />} />
+              <Route path="roster-viewer" element={<RosterViewer />} />
+              <Route path="my-rosters" element={<MyRosters />} />
+              <Route path="my-configurations" element={<MyConfigurations />} />
+              <Route path="manage-leave" element={<ManageLeave />} />
+              <Route path="leave-requests" element={<LeaveRequests />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="staffing-analysis" element={<StaffingAnalysis />} />
+              <Route path="roster-testing" element={<RosterTesting />} />
+              <Route path="test-pro" element={<TestPro />} />
+              <Route path="support" element={<SupportPage />} />
+              <Route path="patterns" element={<PatternManagement />} />
+            </Route>
+            
+            {/* 404 route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
