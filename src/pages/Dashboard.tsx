@@ -1,360 +1,302 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Settings, BarChart3, Edit, Star } from 'lucide-react';
-import { MultiWeekRoster } from '@/components/roster/MultiWeekRoster';
-import { NewRosterWizard } from '@/components/NewRosterWizard';
-import { PatternsPanel } from '@/components/PatternsPanel';
-import { ImprovedPatternsPanel } from '@/components/patterns/ImprovedPatternsPanel';
-import { ComplianceDrawer } from '@/components/ComplianceDrawer';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Calendar, 
+  Users, 
+  Settings, 
+  FileText, 
+  Star,
+  TrendingUp,
+  Clock,
+  BarChart3,
+  Plus,
+  Zap,
+  Target,
+  Brain
+} from 'lucide-react';
 import { ActionsFAB } from '@/components/ActionsFAB';
-import { RosterDetailsDialog } from '@/components/roster/RosterDetailsDialog';
-import { supabase } from '@/integrations/supabase/client';
-import { fetchStaffMembers } from '@/utils/roster/rosterGeneration';
-import { StaffMember } from '@/types/roster';
-import { toast } from '@/hooks/use-toast';
+import { NewRosterWizard } from '@/components/NewRosterWizard';
+import { ComplianceDrawer } from '@/components/ComplianceDrawer';
+import { DashboardStats } from '@/components/roster/DashboardStats';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
-interface LatestRoster {
-  id: string;
-  version_name: string;
-  config_id: string;
-  generated_at: string;
-  assignmentCount: number;
-}
-
-const Dashboard = () => {
-  const [latestRoster, setLatestRoster] = useState<LatestRoster | null>(null);
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export default function Dashboard() {
   const [showNewRosterWizard, setShowNewRosterWizard] = useState(false);
-  const [showPatternsPanel, setShowPatternsPanel] = useState(false);
-  const [showImprovedPatternsPanel, setShowImprovedPatternsPanel] = useState(false);
   const [showComplianceDrawer, setShowComplianceDrawer] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useSupabaseAuth();
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    console.log('📊 Dashboard: Loading dashboard data...');
-    try {
-      setIsLoading(true);
-      
-      // Load staff and latest roster in parallel
-      const [staffData, rosterData] = await Promise.all([
-        fetchStaffMembers(),
-        fetchLatestRoster()
-      ]);
-      
-      setStaffList(staffData);
-      setLatestRoster(rosterData);
-      
-      console.log('✅ Dashboard: Data loaded successfully', {
-        staffCount: staffData.length,
-        hasRoster: !!rosterData
-      });
-    } catch (error) {
-      console.error('❌ Dashboard: Error loading data:', error);
-      toast({
-        title: "Error loading dashboard",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+  const quickActions = [
+    {
+      title: 'Generate New Roster',
+      description: 'Create a new roster with the wizard',
+      icon: Calendar,
+      action: () => setShowNewRosterWizard(true),
+      color: 'bg-blue-500',
+      badge: 'Popular'
+    },
+    {
+      title: 'Manage Staff',
+      description: 'Add, edit, or remove staff members',
+      icon: Users,
+      action: () => navigate('/staff'),
+      color: 'bg-green-500'
+    },
+    {
+      title: 'Shift Patterns',
+      description: 'Create and manage custom shift patterns',
+      icon: Star,
+      action: () => navigate('/patterns'),
+      color: 'bg-purple-500',
+      badge: 'Enhanced'
+    },
+    {
+      title: 'Configuration',
+      description: 'Set up roster parameters and rules',
+      icon: Settings,
+      action: () => navigate('/roster-config'),
+      color: 'bg-orange-500'
     }
-  };
+  ];
 
-  const fetchLatestRoster = async (): Promise<LatestRoster | null> => {
-    console.log('📥 Dashboard: Fetching latest roster...');
-    
-    const { data: versions, error: versionsError } = await supabase
-      .from('roster_versions')
-      .select('*')
-      .order('generated_at', { ascending: false })
-      .limit(1);
+  const recentActivities = [
+    { title: 'Weekly Roster Generated', time: '2 hours ago', icon: Calendar },
+    { title: 'Staff Member Added', time: '1 day ago', icon: Users },
+    { title: 'Pattern Created', time: '2 days ago', icon: Star },
+    { title: 'Configuration Updated', time: '3 days ago', icon: Settings }
+  ];
 
-    if (versionsError) {
-      console.error('❌ Dashboard: Error fetching roster versions:', versionsError);
-      return null;
+  const insights = [
+    {
+      title: 'Staffing Efficiency',
+      value: '94%',
+      trend: '+2.1%',
+      icon: TrendingUp,
+      color: 'text-green-600'
+    },
+    {
+      title: 'Average Shift Duration',
+      value: '8.2h',
+      trend: '-0.3h',
+      icon: Clock,
+      color: 'text-blue-600'
+    },
+    {
+      title: 'Pattern Utilization',
+      value: '87%',
+      trend: '+5.2%',
+      icon: BarChart3,
+      color: 'text-purple-600'
     }
-
-    if (!versions || versions.length === 0) {
-      console.log('📋 Dashboard: No roster versions found');
-      return null;
-    }
-
-    const latestVersion = versions[0];
-    
-    // Count assignments for this version
-    const { count, error: countError } = await supabase
-      .from('roster_assignments')
-      .select('*', { count: 'exact', head: true })
-      .eq('version_id', latestVersion.id);
-
-    if (countError) {
-      console.error('❌ Dashboard: Error counting assignments:', countError);
-    }
-
-    const result = {
-      id: latestVersion.id,
-      version_name: latestVersion.version_name || 'Untitled Roster',
-      config_id: latestVersion.config_id,
-      generated_at: latestVersion.generated_at,
-      assignmentCount: count || 0
-    };
-
-    console.log('✅ Dashboard: Latest roster found:', result);
-    return result;
-  };
-
-  const cleanupTempConfig = async (configId: string) => {
-    try {
-      console.log('🧹 Dashboard: Cleaning up temp config:', configId);
-      await supabase
-        .from('roster_config')
-        .delete()
-        .eq('id', configId);
-      console.log('✅ Dashboard: Temp config cleaned up');
-    } catch (error) {
-      console.error('❌ Dashboard: Error cleaning up temp config:', error);
-      // Non-critical error, don't throw
-    }
-  };
-
-  const handleRosterGenerated = async (tempConfigId?: string) => {
-    console.log('🔄 Dashboard: Roster generated, reloading data...');
-    setShowNewRosterWizard(false);
-    
-    // First load the dashboard data to ensure UI is updated
-    await loadDashboardData();
-    
-    // Then cleanup the temporary config if provided
-    if (tempConfigId) {
-      await cleanupTempConfig(tempConfigId);
-    }
-    
-    toast({
-      title: "Roster generated successfully",
-      description: "Your new roster is now available",
-    });
-  };
-
-  const handlePatternSelected = (pattern: any) => {
-    console.log('📋 Dashboard: Pattern selected for use:', pattern);
-    toast({
-      title: "Pattern ready to use",
-      description: `"${pattern.name}" can now be used in roster generation`,
-    });
-    setShowImprovedPatternsPanel(false);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading dashboard...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  ];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Roster Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage your shift rosters and view operational insights
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            {staffList.length} Staff Members
-          </Badge>
-        </div>
-      </div>
-
-      {/* Primary Action Cards - Enhanced with Pattern Management */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Button
-          onClick={() => setShowNewRosterWizard(true)}
-          className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-          size="lg"
-        >
-          <Plus className="h-6 w-6" />
-          <span className="text-sm font-medium">New Roster</span>
-        </Button>
-        
-        {/* PROMINENT PATTERN MANAGEMENT CARD */}
-        <Card className="relative overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer group" 
-              onClick={() => setShowImprovedPatternsPanel(true)}>
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
-          <CardContent className="h-20 flex items-center justify-center p-4">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                <Star className="h-4 w-4 text-white" />
-              </div>
-              <span className="text-sm font-medium text-center group-hover:text-emerald-600 transition-colors">
-                Shift Patterns
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Button
-          variant="outline"
-          onClick={() => setShowPatternsPanel(true)}
-          className="h-20 flex flex-col items-center justify-center gap-2"
-          size="lg"
-        >
-          <Settings className="h-6 w-6" />
-          <span className="text-sm font-medium">Legacy Patterns</span>
-        </Button>
-        
-        <Button
-          variant="outline"
-          onClick={() => setShowComplianceDrawer(true)}
-          className="h-20 flex flex-col items-center justify-center gap-2"
-          size="lg"
-        >
-          <FileText className="h-6 w-6" />
-          <span className="text-sm font-medium">Compliance</span>
-        </Button>
-      </div>
-
-      {/* Pattern Management Shortcut Section */}
-      <Card className="border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-emerald-700">
-            <Star className="h-5 w-5" />
-            Quick Pattern Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-emerald-600 mb-2">
-                Create, edit, and manage custom shift patterns for optimal roster generation
+              <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+              <p className="text-muted-foreground mt-1">
+                Welcome back{user?.email ? `, ${user.email}` : ''}! Here's your roster management overview.
               </p>
-              <div className="flex gap-2 text-xs text-emerald-500">
-                <span>• Create custom patterns</span>
-                <span>• Edit existing patterns</span>
-                <span>• Pattern templates</span>
-              </div>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => setShowImprovedPatternsPanel(true)}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Manage Patterns
-              </Button>
-            </div>
+            <Badge variant="outline" className="px-3 py-1">
+              <Zap className="h-3 w-3 mr-1" />
+              Pro Features Available
+            </Badge>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Current Roster Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Current Roster</span>
-            {latestRoster && (
-              <Badge variant="secondary">
-                {latestRoster.assignmentCount} Assignments
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {latestRoster ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                <div>
-                  <h3 className="font-semibold">{latestRoster.version_name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Generated {new Date(latestRoster.generated_at).toLocaleDateString()}
-                  </p>
+      <div className="container mx-auto px-4 py-8">
+        {/* Stats Overview */}
+        <DashboardStats />
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          {/* Quick Actions - Takes up 2 columns */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Primary Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {quickActions.map((action, index) => (
+                    <Card 
+                      key={index}
+                      className="relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer border-2 hover:border-primary/20"
+                      onClick={action.action}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`${action.color} p-2 rounded-lg`}>
+                            <action.icon className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium text-sm">{action.title}</h3>
+                              {action.badge && (
+                                <Badge variant="secondary" className="text-xs px-2 py-0">
+                                  {action.badge}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {action.description}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-                <RosterDetailsDialog 
-                  rosterId={latestRoster.id}
-                  rosterName={latestRoster.version_name}
-                >
-                  <Button variant="outline" size="sm">
-                    View Details
-                  </Button>
-                </RosterDetailsDialog>
-              </div>
-              
-              <MultiWeekRoster 
-                staffList={staffList}
-                config={null}
-                showWeeks={4}
-              />
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="mb-4">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No roster yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first roster to get started with shift management
-              </p>
-              <Button onClick={() => setShowNewRosterWizard(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Roster
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
 
-      {/* Modals and Panels */}
-      <NewRosterWizard
+            {/* Quick Pattern Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Quick Pattern Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-3 flex flex-col gap-2"
+                    onClick={() => navigate('/patterns')}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-xs">Create Pattern</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-3 flex flex-col gap-2"
+                    onClick={() => navigate('/patterns')}
+                  >
+                    <Star className="h-4 w-4" />
+                    <span className="text-xs">Browse Library</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="h-auto py-3 flex flex-col gap-2"
+                    onClick={() => navigate('/patterns')}
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="text-xs">Manage</span>
+                  </Button>
+                </div>
+                <Separator />
+                <div className="text-center">
+                  <Button onClick={() => navigate('/patterns')} className="w-full">
+                    <Star className="h-4 w-4 mr-2" />
+                    Open Pattern Manager
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Performance Insights */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Performance Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {insights.map((insight, index) => (
+                    <div key={index} className="text-center p-3 rounded-lg bg-muted/50">
+                      <insight.icon className={`h-6 w-6 mx-auto mb-2 ${insight.color}`} />
+                      <div className="text-2xl font-bold">{insight.value}</div>
+                      <div className="text-xs text-muted-foreground">{insight.title}</div>
+                      <div className={`text-xs mt-1 ${insight.color}`}>{insight.trend}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activity - Takes up 1 column */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Recent Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentActivities.map((activity, index) => (
+                    <div key={index} className="flex items-center gap-3 py-2">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                        <activity.icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Navigation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/my-rosters')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  My Rosters
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/reports')}>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Reports
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/staffing-analysis')}>
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Analytics
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* FAB and Modals */}
+      <ActionsFAB 
+        onNewRoster={() => setShowNewRosterWizard(true)}
+        onOpenPatterns={() => navigate('/patterns')}
+        onOpenCompliance={() => setShowComplianceDrawer(true)}
+      />
+      
+      <NewRosterWizard 
         isOpen={showNewRosterWizard}
         onClose={() => setShowNewRosterWizard(false)}
-        onRosterGenerated={handleRosterGenerated}
-        staffList={staffList}
       />
-
-      {/* Legacy Patterns Panel */}
-      <PatternsPanel
-        isOpen={showPatternsPanel}
-        onClose={() => setShowPatternsPanel(false)}
-        onPatternSelected={handlePatternSelected}
-      />
-
-      {/* NEW IMPROVED PATTERNS PANEL - Main Feature */}
-      <ImprovedPatternsPanel
-        isOpen={showImprovedPatternsPanel}
-        onClose={() => setShowImprovedPatternsPanel(false)}
-        onPatternSelected={handlePatternSelected}
-      />
-
-      <ComplianceDrawer
+      
+      <ComplianceDrawer 
         isOpen={showComplianceDrawer}
         onClose={() => setShowComplianceDrawer(false)}
-        rosterId={latestRoster?.id}
-      />
-
-      {/* Floating Action Button */}
-      <ActionsFAB
-        onNewRoster={() => setShowNewRosterWizard(true)}
-        onOpenPatterns={() => setShowImprovedPatternsPanel(true)}
-        onOpenCompliance={() => setShowComplianceDrawer(true)}
       />
     </div>
   );
-};
-
-export default Dashboard;
+}

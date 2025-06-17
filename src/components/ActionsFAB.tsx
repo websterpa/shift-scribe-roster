@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Fab, Action } from 'react-tiny-fab';
 import { Plus, Settings, FileText, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import 'react-tiny-fab/dist/styles.css';
 
 interface ActionsFABProps {
@@ -11,6 +12,12 @@ interface ActionsFABProps {
 }
 
 export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: ActionsFABProps) {
+  const navigate = useNavigate();
+
+  const handlePatternsClick = () => {
+    navigate('/patterns');
+  };
+
   return (
     <Fab
       mainButtonStyles={{
@@ -35,7 +42,7 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
       {/* PROMINENT PATTERN MANAGEMENT ACTION */}
       <Action
         text="Manage Patterns"
-        onClick={onOpenPatterns}
+        onClick={handlePatternsClick}
         style={{
           backgroundColor: '#059669',
           color: 'white'
