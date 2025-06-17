@@ -45,9 +45,9 @@ export default function Dashboard() {
   const quickActions = [
     {
       title: 'Generate New Roster',
-      description: 'Create a new roster with the wizard',
+      description: 'Create a new roster with existing configuration',
       icon: Calendar,
-      action: () => setShowNewRosterWizard(true),
+      action: () => navigate('/generate-roster'),
       color: 'bg-blue-500',
       badge: 'Popular'
     },
@@ -278,6 +278,10 @@ export default function Dashboard() {
                   <FileText className="h-4 w-4 mr-2" />
                   My Rosters
                 </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/my-configurations')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  My Configurations
+                </Button>
                 <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/reports')}>
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Reports
@@ -294,7 +298,7 @@ export default function Dashboard() {
 
       {/* FAB and Modals */}
       <ActionsFAB 
-        onNewRoster={() => setShowNewRosterWizard(true)}
+        onNewRoster={() => navigate('/generate-roster')}
         onOpenPatterns={() => navigate('/patterns')}
         onOpenCompliance={() => setShowComplianceDrawer(true)}
       />

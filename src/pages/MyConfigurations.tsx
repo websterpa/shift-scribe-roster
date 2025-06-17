@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { fetchAllConfigs } from '@/utils/configHelpers';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Search, Settings, Calendar, Clock, Edit, Trash } from 'lucide-react';
+import { Search, Settings, Calendar, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ConfigItem {
@@ -128,11 +129,6 @@ const MyConfigurations = () => {
     } finally {
       setDeletingConfigId(null);
     }
-  };
-
-  const handleLoadConfig = (configId: string) => {
-    console.log('📂 MyConfigurations: Loading config for editing:', configId);
-    navigate(`/roster-config?configId=${configId}`);
   };
 
   const handleEditConfig = (configId: string) => {
@@ -273,7 +269,7 @@ const MyConfigurations = () => {
                                 size="sm"
                                 disabled={deletingConfigId === config.id}
                               >
-                                <Trash className="h-4 w-4 mr-1" />
+                                <Trash2 className="h-4 w-4 mr-1" />
                                 {deletingConfigId === config.id ? 'Deleting...' : 'Delete'}
                               </Button>
                             </AlertDialogTrigger>

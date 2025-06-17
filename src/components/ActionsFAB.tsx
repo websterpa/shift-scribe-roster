@@ -18,6 +18,10 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
     navigate('/patterns');
   };
 
+  const handleNewRosterClick = () => {
+    navigate('/generate-roster');
+  };
+
   return (
     <Fab
       mainButtonStyles={{
@@ -30,7 +34,7 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
     >
       <Action
         text="New Roster"
-        onClick={onNewRoster}
+        onClick={handleNewRosterClick}
         style={{
           backgroundColor: '#1f2937',
           color: 'white'
@@ -39,7 +43,6 @@ export function ActionsFAB({ onNewRoster, onOpenPatterns, onOpenCompliance }: Ac
         <Plus />
       </Action>
       
-      {/* PROMINENT PATTERN MANAGEMENT ACTION */}
       <Action
         text="Manage Patterns"
         onClick={handlePatternsClick}
