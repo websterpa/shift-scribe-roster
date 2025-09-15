@@ -37,6 +37,7 @@ export interface ShiftWindow {
  * Rules:
  * - 8h system: E starts at T0, L at T0+8h, N at T0+16h (ends next day T0+24h)
  * - 12h system: D starts at T0, N starts at T0+12h (ends next day T0+24h)
+ * - OT: Variable hours and start time based on otOpts or config defaults
  * - Handles DST correctly via Luxon.
  * - Validates that codes are consistent with the declared shiftSystem.
  */
@@ -56,47 +57,66 @@ export function makeShiftWindowResolver(config: ShiftTimingConfig) {
     throw new Error(`Invalid siteStartLocalTime "${siteStartLocalTime}" — expected "HH:mm" 00:00–23:59`);
   }
 
-  // Shift offsets (hours from T0) by system
-  const offsets8h: Record<"E" | "L" | "N", number> = { E: 0, L: 8, N: 16 };
-  const offsets12h: Record<"D" | "N", number> = { D: 0, N: 12 };
-
-  return function resolve(dateISO: string, code: ShiftCode): ShiftWindow | null {
-    // Allow rest/leave codes to return null (no window)
+  return function resolve(dateISO: string, code: ShiftCode, otOpts?: OTOptions): ShiftWindow | null {
+    // Non-work codes
     if (!["E","L","N","D","OT"].includes(code)) return null;
 
     if (!ensureShiftSystemConsistency(code, shiftSystem)) {
       throw new Error(`Shift code "${code}" not allowed in system "${shiftSystem}"`);
     }
 
-    // Base T0 at local siteStart on dateISO
+    // Compute T0 from siteStartLocalTime
     const T0 = DateTime.fromISO(`${dateISO}T${pad2(baseHour)}:${pad2(baseMinute)}`, { zone: timezone });
     if (!T0.isValid) {
       throw new Error(`Invalid date/time for site timezone: ${dateISO} @ ${siteStartLocalTime} (${timezone})`);
     }
 
-    // Compute start and end using Luxon durations (DST-safe)
     let start: DateTime;
     let end: DateTime;
 
-    if (shiftSystem === "8h") {
-      const code8 = code as "E" | "L" | "N" | "OT"; // OT uses same duration logic as a worked shift; duration depends on system
-      const startOffsetHrs =
-        code8 === "OT"
-          ? 0 // For OT we assume manager sets explicit start elsewhere; here we default to E's slot to get a duration
-          : offsets8h[code8 as "E" | "L" | "N"];
+    if (code === "OT") {
+      // --- Variable OT handling ---
+      const otHours =
+        (otOpts?.otHours ?? config.defaultOtHours) ??
+        (shiftSystem === "8h" ? 8 : 12); // fallback to system duration
+
+      if (!Number.isFinite(otHours) || otHours <= 0) {
+        throw new Error(`Invalid otHours "${otOpts?.otHours}" — must be > 0`);
+      }
+
+      let otStart: DateTime = T0;
+      const otStartStr = otOpts?.otStartLocalTime ?? config.defaultOtStartLocalTime;
+      if (otStartStr) {
+        const [oh, om = "0"] = otStartStr.split(":");
+        const oH = Number(oh), oM = Number(om);
+        if (
+          Number.isFinite(oH) && Number.isFinite(oM) &&
+          oH >= 0 && oH <= 23 && oM >= 0 && oM <= 59
+        ) {
+          const customOtStart = DateTime.fromISO(`${dateISO}T${pad2(oH)}:${pad2(oM)}`, { zone: timezone });
+          if (!customOtStart.isValid) {
+            throw new Error(`Invalid otStartLocalTime "${otStartStr}" for ${dateISO} in ${timezone}`);
+          }
+          otStart = customOtStart;
+        } else {
+          throw new Error(`Invalid otStartLocalTime "${otStartStr}" — expected "HH:mm"`);
+        }
+      }
+
+      start = otStart;
+      end = start.plus(Duration.fromObject({ hours: otHours }));
+
+    } else if (shiftSystem === "8h") {
+      const offsets8h: Record<"E" | "L" | "N", number> = { E: 0, L: 8, N: 16 };
+      const startOffsetHrs = offsets8h[code as "E" | "L" | "N"];
       start = T0.plus(Duration.fromObject({ hours: startOffsetHrs }));
-      // 8h duration for E/L/N/OT within 8h system
       end = start.plus(Duration.fromObject({ hours: 8 }));
 
     } else {
       // 12h system
-      const code12 = code as "D" | "N" | "OT";
-      const startOffsetHrs =
-        code12 === "OT"
-          ? 0
-          : offsets12h[code12 as "D" | "N"];
+      const offsets12h: Record<"D" | "N", number> = { D: 0, N: 12 };
+      const startOffsetHrs = offsets12h[code as "D" | "N"];
       start = T0.plus(Duration.fromObject({ hours: startOffsetHrs }));
-      // 12h duration for D/N/OT within 12h system
       end = start.plus(Duration.fromObject({ hours: 12 }));
     }
 
