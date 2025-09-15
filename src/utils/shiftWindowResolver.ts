@@ -1,6 +1,17 @@
 import { DateTime, Duration } from "luxon";
 import { ShiftCode, ShiftSystem, ensureShiftSystemConsistency } from "./constraints";
 
+export interface OTOptions {
+  /** Length of the OT shift in hours (can be fractional, e.g., 4 or 3.5). */
+  otHours?: number;
+  /**
+   * Custom local start time for this OT shift ("HH:mm"). If omitted,
+   * OT starts at the system's Day/Early slot (T0) by default.
+   */
+  otStartLocalTime?: string;
+}
+
+/** Add to ShiftTimingConfig if you want site defaults (optional) */
 export interface ShiftTimingConfig {
   /** "8h" => (E,L,N)  |  "12h" => (D,N) */
   shiftSystem: ShiftSystem;
@@ -8,6 +19,10 @@ export interface ShiftTimingConfig {
   siteStartLocalTime: string;
   /** IANA timezone for the site, e.g., "Europe/London". */
   timezone: string;
+  /** Default OT hours if not passed per assignment. Optional. */
+  defaultOtHours?: number; // e.g., 4 for common top-ups
+  /** Default OT start local time if not passed per assignment. Optional. */
+  defaultOtStartLocalTime?: string; // e.g., "10:00"
 }
 
 export interface ShiftWindow {
