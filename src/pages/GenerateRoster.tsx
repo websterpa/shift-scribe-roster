@@ -9,6 +9,7 @@ import { RosterGenerationSettings } from '@/components/roster/RosterGenerationSe
 import { ShiftCycleTestInterface } from '@/components/roster/ShiftCycleTestInterface';
 import { CycleValidationTestInterface } from '@/components/roster/CycleValidationTestInterface';
 import PatternSelector from '@/components/roster/PatternSelector';
+import { RosterOptimizationStatus } from '@/components/roster/RosterOptimizationStatus';
 import { useRosterGeneration } from '@/hooks/useRosterGeneration';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +42,8 @@ const GenerateRoster = () => {
     generatedVersionId,
     errors,
     selectedPattern,
+    isOptimizing,
+    optimizationTimeRemaining,
     setSelectedConfigId,
     setRosterName,
     setSelectedPattern,
@@ -352,6 +355,12 @@ const GenerateRoster = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Optimization Status Overlay - Shows during roster generation */}
+      <RosterOptimizationStatus
+        isOptimizing={isOptimizing}
+        timeRemaining={optimizationTimeRemaining}
+      />
     </div>
   );
 };

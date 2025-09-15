@@ -28,6 +28,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
   const [isLoading, setIsLoading] = useState(true);
   const [generatedVersionId, setGeneratedVersionId] = useState<string | null>(null);
   const [selectedPattern, setSelectedPattern] = useState<string[]>([]);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizationTimeRemaining, setOptimizationTimeRemaining] = useState<number | undefined>(undefined);
   const [errors, setErrors] = useState<{
     configs?: string;
     staff?: string;
@@ -237,7 +239,20 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     try {
       console.log('🚀 useRosterGeneration: Starting roster generation...');
       setIsGenerating(true);
+      setIsOptimizing(true);
+      setOptimizationTimeRemaining(5.0);
       setErrors({});
+      
+      // Start countdown timer for optimization UI
+      const optimizationTimer = setInterval(() => {
+        setOptimizationTimeRemaining(prev => {
+          if (prev === undefined || prev <= 0) {
+            clearInterval(optimizationTimer);
+            return 0;
+          }
+          return prev - 0.1;
+        });
+      }, 100);
       
       const configForGeneration = {
         id: selectedConfig.id,
@@ -269,6 +284,10 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       console.log('✅ useRosterGeneration: Roster generated successfully, result:', result);
       setGeneratedVersionId(result.versionId);
       
+      // Clear optimization status
+      setIsOptimizing(false);
+      setOptimizationTimeRemaining(undefined);
+      
       toast({
         title: "Roster generated successfully",
         description: `Generated roster: "${rosterName.trim()}"${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}`,
@@ -287,6 +306,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       });
     } finally {
       setIsGenerating(false);
+      setIsOptimizing(false);
+      setOptimizationTimeRemaining(undefined);
     }
   };
 
@@ -310,6 +331,8 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     generatedVersionId,
     errors,
     selectedPattern,
+    isOptimizing,
+    optimizationTimeRemaining,
     setSelectedConfigId,
     setRosterName,
     setSelectedPattern,

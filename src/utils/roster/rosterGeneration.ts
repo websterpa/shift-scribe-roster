@@ -956,6 +956,14 @@ function getShiftCodeFromName(shiftName: string): string | null {
   return mapping[shiftName] || null;
 }
 
+function getShiftHours(shiftCode: string, shiftType: "8h" | "12h"): number {
+  if (!isWorkCode(shiftCode as ShiftCode)) {
+    return 0;
+  }
+  
+  return shiftType === "12h" ? 12 : 8;
+}
+
 async function fetchPastWeeks(staffList: StaffMember[], cycleLengthWeeks: number): Promise<Record<string, number[]>> {
   try {
     const pastWeeksMap: Record<string, number[]> = {};
