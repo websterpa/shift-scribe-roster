@@ -14,6 +14,7 @@ import { score, ScoreWeights, ScoreContext, PersonStats } from "./scoring";
 import { optimiseRoster } from "./optimizer"; 
 import { checkWeeklyLimits, WeeklySummaries } from "../wtrGate";
 import { calculatePeriodCostSummary, StaffCostSummary } from "../costCalculations";
+import { makeShiftWindowResolver } from "../shiftWindowResolver";
 
 const logger = createLogger('RosterGeneration');
 
@@ -27,6 +28,8 @@ export async function generateAndSaveRoster(
     handshake_minutes: number;
     start_date: string;
     pattern?: string[];
+    siteStartTime?: string; // e.g. "06:00" or "07:00"
+    timezone?: string; // e.g. "Europe/London"
     staffing_requirements?: {
       day_shift_staff?: number;
       night_shift_staff?: number;
@@ -108,6 +111,17 @@ export async function generateAndSaveRoster(
     });
     console.log('✅ AUDIT: Shift system validation completed');
 
+    // Setup shift timing configuration for luxon-based resolver
+    console.log('⚙️ AUDIT: Setting up shift timing configuration...');
+    const timingConfig = {
+      shiftSystem: config.shift_type as ShiftSystem,
+      siteStartLocalTime: config.siteStartTime || (config.shift_type === "12h" ? "07:00" : "06:00"),
+      timezone: config.timezone || "Europe/London",
+    } as const;
+    
+    const resolveShiftWindow = makeShiftWindowResolver(timingConfig);
+    console.log('✅ AUDIT: Shift timing configuration ready:', timingConfig);
+
     // 2. PRE-MARK LEAVE - Fetch and convert to new format
     console.log('📅 AUDIT: Fetching and pre-marking leave dates...');
     const leaveMap: LeaveMap = await getLeaveMap();
@@ -150,7 +164,7 @@ export async function generateAndSaveRoster(
 
     // 3. ENFORCE REST RULES - Per-assignment enforcement using respectsRestRules
     console.log('⏰ AUDIT: Enforcing rest rules per assignment...');
-    cycle = enforceRestRulesPerAssignment(cycle, config.shift_type, leaveMap);
+    cycle = enforceRestRulesPerAssignment(cycle, resolveShiftWindow, leaveMap);
     console.log('✅ AUDIT: Rest rules enforcement completed');
 
     // 4. COVERAGE ENFORCEMENT - Eligibility + rest + supervisor/night rules
@@ -293,45 +307,10 @@ export async function generateAndSaveRoster(
 }
 
 /**
- * 3. ENFORCE REST RULES - Per-assignment enforcement using respectsRestRules
+ * 3. ENFORCE REST RULES - Per-assignment enforcement using luxon-based resolver
  */
-function enforceRestRulesPerAssignment(cycle: any[], shiftType: "8h" | "12h", leaveMap: LeaveMap): any[] {
-  console.log('⏰ Starting enhanced rest rules enforcement...');
-  
-  // Create shift window resolver for the respectsRestRules function
-  const shiftWindowResolver: ShiftWindowResolver = (dateISO: string, code: ShiftCode) => {
-    const date = new Date(dateISO + 'T00:00:00Z');
-    const start = new Date(date);
-    const end = new Date(date);
-    
-    if (shiftType === "12h") {
-      if (code === 'D') {
-        start.setHours(7, 0);
-        end.setHours(19, 0);
-      } else if (code === 'N') {
-        start.setHours(19, 0);
-        end.setDate(end.getDate() + 1);
-        end.setHours(7, 0);
-      }
-    } else { // 8h
-      if (code === 'E') {
-        start.setHours(6, 0);
-        end.setHours(14, 0);
-      } else if (code === 'L') {
-        start.setHours(14, 0);
-        end.setHours(22, 0);
-      } else if (code === 'N') {
-        start.setHours(22, 0);
-        end.setDate(end.getDate() + 1);
-        end.setHours(6, 0);
-      } else if (code === 'D') {
-        start.setHours(10, 0);
-        end.setHours(18, 0);
-      }
-    }
-    
-    return isWorkCode(code) ? { start, end } : null;
-  };
+function enforceRestRulesPerAssignment(cycle: any[], resolveShiftWindow: ShiftWindowResolver, leaveMap: LeaveMap): any[] {
+  console.log('⏰ Starting enhanced rest rules enforcement with luxon resolver...');
   
   // Group assignments by staff member and sort by date
   const staffAssignments: { [staffId: string]: any[] } = {};
@@ -350,36 +329,45 @@ function enforceRestRulesPerAssignment(cycle: any[], shiftType: "8h" | "12h", le
   const adjustedCycle = [...cycle];
   let adjustmentCount = 0;
 
-  // Check each staff member's consecutive shifts using new rest validation
+  // Track last worked end time and details by staff
+  const lastWorkedEndByStaff: { [staffId: string]: Date | null } = {};
+  const prevWorkedDateISOByStaff: { [staffId: string]: string | null } = {};
+  const prevWorkedCodeByStaff: { [staffId: string]: ShiftCode | null } = {};
+
+  // Check each staff member's consecutive shifts using luxon-based rest validation
   Object.entries(staffAssignments).forEach(([staffId, assignments]) => {
-    for (let i = 1; i < assignments.length; i++) {
-      const prevAssignment = assignments[i - 1];
+    lastWorkedEndByStaff[staffId] = null;
+    prevWorkedDateISOByStaff[staffId] = null;
+    prevWorkedCodeByStaff[staffId] = null;
+
+    for (let i = 0; i < assignments.length; i++) {
       const currentAssignment = assignments[i];
+      const dateISO = currentAssignment.date;
+      const proposedCode = currentAssignment.shiftCode as ShiftCode;
       
       // Skip if current assignment is already rest or leave
-      if (!isWorkCode(currentAssignment.shiftCode as ShiftCode)) {
+      if (!isWorkCode(proposedCode)) {
+        // Reset tracking for non-work assignments
+        if (proposedCode === 'R') {
+          lastWorkedEndByStaff[staffId] = null;
+          prevWorkedDateISOByStaff[staffId] = null;
+          prevWorkedCodeByStaff[staffId] = null;
+        }
         continue;
       }
 
-      // Get previous shift end time
-      let prevEnd: Date | null = null;
-      if (isWorkCode(prevAssignment.shiftCode as ShiftCode)) {
-        const prevWindow = shiftWindowResolver(prevAssignment.date, prevAssignment.shiftCode as ShiftCode);
-        prevEnd = prevWindow?.end || null;
-      }
-
-      // Use new respectsRestRules function
+      // Use luxon-based respectsRestRules function
       const respectsRest = respectsRestRules(
-        prevEnd,
-        prevAssignment.date,
-        prevAssignment.shiftCode as ShiftCode,
-        currentAssignment.date,
-        currentAssignment.shiftCode as ShiftCode,
-        shiftWindowResolver
+        lastWorkedEndByStaff[staffId],
+        prevWorkedDateISOByStaff[staffId],
+        prevWorkedCodeByStaff[staffId],
+        dateISO,
+        proposedCode,
+        resolveShiftWindow
       );
 
       if (!respectsRest) {
-        console.log(`⚠️ Rest rule violation: Staff ${staffId} day ${currentAssignment.day} - changing ${currentAssignment.shiftCode} to R`);
+        console.log(`⚠️ Rest rule violation: Staff ${staffId} day ${currentAssignment.day} - changing ${proposedCode} to R`);
         
         // Find and update the assignment in the main cycle
         const cycleIndex = adjustedCycle.findIndex(a => 
@@ -388,6 +376,16 @@ function enforceRestRulesPerAssignment(cycle: any[], shiftType: "8h" | "12h", le
         if (cycleIndex !== -1) {
           adjustedCycle[cycleIndex].shiftCode = 'R';
           adjustmentCount++;
+        }
+        
+        // Don't update tracking since we changed to rest
+      } else {
+        // Update tracking for successful work assignment
+        const shiftWindow = resolveShiftWindow(dateISO, proposedCode);
+        if (shiftWindow) {
+          lastWorkedEndByStaff[staffId] = shiftWindow.end;
+          prevWorkedDateISOByStaff[staffId] = dateISO;
+          prevWorkedCodeByStaff[staffId] = proposedCode;
         }
       }
     }
