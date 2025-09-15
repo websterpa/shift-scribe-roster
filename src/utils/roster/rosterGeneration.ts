@@ -28,7 +28,7 @@ export async function generateAndSaveRoster(
     handshake_minutes: number;
     start_date: string;
     pattern?: string[];
-    siteStartTime?: string; // e.g. "06:00" or "07:00"
+    site_start_time?: string; // e.g. "06:00" or "07:00"
     timezone?: string; // e.g. "Europe/London"
     staffing_requirements?: {
       day_shift_staff?: number;
@@ -115,7 +115,7 @@ export async function generateAndSaveRoster(
     console.log('⚙️ AUDIT: Setting up shift timing configuration...');
     const timingConfig = {
       shiftSystem: config.shift_type as ShiftSystem,
-      siteStartLocalTime: config.siteStartTime || (config.shift_type === "12h" ? "07:00" : "06:00"),
+      siteStartLocalTime: config.site_start_time || (config.shift_type === "12h" ? "07:00" : "06:00"),
       timezone: config.timezone || "Europe/London",
     } as const;
     

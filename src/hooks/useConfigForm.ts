@@ -11,6 +11,8 @@ export interface ConfigFormData {
   operational_hours_per_day: number;
   handshake_minutes: 0 | 15 | 30 | 45 | 60;
   start_date: string;
+  site_start_time: string;
+  timezone: string;
   pattern?: string[];
   staffing_requirements?: {
     day_shift_staff?: number;
@@ -33,6 +35,8 @@ export function useConfigForm() {
     operational_hours_per_day: 24,
     handshake_minutes: 0,
     start_date: '',
+    site_start_time: '07:00',
+    timezone: 'Europe/London',
     pattern: [],
     staffing_requirements: {
       day_shift_staff: 2,
@@ -107,6 +111,8 @@ export function useConfigForm() {
         operational_hours_per_day: data.operational_hours_per_day,
         handshake_minutes: closestValid,
         start_date: data.start_date,
+        site_start_time: data.site_start_time || '07:00',
+        timezone: data.timezone || 'Europe/London',
         pattern: pattern,
         staffing_requirements: staffingRequirements
       });

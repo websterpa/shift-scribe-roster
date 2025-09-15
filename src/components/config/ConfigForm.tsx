@@ -74,6 +74,42 @@ export const ConfigForm = ({ formData, onFormDataChange }: ConfigFormProps) => {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="site_start_time">Site Start Time</Label>
+          <Input
+            id="site_start_time"
+            type="time"
+            value={formData.site_start_time}
+            onChange={(e) => handleFieldChange('site_start_time', e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="timezone">Timezone</Label>
+          <Select 
+            value={formData.timezone} 
+            onValueChange={(value) => handleFieldChange('timezone', value)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Europe/London">Europe/London</SelectItem>
+              <SelectItem value="America/New_York">America/New_York</SelectItem>
+              <SelectItem value="America/Chicago">America/Chicago</SelectItem>
+              <SelectItem value="America/Denver">America/Denver</SelectItem>
+              <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
+              <SelectItem value="Australia/Sydney">Australia/Sydney</SelectItem>
+              <SelectItem value="Australia/Melbourne">Australia/Melbourne</SelectItem>
+              <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
+              <SelectItem value="Asia/Shanghai">Asia/Shanghai</SelectItem>
+              <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
+              <SelectItem value="Europe/Berlin">Europe/Berlin</SelectItem>
+              <SelectItem value="UTC">UTC</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="operational_hours">Operational Hours per Day</Label>
           <Input
             id="operational_hours"
