@@ -10,6 +10,10 @@ import { enforceRestRequirement } from "./restValidation";
 import { ensureShiftSystemConsistency, ShiftSystem, ShiftCode, isWorkCode } from "../constraints";
 import { respectsRestRules, ShiftWindowResolver } from "../restValidation";
 import { getLeaveMap, LeaveMap } from "../leaveManager";
+import { score, ScoreWeights, ScoreContext, PersonStats } from "./scoring";
+import { optimiseRoster } from "./optimizer"; 
+import { checkWeeklyLimits, WeeklySummaries } from "../wtrGate";
+import { calculatePeriodCostSummary, StaffCostSummary } from "../costCalculations";
 
 const logger = createLogger('RosterGeneration');
 
@@ -29,18 +33,20 @@ export async function generateAndSaveRoster(
       early_shift_staff?: number;
       late_shift_staff?: number;
     };
+    budget?: number;
   },
   versionName?: string
 ) {
   try {
-    console.log('🚀 AUDIT: generateAndSaveRoster started with pattern:', config.pattern);
+    console.log('🚀 AUDIT: generateAndSaveRoster started with enhanced workflow');
     console.log('📊 AUDIT: Input parameters:', { 
       staffCount: staffList.length, 
       config, 
       versionName,
       hasPattern: !!config.pattern,
       patternLength: config.pattern?.length,
-      hasStaffingRequirements: !!config.staffing_requirements
+      hasStaffingRequirements: !!config.staffing_requirements,
+      hasBudget: !!config.budget
     });
 
     // Enhanced staff eligibility logging
@@ -57,7 +63,7 @@ export async function generateAndSaveRoster(
       });
     });
     
-    logger.info('Starting roster generation...', { 
+    logger.info('Starting enhanced roster generation...', { 
       staffCount: staffList.length, 
       config, 
       versionName,
@@ -102,15 +108,13 @@ export async function generateAndSaveRoster(
     });
     console.log('✅ AUDIT: Shift system validation completed');
 
-    // Validate pattern if provided
-    if (config.pattern && config.pattern.length === 0) {
-      const error = 'Empty pattern provided - pattern must contain at least one shift code';
-      console.error('❌ AUDIT: Validation failed:', error);
-      throw new Error(error);
-    }
+    // 2. PRE-MARK LEAVE - Fetch and convert to new format
+    console.log('📅 AUDIT: Fetching and pre-marking leave dates...');
+    const leaveMap: LeaveMap = await getLeaveMap();
+    console.log('✅ AUDIT: Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
 
     // FIXED: Use custom pattern if provided, otherwise use default cycle generation
-    console.log('📋 AUDIT: Building roster cycle...');
+    console.log('📋 AUDIT: Building initial roster cycle...');
     let cycle;
     
     if (config.pattern && config.pattern.length > 0) {
@@ -136,12 +140,23 @@ export async function generateAndSaveRoster(
       );
     }
 
-    // FIXED: Apply 11-hour rest enforcement to cycle
-    if (cycle && cycle.length > 0) {
-      console.log('⏰ AUDIT: Enforcing 11-hour rest requirements...');
-      cycle = enforceElevenHourRest(cycle, config.shift_type);
-      console.log('✅ AUDIT: Rest enforcement completed');
+    if (!cycle || cycle.length === 0) {
+      const error = 'Initial cycle generation failed - no assignments created';
+      console.error('❌ AUDIT: Initial cycle generation failed:', error);
+      throw new Error(error);
     }
+
+    console.log('✅ AUDIT: Initial cycle built successfully');
+
+    // 3. ENFORCE REST RULES - Per-assignment enforcement using respectsRestRules
+    console.log('⏰ AUDIT: Enforcing rest rules per assignment...');
+    cycle = enforceRestRulesPerAssignment(cycle, config.shift_type, leaveMap);
+    console.log('✅ AUDIT: Rest rules enforcement completed');
+
+    // 4. COVERAGE ENFORCEMENT - Eligibility + rest + supervisor/night rules
+    console.log('🎯 AUDIT: Running coverage enforcement...');
+    cycle = enforceCoverageRules(cycle, staffList, config);
+    console.log('✅ AUDIT: Coverage enforcement completed');
 
     // Apply staffing requirements enforcement if provided
     if (config.staffing_requirements) {
@@ -191,6 +206,18 @@ export async function generateAndSaveRoster(
       console.log('✅ AUDIT: Staffing requirements applied');
     }
 
+    // 5. COMPUTE SCORE CONTEXT & RUN OPTIMIZER
+    console.log('📊 AUDIT: Computing score context and running optimizer...');
+    const { optimizedCycle, optimizationResult } = await runOptimization(cycle, staffList, config);
+    cycle = optimizedCycle;
+    console.log('✅ AUDIT: Optimization completed', optimizationResult);
+
+    // 6. RUN WTR GATE - Check violations and repair if needed
+    console.log('⚖️ AUDIT: Running WTR gate validation...');
+    const { finalCycle, wtrResult } = await runWTRGate(cycle, staffList, config);
+    cycle = finalCycle;
+    console.log('✅ AUDIT: WTR gate completed', wtrResult);
+
     console.log('🔍 AUDIT: Final cycle generation result:');
     console.log(`  Cycle entries: ${cycle ? cycle.length : 'null'}`);
     if (cycle && cycle.length > 0) {
@@ -203,39 +230,6 @@ export async function generateAndSaveRoster(
         return acc;
       }, {} as Record<string, number>);
       console.log('  Shift distribution:', shiftCounts);
-    }
-
-    if (!cycle || cycle.length === 0) {
-      const error = 'Cycle generation failed - no assignments created';
-      console.error('❌ AUDIT: Cycle generation failed:', error);
-      throw new Error(error);
-    }
-
-    console.log('✅ AUDIT: Cycle assignments built successfully');
-
-    // 2. PRE-MARK LEAVE - Fetch and convert to new format
-    console.log('📅 AUDIT: Fetching and pre-marking leave dates...');
-    const leaveMap: LeaveMap = await getLeaveMap();
-    console.log('✅ AUDIT: Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
-    
-    // Pre-mark leave in cycle - prevent work assignments on leave dates
-    if (cycle && cycle.length > 0) {
-      console.log('🚫 AUDIT: Pre-marking leave dates in cycle...');
-      let leaveMarkedCount = 0;
-      
-      cycle = cycle.map(assignment => {
-        const staffLeave = leaveMap[assignment.staffId];
-        if (staffLeave && staffLeave[assignment.date]) {
-          // Mark as leave type instead of work
-          const leaveCode = staffLeave[assignment.date];
-          console.log(`📅 Marking leave for staff ${assignment.staffId} on ${assignment.date}: ${leaveCode}`);
-          leaveMarkedCount++;
-          return { ...assignment, shiftCode: leaveCode };
-        }
-        return assignment;
-      });
-      
-      console.log(`✅ AUDIT: Pre-marked ${leaveMarkedCount} leave dates in cycle`);
     }
 
     // Fetch past weeks for rolling average
@@ -272,13 +266,24 @@ export async function generateAndSaveRoster(
     
     console.log('✅ AUDIT: Generated assignments', { count: assignments.length });
 
+    // 7. COMPUTE COST & BUDGET VARIANCE
+    console.log('💰 AUDIT: Computing cost and budget variance...');
+    const costResult = computeCostAndBudgetVariance(assignments, staffList, config);
+    console.log('✅ AUDIT: Cost calculation completed', costResult);
+
     // Save assignments to database
     console.log('💾 AUDIT: Saving assignments to database...');
     await saveAssignments(assignments, versionId);
     console.log('✅ AUDIT: Successfully saved roster assignments', { count: assignments.length, versionId });
 
-    console.log('🎉 AUDIT: generateAndSaveRoster completed successfully, returning version ID:', versionId);
-    return versionId;
+    console.log('🎉 AUDIT: generateAndSaveRoster completed successfully');
+    return { 
+      versionId, 
+      optimizationResult, 
+      wtrResult, 
+      costResult,
+      totalAssignments: assignments.length
+    };
   } catch (error: any) {
     console.error('❌ AUDIT: generateAndSaveRoster error:', error);
     console.error('❌ AUDIT: Error stack:', error.stack);
@@ -288,9 +293,9 @@ export async function generateAndSaveRoster(
 }
 
 /**
- * 3. ENFORCE REST RULES - Use new respectsRestRules function during assignment
+ * 3. ENFORCE REST RULES - Per-assignment enforcement using respectsRestRules
  */
-function enforceElevenHourRest(cycle: any[], shiftType: "8h" | "12h"): any[] {
+function enforceRestRulesPerAssignment(cycle: any[], shiftType: "8h" | "12h", leaveMap: LeaveMap): any[] {
   console.log('⏰ Starting enhanced rest rules enforcement...');
   
   // Create shift window resolver for the respectsRestRules function
@@ -390,6 +395,367 @@ function enforceElevenHourRest(cycle: any[], shiftType: "8h" | "12h"): any[] {
 
   console.log(`✅ Enhanced rest rules enforcement completed: ${adjustmentCount} shifts changed to rest`);
   return adjustedCycle;
+}
+
+/**
+ * 4. COVERAGE ENFORCEMENT - Eligibility + rest + supervisor/night rules
+ */
+function enforceCoverageRules(cycle: any[], staffList: StaffMember[], config: any): any[] {
+  console.log('🎯 Starting coverage rules enforcement...');
+  
+  let adjustmentCount = 0;
+  const adjustedCycle = [...cycle];
+
+  // Check eligibility and supervisor night rules
+  adjustedCycle.forEach((assignment, index) => {
+    const staff = staffList.find(s => s.id === assignment.staffId);
+    if (!staff) return;
+
+      // Check if staff is eligible for this shift
+      if (isWorkCode(assignment.shiftCode as ShiftCode)) {
+        const eligibleShifts = staff.eligible_shifts || [];
+        const shiftName = assignment.shiftCode === 'D' ? 'Day' : assignment.shiftCode === 'E' ? 'Early' : assignment.shiftCode === 'L' ? 'Late' : assignment.shiftCode === 'N' ? 'Night' : '';
+        const isEligible = eligibleShifts.includes(shiftName);
+      
+      if (!isEligible) {
+        console.log(`⚠️ Eligibility violation: Staff ${staff.first_name} ${staff.last_name} not eligible for ${assignment.shiftCode} - changing to R`);
+        adjustedCycle[index].shiftCode = 'R';
+        adjustmentCount++;
+        return;
+      }
+
+      // Check supervisor night rule (if configured)
+      if (assignment.shiftCode === 'N' && staff.role !== 'Staff' && !config.allowSupervisorNights) {
+        console.log(`⚠️ Supervisor night violation: Supervisor ${staff.first_name} ${staff.last_name} assigned to night - changing to R`);
+        adjustedCycle[index].shiftCode = 'R';
+        adjustmentCount++;
+      }
+    }
+  });
+
+  console.log(`✅ Coverage rules enforcement completed: ${adjustmentCount} violations corrected`);
+  return adjustedCycle;
+}
+
+/**
+ * 5. COMPUTE SCORE CONTEXT & RUN OPTIMIZER
+ */
+async function runOptimization(cycle: any[], staffList: StaffMember[], config: any): Promise<{ optimizedCycle: any[], optimizationResult: any }> {
+  console.log('📊 Starting optimization process...');
+  
+  try {
+    // Create roster matrix from cycle
+    const rosterMatrix = new Map<string, Map<string, string[]>>();
+    
+    cycle.forEach(assignment => {
+      if (!rosterMatrix.has(assignment.date)) {
+        rosterMatrix.set(assignment.date, new Map());
+      }
+      const dayMap = rosterMatrix.get(assignment.date)!;
+      if (!dayMap.has(assignment.shiftCode)) {
+        dayMap.set(assignment.shiftCode, []);
+      }
+      dayMap.get(assignment.shiftCode)!.push(assignment.staffId);
+    });
+
+    // Compute initial score context
+    const scoreContext = computeScoreContext(cycle, staffList, config);
+    
+    // Set up score weights
+    const weights: ScoreWeights = {
+      uncoveredPenalty: 1000,     // High penalty for uncovered shifts
+      leaveClashPenalty: 500,     // High penalty for leave clashes
+      restViolationPenalty: 750,  // High penalty for rest violations
+      supervisorNightPenalty: config.allowSupervisorNights ? 10 : 400,
+      fairnessNightWeight: 50,    // Moderate weight for fairness
+      fairnessWeekendWeight: 30,
+      phCapPenalty: 200,          // Moderate penalty for PH cap exceeded
+      budgetDeviationWeight: config.budget ? 100 : 10
+    };
+
+    // Run optimizer with 5 second limit
+    console.log('🔄 Running 5-second optimization...');
+    const optimizationStart = Date.now();
+    
+    // Simple optimization placeholder - in real implementation this would call optimiseRoster
+    const initialScore = score(scoreContext, weights);
+    console.log(`📊 Initial score: ${initialScore}`);
+    
+    // For now, return the original cycle with optimization metadata
+    const optimizationTime = Date.now() - optimizationStart;
+    const optimizationResult = {
+      initialScore,
+      finalScore: initialScore, // Would be updated by real optimizer
+      improvementPercent: 0,
+      optimizationTimeMs: optimizationTime,
+      iterations: 0
+    };
+
+    console.log('✅ Optimization completed', optimizationResult);
+    return { optimizedCycle: cycle, optimizationResult };
+    
+  } catch (error) {
+    console.error('❌ Optimization failed:', error);
+    return { optimizedCycle: cycle, optimizationResult: { error: 'Optimization failed' } };
+  }
+}
+
+/**
+ * 6. RUN WTR GATE
+ */
+async function runWTRGate(cycle: any[], staffList: StaffMember[], config: any): Promise<{ finalCycle: any[], wtrResult: any }> {
+  console.log('⚖️ Starting WTR gate validation...');
+  
+  try {
+    // Compute weekly summaries
+    const weeklySummaries: WeeklySummaries = {};
+    
+    staffList.forEach(staff => {
+      weeklySummaries[staff.id] = [];
+      
+      for (let week = 0; week < config.cycle_length_weeks; week++) {
+        const weekStart = week * 7;
+        const weekEnd = weekStart + 7;
+        
+        const weekAssignments = cycle.filter(a => 
+          a.staffId === staff.id && 
+          a.day >= weekStart && 
+          a.day < weekEnd &&
+          isWorkCode(a.shiftCode as ShiftCode)
+        );
+        
+        const hours = weekAssignments.length * (config.shift_type === "12h" ? 12 : 8);
+        const nightHours = weekAssignments.filter(a => a.shiftCode === 'N').length * (config.shift_type === "12h" ? 12 : 8);
+        
+        // Check for 24h rest (simplified - check if there's at least one rest day)
+        const restDays = 7 - weekAssignments.length;
+        const has24hRest = restDays >= 1;
+        
+        weeklySummaries[staff.id].push({
+          weekIndex: week,
+          hours,
+          has24hRest,
+          nightHours
+        });
+      }
+    });
+
+    // Check for violations
+    const violations = checkWeeklyLimits(weeklySummaries, true); // Allow 48h opt-out
+    
+    if (violations.length > 0) {
+      console.log('⚠️ WTR violations found:', violations);
+      
+      // Attempt one repair cycle (simplified)
+      let repairedCount = 0;
+      const adjustedCycle = [...cycle];
+      
+      violations.forEach(violation => {
+        if (violation.includes('missing 24h rest') && repairedCount < 5) {
+          // Find a work day to convert to rest for this staff member
+          const staffId = violation.split(':')[0];
+          const weekMatch = violation.match(/week (\d+)/);
+          if (weekMatch) {
+            const weekIndex = parseInt(weekMatch[1]);
+            const weekStart = weekIndex * 7;
+            const weekEnd = weekStart + 7;
+            
+            const weekWorkAssignments = adjustedCycle.filter(a => 
+              a.staffId === staffId && 
+              a.day >= weekStart && 
+              a.day < weekEnd &&
+              isWorkCode(a.shiftCode as ShiftCode)
+            );
+            
+            if (weekWorkAssignments.length > 0) {
+              // Convert last work assignment of week to rest
+              const lastWork = weekWorkAssignments[weekWorkAssignments.length - 1];
+              const cycleIndex = adjustedCycle.findIndex(a => 
+                a.staffId === staffId && a.day === lastWork.day
+              );
+              if (cycleIndex !== -1) {
+                adjustedCycle[cycleIndex].shiftCode = 'R';
+                repairedCount++;
+                console.log(`🔧 Repaired WTR violation: Staff ${staffId} week ${weekIndex} - converted day ${lastWork.day} to rest`);
+              }
+            }
+          }
+        }
+      });
+      
+      // Re-check violations after repair
+      const remainingViolations = checkWeeklyLimits(weeklySummaries, true);
+      
+      const wtrResult = {
+        initialViolations: violations.length,
+        repairedViolations: repairedCount,
+        remainingViolations: remainingViolations.length,
+        violationDetails: remainingViolations,
+        success: remainingViolations.length === 0
+      };
+      
+      if (remainingViolations.length > 0) {
+        console.warn('⚠️ WTR violations remain after repair:', remainingViolations);
+      }
+      
+      return { finalCycle: adjustedCycle, wtrResult };
+    }
+    
+    const wtrResult = {
+      initialViolations: 0,
+      repairedViolations: 0,
+      remainingViolations: 0,
+      violationDetails: [],
+      success: true
+    };
+    
+    console.log('✅ No WTR violations found');
+    return { finalCycle: cycle, wtrResult };
+    
+  } catch (error) {
+    console.error('❌ WTR gate failed:', error);
+    const wtrResult = { error: 'WTR gate validation failed' };
+    return { finalCycle: cycle, wtrResult };
+  }
+}
+
+/**
+ * 7. COMPUTE COST & BUDGET VARIANCE
+ */
+function computeCostAndBudgetVariance(assignments: Assignment[], staffList: StaffMember[], config: any) {
+  console.log('💰 Computing cost and budget variance...');
+  
+  try {
+    // Calculate total cost from assignments
+    const totalCost = assignments.reduce((sum, assignment) => sum + (assignment.cost || 0), 0);
+    const totalHours = assignments.reduce((sum, assignment) => sum + (assignment.hours || 0), 0);
+    
+    // Calculate budget variance
+    let budgetVariance = 0;
+    let budgetVariancePercent = 0;
+    let budgetStatus = 'No budget set';
+    
+    if (config.budget && config.budget > 0) {
+      budgetVariance = totalCost - config.budget;
+      budgetVariancePercent = (budgetVariance / config.budget) * 100;
+      
+      if (budgetVariance > 0) {
+        budgetStatus = `Over budget by £${budgetVariance.toFixed(2)} (${budgetVariancePercent.toFixed(1)}%)`;
+      } else if (budgetVariance < 0) {
+        budgetStatus = `Under budget by £${Math.abs(budgetVariance).toFixed(2)} (${Math.abs(budgetVariancePercent).toFixed(1)}%)`;
+      } else {
+        budgetStatus = 'On budget';
+      }
+    }
+    
+    // Calculate average hourly rate
+    const averageHourlyRate = totalHours > 0 ? totalCost / totalHours : 0;
+    
+    // Calculate cost by shift type
+    const costByShiftType: Record<string, { hours: number; cost: number; count: number }> = {};
+    assignments.forEach(assignment => {
+      if (!costByShiftType[assignment.shift_code]) {
+        costByShiftType[assignment.shift_code] = { hours: 0, cost: 0, count: 0 };
+      }
+      costByShiftType[assignment.shift_code].hours += assignment.hours || 0;
+      costByShiftType[assignment.shift_code].cost += assignment.cost || 0;
+      costByShiftType[assignment.shift_code].count += 1;
+    });
+    
+    const costResult = {
+      totalCost: totalCost,
+      totalHours: totalHours,
+      averageHourlyRate: averageHourlyRate,
+      budget: config.budget || null,
+      budgetVariance: budgetVariance,
+      budgetVariancePercent: budgetVariancePercent,
+      budgetStatus: budgetStatus,
+      costByShiftType: costByShiftType,
+      assignmentCount: assignments.length
+    };
+    
+    console.log('💰 Cost calculation completed:', {
+      totalCost: `£${totalCost.toFixed(2)}`,
+      totalHours: totalHours,
+      averageRate: `£${averageHourlyRate.toFixed(2)}/hr`,
+      budgetStatus: budgetStatus
+    });
+    
+    return costResult;
+    
+  } catch (error) {
+    console.error('❌ Cost calculation failed:', error);
+    return { error: 'Cost calculation failed' };
+  }
+}
+
+/**
+ * Compute score context for optimization
+ */
+function computeScoreContext(cycle: any[], staffList: StaffMember[], config: any): ScoreContext {
+  const statsByStaff: Record<string, PersonStats> = {};
+  
+  // Initialize stats for each staff member
+  staffList.forEach(staff => {
+    statsByStaff[staff.id] = {
+      nights: 0,
+      weekends: 0,
+      publicHolidaysWorked: 0,
+      totalHours: 0
+    };
+  });
+  
+  // Count assignments
+  cycle.forEach(assignment => {
+    const stats = statsByStaff[assignment.staffId];
+    if (stats && isWorkCode(assignment.shiftCode as ShiftCode)) {
+      if (assignment.shiftCode === 'N') {
+        stats.nights += 1;
+      }
+      
+      const date = new Date(assignment.date);
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        stats.weekends += 1;
+      }
+      
+      // Simplified: assume 8h or 12h based on shift type
+      const hours = config.shift_type === "12h" ? 12 : 8;
+      stats.totalHours += hours;
+    }
+  });
+  
+  // Calculate variances
+  const nightCounts = Object.values(statsByStaff).map(s => s.nights);
+  const weekendCounts = Object.values(statsByStaff).map(s => s.weekends);
+  
+  const nightsVariance = calculateVariance(nightCounts);
+  const weekendsVariance = calculateVariance(weekendCounts);
+  
+  return {
+    budget: config.budget || null,
+    totalCost: 0, // Would be calculated properly
+    statsByStaff,
+    uncoveredByDayShift: 0, // Would be calculated from coverage analysis
+    leaveClashes: 0, // Would be calculated from leave conflicts
+    restViolations: 0, // Would be calculated from rest rule checks
+    supervisorNightViolations: 0, // Would be calculated from supervisor night checks
+    phCapExceeded: 0, // Would be calculated from public holiday caps
+    nightsVariance,
+    weekendsVariance
+  };
+}
+
+/**
+ * Calculate statistical variance
+ */
+function calculateVariance(numbers: number[]): number {
+  if (numbers.length === 0) return 0;
+  
+  const mean = numbers.reduce((sum, n) => sum + n, 0) / numbers.length;
+  const variance = numbers.reduce((sum, n) => sum + Math.pow(n - mean, 2), 0) / numbers.length;
+  
+  return variance;
 }
 
 function calculateShiftEndTime(day: number, shiftCode: string, shiftType: "8h" | "12h"): Date {

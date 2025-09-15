@@ -97,14 +97,14 @@ export async function continueRoster(configId: string): Promise<string> {
 
     // 6. Generate and save roster with auto-generated version name
     const versionName = `Continued v${nextVersionNumber} - ${configRow.config_name}`;
-    const newVersionId = await generateAndSaveRoster(
+    const result = await generateAndSaveRoster(
       staffList,
       configForGeneration,
       versionName
     );
 
-    logger.info('Successfully continued roster', { newVersionId });
-    return newVersionId;
+    logger.info('Successfully continued roster', { result });
+    return result.versionId;
 
   } catch (error: any) {
     logger.error(new Error('Error continuing roster'), { originalError: error });

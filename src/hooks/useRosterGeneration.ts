@@ -260,14 +260,14 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       console.log('📊 useRosterGeneration: Config for generation:', configForGeneration);
       console.log('📊 useRosterGeneration: Staff list:', staffList.map(s => ({ id: s.id, name: s.name })));
 
-      const versionId = await generateAndSaveRoster(
+      const result = await generateAndSaveRoster(
         staffList,
         configForGeneration,
         rosterName.trim()
       );
       
-      console.log('✅ useRosterGeneration: Roster generated successfully, version ID:', versionId);
-      setGeneratedVersionId(versionId);
+      console.log('✅ useRosterGeneration: Roster generated successfully, result:', result);
+      setGeneratedVersionId(result.versionId);
       
       toast({
         title: "Roster generated successfully",
