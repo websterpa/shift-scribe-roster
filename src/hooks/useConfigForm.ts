@@ -13,6 +13,8 @@ export interface ConfigFormData {
   start_date: string;
   site_start_time: string;
   timezone: string;
+  default_ot_hours?: number;
+  default_ot_start_local_time?: string;
   pattern?: string[];
   staffing_requirements?: {
     day_shift_staff?: number;
@@ -37,6 +39,8 @@ export function useConfigForm() {
     start_date: '',
     site_start_time: '07:00',
     timezone: 'Europe/London',
+    default_ot_hours: 4,
+    default_ot_start_local_time: '10:00',
     pattern: [],
     staffing_requirements: {
       day_shift_staff: 2,
@@ -113,6 +117,8 @@ export function useConfigForm() {
         start_date: data.start_date,
         site_start_time: data.site_start_time || '07:00',
         timezone: data.timezone || 'Europe/London',
+        default_ot_hours: data.default_ot_hours || undefined,
+        default_ot_start_local_time: data.default_ot_start_local_time || undefined,
         pattern: pattern,
         staffing_requirements: staffingRequirements
       });

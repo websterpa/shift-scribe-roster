@@ -13,6 +13,8 @@ export interface ConfigData {
   start_date: string;
   site_start_time?: string;
   timezone?: string;
+  default_ot_hours?: number;
+  default_ot_start_local_time?: string;
   pattern?: string[];
   staffing_requirements?: {
     day_shift_staff?: number;
@@ -73,6 +75,8 @@ export const saveConfig = async (configData: ConfigData): Promise<string> => {
       start_date: configData.start_date,
       site_start_time: configData.site_start_time || '07:00',
       timezone: configData.timezone || 'Europe/London',
+      default_ot_hours: configData.default_ot_hours,
+      default_ot_start_local_time: configData.default_ot_start_local_time,
       staffing_requirements: configData.staffing_requirements || {
         day_shift_staff: 2,
         night_shift_staff: 2,
@@ -107,6 +111,8 @@ export const updateConfig = async (configId: string, configData: any) => {
       start_date: configData.start_date,
       site_start_time: configData.site_start_time,
       timezone: configData.timezone,
+      default_ot_hours: configData.default_ot_hours,
+      default_ot_start_local_time: configData.default_ot_start_local_time,
       staffing_requirements: configData.staffing_requirements,
       pattern: configData.pattern
     })
@@ -152,6 +158,8 @@ export const ensureDefaultConfig = async () => {
         start_date: getNextMonday(),
         site_start_time: '07:00',
         timezone: 'Europe/London',
+        default_ot_hours: 4,
+        default_ot_start_local_time: '10:00',
         staffing_requirements: {
           day_shift_staff: 2,
           night_shift_staff: 2,

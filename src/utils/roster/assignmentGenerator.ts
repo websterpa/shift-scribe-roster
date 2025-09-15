@@ -19,8 +19,8 @@ export function generateAssignments(
     start_date: string;
     site_start_time?: string;
     timezone?: string;
-    defaultOtHours?: number;
-    defaultOtStartLocalTime?: string;
+    default_ot_hours?: number;
+    default_ot_start_local_time?: string;
   },
   leaveMap: LeaveMap,
   pastWeeksMap: Record<string, number[]>,
@@ -77,8 +77,8 @@ export function generateAssignments(
     shiftSystem: config.shift_type,
     siteStartLocalTime: config.site_start_time || '07:00',
     timezone: config.timezone || 'Europe/London',
-    defaultOtHours: config.defaultOtHours,
-    defaultOtStartLocalTime: config.defaultOtStartLocalTime
+    defaultOtHours: config.default_ot_hours,
+    defaultOtStartLocalTime: config.default_ot_start_local_time
   });
 
   // Track last worked info for rest validation
@@ -120,8 +120,8 @@ export function generateAssignments(
       // Handle OT with variable timing using shift window resolver
       if (finalShiftCode === "OT") {
         const otOpts: OTOptions = {
-          otHours: cycleEntry.otOptions?.otHours || config.defaultOtHours || (config.shift_type === "12h" ? 12 : 8),
-          otStartLocalTime: cycleEntry.otOptions?.otStartLocalTime || config.defaultOtStartLocalTime
+          otHours: cycleEntry.otOptions?.otHours || config.default_ot_hours || (config.shift_type === "12h" ? 12 : 8),
+          otStartLocalTime: cycleEntry.otOptions?.otStartLocalTime || config.default_ot_start_local_time
         };
 
         console.log(`🕒 AUDIT: Processing OT for staff ${staff.id} on ${dateString} with options:`, otOpts);

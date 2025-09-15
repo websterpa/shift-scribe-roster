@@ -300,6 +300,8 @@ export type Database = {
           config_name: string
           created_at: string | null
           cycle_length_weeks: number
+          default_ot_hours: number | null
+          default_ot_start_local_time: string | null
           handshake_minutes: number | null
           id: string
           operational_hours_per_day: number
@@ -314,6 +316,8 @@ export type Database = {
           config_name: string
           created_at?: string | null
           cycle_length_weeks: number
+          default_ot_hours?: number | null
+          default_ot_start_local_time?: string | null
           handshake_minutes?: number | null
           id?: string
           operational_hours_per_day: number
@@ -328,6 +332,8 @@ export type Database = {
           config_name?: string
           created_at?: string | null
           cycle_length_weeks?: number
+          default_ot_hours?: number | null
+          default_ot_start_local_time?: string | null
           handshake_minutes?: number | null
           id?: string
           operational_hours_per_day?: number

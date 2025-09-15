@@ -109,6 +109,49 @@ export const ConfigForm = ({ formData, onFormDataChange }: ConfigFormProps) => {
           </Select>
         </div>
 
+        <div className="space-y-4 border-t pt-4">
+          <h4 className="text-sm font-semibold text-muted-foreground">Overtime Defaults</h4>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="default_ot_hours">Default OT Hours</Label>
+              <Input
+                id="default_ot_hours"
+                type="number"
+                step="0.5"
+                min="0.5"
+                max="24"
+                value={formData.default_ot_hours || ''}
+                onChange={(e) => handleFieldChange('default_ot_hours', e.target.value ? parseFloat(e.target.value) : undefined)}
+                placeholder="e.g., 4"
+              />
+              <p className="text-xs text-muted-foreground">
+                Default duration for OT shifts (hours). Leave empty to use system default ({formData.shift_type === '12h' ? '12' : '8'}h).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="default_ot_start_time">Default OT Start Time</Label>
+              <Input
+                id="default_ot_start_time"
+                type="time"
+                value={formData.default_ot_start_local_time || ''}
+                onChange={(e) => handleFieldChange('default_ot_start_local_time', e.target.value || undefined)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Default start time for OT shifts. Leave empty to use site start time ({formData.site_start_time}).
+              </p>
+            </div>
+          </div>
+          
+          <div className="bg-muted/20 p-3 rounded-md">
+            <p className="text-xs text-muted-foreground">
+              <strong>💡 Tip:</strong> These defaults apply when creating OT assignments without specific timing. 
+              Individual OT assignments can still override these settings for flexibility.
+            </p>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="operational_hours">Operational Hours per Day</Label>
           <Input

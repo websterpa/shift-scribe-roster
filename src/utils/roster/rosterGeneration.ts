@@ -30,6 +30,8 @@ export async function generateAndSaveRoster(
     pattern?: string[];
     site_start_time?: string; // e.g. "06:00" or "07:00"
     timezone?: string; // e.g. "Europe/London"
+    default_ot_hours?: number; // e.g. 4 or 3.5
+    default_ot_start_local_time?: string; // e.g. "10:00"
     staffing_requirements?: {
       day_shift_staff?: number;
       night_shift_staff?: number;
@@ -117,6 +119,8 @@ export async function generateAndSaveRoster(
       shiftSystem: config.shift_type as ShiftSystem,
       siteStartLocalTime: config.site_start_time || (config.shift_type === "12h" ? "07:00" : "06:00"),
       timezone: config.timezone || "Europe/London",
+      defaultOtHours: config.default_ot_hours,
+      defaultOtStartLocalTime: config.default_ot_start_local_time,
     } as const;
     
     const resolveShiftWindow = makeShiftWindowResolver(timingConfig);
