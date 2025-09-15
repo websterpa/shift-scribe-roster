@@ -2,6 +2,7 @@
 import { StaffMember, Assignment } from "@/types/roster";
 import { calculateShiftDetails, calculateShiftCost } from "./shiftCalculator";
 import { createLogger } from "../errorLogger";
+import { LeaveMap } from "../leaveManager";
 
 const logger = createLogger('AssignmentGenerator');
 
@@ -14,7 +15,7 @@ export function generateAssignments(
     handshake_minutes: number;
     start_date: string;
   },
-  leaveMap: Record<string, { date: string; type: string }[]>,
+  leaveMap: LeaveMap,
   pastWeeksMap: Record<string, number[]>
 ): Assignment[] {
   console.log('⚙️ AUDIT: generateAssignments called');
@@ -72,17 +73,15 @@ export function generateAssignments(
       assignmentDate.setDate(assignmentDate.getDate() + cycleEntry.day);
       const dateString = assignmentDate.toISOString().split('T')[0];
 
-      // Check for leave conflicts
+      // Check for leave conflicts using new LeaveMap format
       const staffLeave = leaveMap[staff.id];
-      const hasLeave = staffLeave?.some(leave => 
-        new Date(leave.date).toDateString() === assignmentDate.toDateString()
-      );
+      const hasLeave = staffLeave && staffLeave[dateString];
 
       let finalShiftCode = cycleEntry.shiftCode;
       
       if (hasLeave) {
-        console.log(`📅 AUDIT: Staff ${staff.id} has leave on ${dateString}, converting ${cycleEntry.shiftCode} to R`);
-        finalShiftCode = 'R';
+        console.log(`📅 AUDIT: Staff ${staff.id} has leave on ${dateString} (${hasLeave}), converting ${cycleEntry.shiftCode} to ${hasLeave}`);
+        finalShiftCode = hasLeave; // Use the actual leave code (A/L, S, SP, CL)
       }
 
       // Calculate shift details using the correct function

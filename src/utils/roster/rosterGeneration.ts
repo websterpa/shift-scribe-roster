@@ -7,6 +7,9 @@ import { createRosterVersion } from "./rosterVersion";
 import { isStaffEligibleForShift, getEligibleShiftCodes } from "./shiftCodeMapping";
 import { enforceStaffingRequirements } from "./staffingEnforcement";
 import { enforceRestRequirement } from "./restValidation";
+import { ensureShiftSystemConsistency, ShiftSystem, ShiftCode, isWorkCode } from "../constraints";
+import { respectsRestRules, ShiftWindowResolver } from "../restValidation";
+import { getLeaveMap, LeaveMap } from "../leaveManager";
 
 const logger = createLogger('RosterGeneration');
 
@@ -73,6 +76,31 @@ export async function generateAndSaveRoster(
       console.error('❌ AUDIT: Validation failed:', error);
       throw new Error(error);
     }
+
+    // 1. VALIDATE SHIFT SYSTEM - Block mixed codes
+    console.log('🔍 AUDIT: Validating shift system consistency...');
+    if (config.pattern) {
+      const invalidCodes = config.pattern.filter(code => 
+        !ensureShiftSystemConsistency(code as ShiftCode, config.shift_type as ShiftSystem)
+      );
+      if (invalidCodes.length > 0) {
+        const error = `Invalid shift codes for ${config.shift_type} system: ${invalidCodes.join(', ')}`;
+        console.error('❌ AUDIT: Shift system validation failed:', error);
+        throw new Error(error);
+      }
+    }
+    
+    // Validate staff eligible shifts for system consistency
+    staffList.forEach(staff => {
+      const invalidStaffShifts = staff.eligible_shifts.filter(shiftName => {
+        const shiftCode = getShiftCodeFromName(shiftName);
+        return shiftCode && !ensureShiftSystemConsistency(shiftCode as ShiftCode, config.shift_type as ShiftSystem);
+      });
+      if (invalidStaffShifts.length > 0) {
+        console.warn(`⚠️ Staff ${staff.first_name} ${staff.last_name} has shifts incompatible with ${config.shift_type} system: ${invalidStaffShifts.join(', ')}`);
+      }
+    });
+    console.log('✅ AUDIT: Shift system validation completed');
 
     // Validate pattern if provided
     if (config.pattern && config.pattern.length === 0) {
@@ -185,10 +213,30 @@ export async function generateAndSaveRoster(
 
     console.log('✅ AUDIT: Cycle assignments built successfully');
 
-    // Fetch approved leave requests
-    console.log('📅 AUDIT: Fetching leave requests...');
-    const leaveMap = await fetchLeaveRequests();
+    // 2. PRE-MARK LEAVE - Fetch and convert to new format
+    console.log('📅 AUDIT: Fetching and pre-marking leave dates...');
+    const leaveMap: LeaveMap = await getLeaveMap();
     console.log('✅ AUDIT: Leave requests processed', { staffWithLeave: Object.keys(leaveMap).length });
+    
+    // Pre-mark leave in cycle - prevent work assignments on leave dates
+    if (cycle && cycle.length > 0) {
+      console.log('🚫 AUDIT: Pre-marking leave dates in cycle...');
+      let leaveMarkedCount = 0;
+      
+      cycle = cycle.map(assignment => {
+        const staffLeave = leaveMap[assignment.staffId];
+        if (staffLeave && staffLeave[assignment.date]) {
+          // Mark as leave type instead of work
+          const leaveCode = staffLeave[assignment.date];
+          console.log(`📅 Marking leave for staff ${assignment.staffId} on ${assignment.date}: ${leaveCode}`);
+          leaveMarkedCount++;
+          return { ...assignment, shiftCode: leaveCode };
+        }
+        return assignment;
+      });
+      
+      console.log(`✅ AUDIT: Pre-marked ${leaveMarkedCount} leave dates in cycle`);
+    }
 
     // Fetch past weeks for rolling average
     console.log('📈 AUDIT: Preparing past weeks data...');
@@ -240,12 +288,47 @@ export async function generateAndSaveRoster(
 }
 
 /**
- * Enforces 11-hour rest between shifts in the cycle
+ * 3. ENFORCE REST RULES - Use new respectsRestRules function during assignment
  */
 function enforceElevenHourRest(cycle: any[], shiftType: "8h" | "12h"): any[] {
-  console.log('⏰ Starting 11-hour rest enforcement...');
+  console.log('⏰ Starting enhanced rest rules enforcement...');
   
-  // Group assignments by staff member
+  // Create shift window resolver for the respectsRestRules function
+  const shiftWindowResolver: ShiftWindowResolver = (dateISO: string, code: ShiftCode) => {
+    const date = new Date(dateISO + 'T00:00:00Z');
+    const start = new Date(date);
+    const end = new Date(date);
+    
+    if (shiftType === "12h") {
+      if (code === 'D') {
+        start.setHours(7, 0);
+        end.setHours(19, 0);
+      } else if (code === 'N') {
+        start.setHours(19, 0);
+        end.setDate(end.getDate() + 1);
+        end.setHours(7, 0);
+      }
+    } else { // 8h
+      if (code === 'E') {
+        start.setHours(6, 0);
+        end.setHours(14, 0);
+      } else if (code === 'L') {
+        start.setHours(14, 0);
+        end.setHours(22, 0);
+      } else if (code === 'N') {
+        start.setHours(22, 0);
+        end.setDate(end.getDate() + 1);
+        end.setHours(6, 0);
+      } else if (code === 'D') {
+        start.setHours(10, 0);
+        end.setHours(18, 0);
+      }
+    }
+    
+    return isWorkCode(code) ? { start, end } : null;
+  };
+  
+  // Group assignments by staff member and sort by date
   const staffAssignments: { [staffId: string]: any[] } = {};
   cycle.forEach(assignment => {
     if (!staffAssignments[assignment.staffId]) {
@@ -262,25 +345,36 @@ function enforceElevenHourRest(cycle: any[], shiftType: "8h" | "12h"): any[] {
   const adjustedCycle = [...cycle];
   let adjustmentCount = 0;
 
-  // Check each staff member's consecutive shifts
+  // Check each staff member's consecutive shifts using new rest validation
   Object.entries(staffAssignments).forEach(([staffId, assignments]) => {
     for (let i = 1; i < assignments.length; i++) {
       const prevAssignment = assignments[i - 1];
       const currentAssignment = assignments[i];
       
-      // Skip if either is a rest day
-      if (prevAssignment.shiftCode === 'R' || currentAssignment.shiftCode === 'R') {
+      // Skip if current assignment is already rest or leave
+      if (!isWorkCode(currentAssignment.shiftCode as ShiftCode)) {
         continue;
       }
 
-      // Calculate shift end time for previous day
-      const prevShiftEnd = calculateShiftEndTime(prevAssignment.day, prevAssignment.shiftCode, shiftType);
-      // Calculate shift start time for current day  
-      const currentShiftStart = calculateShiftStartTime(currentAssignment.day, currentAssignment.shiftCode, shiftType);
+      // Get previous shift end time
+      let prevEnd: Date | null = null;
+      if (isWorkCode(prevAssignment.shiftCode as ShiftCode)) {
+        const prevWindow = shiftWindowResolver(prevAssignment.date, prevAssignment.shiftCode as ShiftCode);
+        prevEnd = prevWindow?.end || null;
+      }
 
-      // Check if 11-hour rest is violated
-      if (!enforceRestRequirement(staffId, currentAssignment.shiftCode, prevShiftEnd, currentShiftStart)) {
-        console.log(`⚠️ Rest violation: Staff ${staffId} day ${currentAssignment.day} - changing to R`);
+      // Use new respectsRestRules function
+      const respectsRest = respectsRestRules(
+        prevEnd,
+        prevAssignment.date,
+        prevAssignment.shiftCode as ShiftCode,
+        currentAssignment.date,
+        currentAssignment.shiftCode as ShiftCode,
+        shiftWindowResolver
+      );
+
+      if (!respectsRest) {
+        console.log(`⚠️ Rest rule violation: Staff ${staffId} day ${currentAssignment.day} - changing ${currentAssignment.shiftCode} to R`);
         
         // Find and update the assignment in the main cycle
         const cycleIndex = adjustedCycle.findIndex(a => 
@@ -294,7 +388,7 @@ function enforceElevenHourRest(cycle: any[], shiftType: "8h" | "12h"): any[] {
     }
   });
 
-  console.log(`✅ 11-hour rest enforcement completed: ${adjustmentCount} shifts changed to rest`);
+  console.log(`✅ Enhanced rest rules enforcement completed: ${adjustmentCount} shifts changed to rest`);
   return adjustedCycle;
 }
 
@@ -481,69 +575,19 @@ function calculateMinimumStaffRequired(config: {
   }
 }
 
-async function fetchLeaveRequests(): Promise<Record<string, { date: string; type: string }[]>> {
-  try {
-    console.log('Calling supabase.from("leave_requests").select...');
-    const { data: leaves, error } = await supabase
-      .from("leave_requests")
-      .select("staff_id, start_date, end_date, leave_type")
-      .eq("status", "approved");
-      
-    if (error) {
-      console.error('❌ Error fetching leave requests:', error);
-      logger.error(new Error('Failed to fetch leave requests'), { error });
-      logger.warn('Continuing roster generation without leave data');
-      return {};
-    }
-
-    if (!leaves || leaves.length === 0) {
-      console.log('ℹ️ No approved leave requests found');
-      logger.info('No approved leave requests found');
-      return {};
-    }
-
-    const leaveMap: Record<string, { date: string; type: string }[]> = {};
-    
-    leaves.forEach((lr: any) => {
-      try {
-        if (!lr.staff_id || !lr.start_date || !lr.end_date) {
-          logger.warn('Invalid leave request data, skipping:', lr);
-          return;
-        }
-        
-        const startDate = new Date(lr.start_date);
-        const endDate = new Date(lr.end_date);
-        
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          logger.warn('Invalid date in leave request, skipping:', lr);
-          return;
-        }
-        
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-          leaveMap[lr.staff_id] = leaveMap[lr.staff_id] || [];
-          leaveMap[lr.staff_id].push({ 
-            date: new Date(d).toDateString(), 
-            type: lr.leave_type === 'sick' ? 'S' : 'R'
-          });
-        }
-      } catch (dateError) {
-        logger.error(new Error('Error processing leave request'), { 
-          error: dateError, 
-          leaveRequest: lr 
-        });
-      }
-    });
-
-    console.log('✅ Successfully processed leave requests', { 
-      totalRequests: leaves.length, 
-      staffAffected: Object.keys(leaveMap).length 
-    });
-    return leaveMap;
-  } catch (error: any) {
-    console.error('❌ Error fetching leave requests:', error);
-    logger.error(new Error('Error fetching leave requests'), { error });
-    return {};
-  }
+/**
+ * Helper function to convert shift name to shift code
+ */
+function getShiftCodeFromName(shiftName: string): string | null {
+  const mapping: Record<string, string> = {
+    'Day': 'D',
+    'Early': 'E', 
+    'Late': 'L',
+    'Night': 'N',
+    'Rest': 'R',
+    'Sick': 'S'
+  };
+  return mapping[shiftName] || null;
 }
 
 async function fetchPastWeeks(staffList: StaffMember[], cycleLengthWeeks: number): Promise<Record<string, number[]>> {
