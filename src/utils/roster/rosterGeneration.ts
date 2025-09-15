@@ -267,7 +267,14 @@ export async function generateAndSaveRoster(
 
     // Generate assignments
     console.log('⚙️ AUDIT: Generating assignments...');
-    const assignments = generateAssignments(staffList, cycle, config, leaveMap, pastWeeksMap);
+    const assignments = generateAssignments(
+      staffList, 
+      cycle, 
+      config, 
+      leaveMap, 
+      pastWeeksMap,
+      respectsRestRules // Pass rest validation function for OT rest checks
+    );
     
     console.log('🔍 AUDIT: Assignment generation result:');
     console.log(`  Generated assignments: ${assignments ? assignments.length : 'null'}`);
