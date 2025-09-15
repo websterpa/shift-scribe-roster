@@ -3,6 +3,7 @@ import { StaffMember, Assignment } from "@/types/roster";
 import { calculateShiftDetails, calculateShiftCost } from "./shiftCalculator";
 import { createLogger } from "../errorLogger";
 import { LeaveMap } from "../leaveManager";
+import { ShiftCode } from "../constraints";
 
 const logger = createLogger('AssignmentGenerator');
 
@@ -92,12 +93,18 @@ export function generateAssignments(
         config.handshake_minutes
       );
 
-      // Calculate cost with holiday multiplier (defaulting to 1.5 for public holidays)
+      // Calculate cost using new costing system with accurate timing
+      const dateISO = dateString;
       const cost = calculateShiftCost(
-        shiftDetails.hours, 
-        staff.hourly_rate || 15.50, 
-        assignmentDate, 
-        1.5
+        finalShiftCode as ShiftCode,
+        dateISO,
+        staff.hourly_rate || 15.50,
+        {
+          start: shiftDetails.shiftStart || undefined,
+          end: shiftDetails.shiftEnd || undefined,
+          hoursOverride: shiftDetails.hours > 0 ? shiftDetails.hours : undefined,
+          publicHolidays: [] // TODO: Pass actual public holidays from config
+        }
       );
 
       const assignment: Assignment = {
