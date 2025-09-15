@@ -50,6 +50,7 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
 
   const coverage = result.coverageAchieved.total;
   const coverageStatus = getCoverageStatus(coverage);
+  const CoverageIcon = coverageStatus.icon;
   const violationSeverity = getViolationSeverity(result.violations);
 
   return (
@@ -79,7 +80,7 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
                   <p className="text-sm text-muted-foreground">Coverage Achieved</p>
                   <p className="text-2xl font-bold">{coverage.toFixed(1)}%</p>
                 </div>
-                <coverageStatus.icon className={`h-8 w-8 ${
+                <CoverageIcon className={`h-8 w-8 ${
                   coverageStatus.color === 'success' ? 'text-green-500' :
                   coverageStatus.color === 'warning' ? 'text-yellow-500' : 'text-red-500'
                 }`} />
