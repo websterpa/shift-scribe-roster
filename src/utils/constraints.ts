@@ -47,3 +47,14 @@ export function ensureShiftSystemConsistency(code: ShiftCode, system: ShiftSyste
   const allowed = new Set(SHIFT_SETS[system].concat(["R","OT","A/L","S","SP","CL"]));
   return allowed.has(code);
 }
+
+export function filterEligibleForSystem(
+  code: ShiftCode,
+  system: "8h" | "12h",
+  isSupervisor: boolean,
+  allowSupervisorNights: boolean
+) {
+  if (!ensureShiftSystemConsistency(code, system)) return false;
+  if (code === "N" && isSupervisor && !allowSupervisorNights) return false;
+  return true;
+}
