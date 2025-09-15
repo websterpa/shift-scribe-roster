@@ -533,8 +533,28 @@ async function runWTRGate(cycle: any[], staffList: StaffMember[], config: any): 
           isWorkCode(a.shiftCode as ShiftCode)
         );
         
-        const hours = weekAssignments.length * (config.shift_type === "12h" ? 12 : 8);
-        const nightHours = weekAssignments.filter(a => a.shiftCode === 'N').length * (config.shift_type === "12h" ? 12 : 8);
+        // Calculate actual hours from assignments (including variable OT)
+        let hours = 0;
+        let nightHours = 0;
+        
+        weekAssignments.forEach(assignment => {
+          let assignmentHours: number;
+          
+          if (assignment.shiftCode === 'OT' && assignment.otOptions?.otHours) {
+            // Use actual OT hours for variable OT
+            assignmentHours = assignment.otOptions.otHours;
+          } else {
+            // Use system default hours for regular shifts
+            assignmentHours = config.shift_type === "12h" ? 12 : 8;
+          }
+          
+          hours += assignmentHours;
+          
+          // Count night hours (including OT that might be night shifts)
+          if (assignment.shiftCode === 'N') {
+            nightHours += assignmentHours;
+          }
+        });
         
         // Check for 24h rest (simplified - check if there's at least one rest day)
         const restDays = 7 - weekAssignments.length;

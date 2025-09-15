@@ -6,6 +6,7 @@ import { LeaveMap } from "../leaveManager";
 import { ShiftCode } from "../constraints";
 import { makeShiftWindowResolver, OTOptions } from "@/utils/shiftWindowResolver";
 import { shiftCost, durationHours } from "@/utils/costing";
+import { respectsRestRules } from "../restValidation";
 
 const logger = createLogger('AssignmentGenerator');
 
@@ -128,16 +129,17 @@ export function generateAssignments(
 
         // Check rest rules for OT using shift window resolver
         if (restValidationFn) {
-          const okRest = restValidationFn(
-            lastWorkedEndByStaff[staff.id] || null,
-            prevWorkedDateISOByStaff[staff.id] || null,
-            prevWorkedCodeByStaff[staff.id] || null,
-            dateString,
-            "OT",
-            (d, c, opts) => resolveShiftWindow(d, c, opts || otOpts)
-          );
+        const respectsRest = respectsRestRules(
+          lastWorkedEndByStaff[staff.id] || null,
+          prevWorkedDateISOByStaff[staff.id] || null,
+          prevWorkedCodeByStaff[staff.id] || null,
+          dateString,
+          "OT",
+          (d, c, opts) => resolveShiftWindow(d, c, opts || otOpts),
+          otOpts
+        );
           
-          if (!okRest) {
+          if (respectsRest) {
             console.warn(`⚠️ AUDIT: OT assignment for staff ${staff.id} on ${dateString} violates rest rules - skipping`);
             return; // Skip this assignment due to rest rule violation
           }

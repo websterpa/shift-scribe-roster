@@ -1,9 +1,10 @@
 import { ShiftCode, isWorkCode } from "./constraints";
+import { OTOptions } from "./shiftWindowResolver";
 
 export interface ShiftWindow { start: Date; end: Date; }
 
 // Inject an adapter so we re-use your canonical shift timing logic.
-export type ShiftWindowResolver = (dateISO: string, code: ShiftCode) => ShiftWindow | null;
+export type ShiftWindowResolver = (dateISO: string, code: ShiftCode, otOpts?: OTOptions) => ShiftWindow | null;
 
 export function has11hRest(prevEnd: Date | null, nextStart: Date | null): boolean {
   if (!prevEnd || !nextStart) return true;
@@ -29,12 +30,13 @@ export function respectsRestRules(
   prevCode: ShiftCode | null,
   nextDateISO: string,
   nextCode: ShiftCode,
-  resolve: ShiftWindowResolver
+  resolve: ShiftWindowResolver,
+  nextOTOptions?: OTOptions
 ): boolean {
   if (!isWorkCode(nextCode)) return true;
   if (violatesSameDayDayToNight(prevDateISO, prevCode, nextDateISO, nextCode)) return false;
 
-  const nextWin = resolve(nextDateISO, nextCode);
+  const nextWin = resolve(nextDateISO, nextCode, nextOTOptions);
   if (!nextWin) return true;
 
   return has11hRest(prevEnd, nextWin.start);
