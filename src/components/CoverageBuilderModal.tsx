@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
   ShiftSystem, Coverage, parseOrDefault, serialiseCoverage,
-  applyPreset, defaultCoverage, copyWeekdaysToWeekend, applyToAllDays, clamp
+  applyPreset, defaultCoverage, copyWeekdaysToWeekend, applyToAllDays, clamp,
+  computeWeeklyTotals
 } from "@/utils/coveragePresets";
 
 const DAY_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -26,6 +27,7 @@ export default function CoverageBuilderModal({
   }, [open, initialJSON, shiftSystem]);
 
   const keys = useMemo(() => shiftSystem === "8h" ? (["E","L","N"] as const) : (["D","N"] as const), [shiftSystem]);
+  const totals = useMemo(() => computeWeeklyTotals(shiftSystem, coverage), [shiftSystem, coverage]);
 
   function setDayShift(d: number, k: string, v: number) {
     setCoverage(prev => {
@@ -110,6 +112,28 @@ export default function CoverageBuilderModal({
             <button className="btn" onClick={copyWeekdays}>Copy Mon–Fri → Weekend</button>
             <button className="btn" onClick={applyAll}>Apply this day → All days</button>
             <button className="btn" onClick={clearAll}>Clear all</button>
+          </div>
+        </div>
+
+        {/* Weekly totals preview */}
+        <div className="px-4 md:px-6 pb-4">
+          <div className="rounded-xl border bg-slate-50 p-3 md:p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-slate-700">Preview weekly totals</h4>
+              <span className="text-sm text-slate-500">Sun–Sat</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+              {keys.map(k => (
+                <div key={k} className="rounded-lg bg-white border p-3">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">Shift {k}</div>
+                  <div className="text-lg font-semibold">{totals.byShift[k]}</div>
+                </div>
+              ))}
+              <div className="rounded-lg bg-white border p-3 md:col-span-2">
+                <div className="text-xs uppercase tracking-wide text-slate-500">Overall</div>
+                <div className="text-lg font-semibold">{totals.overall}</div>
+              </div>
+            </div>
           </div>
         </div>
 
