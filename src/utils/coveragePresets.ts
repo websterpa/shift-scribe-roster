@@ -144,3 +144,48 @@ export function computeEstimatedWeeklyWageCost(
   const overall = +(weeklyHours.overall * rate).toFixed(2);
   return { byShift, overall };
 }
+
+// --- Role-based estimated cost helpers ---
+
+export interface RoleRates {
+  staffRate: number;
+  supervisorRate: number;
+  /** Supervisor mix % per shift key (0..100) */
+  roleMixByShift: Record<string, number>;
+}
+
+/**
+ * Compute blended hourly rate per shift:
+ * blended = (supMix% / 100) * supRate + (1 - supMix% / 100) * staffRate
+ */
+export function computeBlendedRates(roleRates: RoleRates, shiftKeys: string[]): Record<string, number> {
+  const blended: Record<string, number> = {};
+  for (const key of shiftKeys) {
+    const mix = roleRates.roleMixByShift[key] ?? 0;
+    const mixPct = Math.max(0, Math.min(100, mix)) / 100;
+    blended[key] = +(mixPct * roleRates.supervisorRate + (1 - mixPct) * roleRates.staffRate).toFixed(2);
+  }
+  return blended;
+}
+
+/**
+ * Returns per-shift and overall cost using role-based blended rates.
+ */
+export function computeRoleBasedWeeklyWageCost(
+  weeklyHours: { byShift: Record<string, number>; overall: number },
+  roleRates: RoleRates,
+  shiftKeys: string[]
+): { byShift: Record<string, number>; overall: number } {
+  const blendedRates = computeBlendedRates(roleRates, shiftKeys);
+  const byShift: Record<string, number> = {};
+  let overallCost = 0;
+  
+  for (const [k, hrs] of Object.entries(weeklyHours.byShift)) {
+    const rate = blendedRates[k] ?? 0;
+    const cost = +(hrs * rate).toFixed(2);
+    byShift[k] = cost;
+    overallCost += cost;
+  }
+  
+  return { byShift, overall: +overallCost.toFixed(2) };
+}

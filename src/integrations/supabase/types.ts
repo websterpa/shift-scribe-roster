@@ -423,6 +423,33 @@ export type Database = {
         }
         Relationships: []
       }
+      site_settings: {
+        Row: {
+          avg_staff_rate: number
+          avg_supervisor_rate: number
+          created_at: string
+          id: string
+          role_mix_by_shift: Json | null
+          updated_at: string
+        }
+        Insert: {
+          avg_staff_rate?: number
+          avg_supervisor_rate?: number
+          created_at?: string
+          id?: string
+          role_mix_by_shift?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          avg_staff_rate?: number
+          avg_supervisor_rate?: number
+          created_at?: string
+          id?: string
+          role_mix_by_shift?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff_counts: {
         Row: {
           count: number
