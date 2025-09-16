@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   ShiftSystem, Coverage, parseOrDefault, serialiseCoverage,
   applyPreset, defaultCoverage, copyWeekdaysToWeekend, applyToAllDays, clamp,
-  computeWeeklyTotals, computeEstimatedWeeklyHours
+  computeWeeklyTotals, computeEstimatedWeeklyHours, computeEstimatedWeeklyWageCost
 } from "@/utils/coveragePresets";
 
 const DAY_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -20,6 +20,7 @@ export default function CoverageBuilderModal({
 }: CoverageBuilderProps) {
   const [tabDay, setTabDay] = useState(1); // default Monday
   const [coverage, setCoverage] = useState<Coverage>(() => parseOrDefault(initialJSON, shiftSystem));
+  const [avgHourlyRate, setAvgHourlyRate] = useState<number>(18.0);
 
   // Reset when system changes or modal opens
   React.useEffect(() => {
@@ -29,6 +30,7 @@ export default function CoverageBuilderModal({
   const keys = useMemo(() => shiftSystem === "8h" ? (["E","L","N"] as const) : (["D","N"] as const), [shiftSystem]);
   const totals = useMemo(() => computeWeeklyTotals(shiftSystem, coverage), [shiftSystem, coverage]);
   const estHours = useMemo(() => computeEstimatedWeeklyHours(shiftSystem, coverage), [shiftSystem, coverage]);
+  const estCost = useMemo(() => computeEstimatedWeeklyWageCost(estHours, avgHourlyRate), [estHours, avgHourlyRate]);
 
   function setDayShift(d: number, k: string, v: number) {
     setCoverage(prev => {
@@ -113,6 +115,16 @@ export default function CoverageBuilderModal({
             <button className="btn" onClick={copyWeekdays}>Copy Mon–Fri → Weekend</button>
             <button className="btn" onClick={applyAll}>Apply this day → All days</button>
             <button className="btn" onClick={clearAll}>Clear all</button>
+            <span className="mx-2 hidden md:inline text-slate-300">|</span>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              Avg hourly rate (£/hr)
+              <input
+                className="input w-28"
+                type="number" min={0} step="0.01"
+                value={avgHourlyRate}
+                onChange={(e) => setAvgHourlyRate(Number(e.target.value))}
+              />
+            </label>
           </div>
         </div>
 
@@ -153,6 +165,26 @@ export default function CoverageBuilderModal({
               </div>
               <div className="text-xs text-slate-500 mt-1">
                 Calculated as {shiftSystem === "8h" ? "8h per E/L/N" : "12h per D/N"} across Sun–Sat coverage.
+              </div>
+            </div>
+            
+            {/* Rough weekly wage cost (estimate) */}
+            <div className="mt-3 text-sm text-slate-700">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="font-medium">Estimated weekly wage cost (rough):</span>
+                {keys.map(k => (
+                  <span key={k} className="inline-flex items-center gap-1">
+                    <span className="text-slate-500">Shift {k}:</span>
+                    <span className="font-semibold">£{estCost.byShift[k]?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  </span>
+                ))}
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-slate-500">Overall:</span>
+                  <span className="font-semibold">£{estCost.overall.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                </span>
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                Estimate only — uses coverage × average hourly rate. Excludes OT multipliers, PH premia, role differentials, and allowances.
               </div>
             </div>
           </div>
