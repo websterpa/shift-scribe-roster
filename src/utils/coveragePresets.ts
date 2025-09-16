@@ -1,0 +1,78 @@
+export type ShiftSystem = "8h" | "12h";
+export type DayIdx = 0|1|2|3|4|5|6;
+export type Coverage8h = { E?: number; L?: number; N?: number; D?: number };
+export type Coverage12h = { D?: number; N?: number; E?: number; L?: number };
+export type Coverage = Record<DayIdx, Coverage8h | Coverage12h>;
+
+export const EMPTY_8H: Coverage8h = { E:0, L:0, N:0, D:0 };
+export const EMPTY_12H: Coverage12h = { D:0, N:0, E:0, L:0 };
+
+export function defaultCoverage(system: ShiftSystem): Coverage {
+  const base = system === "8h" ? EMPTY_8H : EMPTY_12H;
+  return {
+    0: { ...base }, 1: { ...base }, 2: { ...base },
+    3: { ...base }, 4: { ...base }, 5: { ...base }, 6: { ...base },
+  } as Coverage;
+}
+
+export function clamp(v: number, min=0, max=20) { return Math.min(max, Math.max(min, Math.floor(v))); }
+
+export function applyPreset(system: ShiftSystem, size: "Small"|"Standard"|"Large"): Coverage {
+  const cov = defaultCoverage(system);
+  const set = (d: DayIdx, key: string, v: number) => { (cov[d] as any)[key] = clamp(v); };
+
+  if (system === "8h") {
+    // Mon–Fri heavier, weekend lighter
+    const wk = { E: size==="Small"?2: size==="Standard"?3:4, L: size==="Small"?2: size==="Standard"?3:4, N: 1 };
+    const we = { E: size==="Small"?1:2, L: size==="Small"?1:2, N: 1 };
+    ( [1,2,3,4,5] as DayIdx[]).forEach(d => { set(d,"E",wk.E); set(d,"L",wk.L); set(d,"N",wk.N); });
+    ( [0,6] as DayIdx[]).forEach(d => { set(d,"E",we.E); set(d,"L",we.L); set(d,"N",we.N); });
+  } else {
+    const wk = { D: size==="Small"?3: size==="Standard"?4:5, N: 1 };
+    const we = { D: size==="Small"?2:3, N: 1 };
+    ( [1,2,3,4,5] as DayIdx[]).forEach(d => { set(d,"D",wk.D); set(d,"N",wk.N); });
+    ( [0,6] as DayIdx[]).forEach(d => { set(d,"D",we.D); set(d,"N",we.N); });
+  }
+  return cov;
+}
+
+export function copyWeekdaysToWeekend(cov: Coverage, system: ShiftSystem): Coverage {
+  const sunday: DayIdx = 0, saturday: DayIdx = 6;
+  const fri: DayIdx = 5;
+  const keys = system === "8h" ? ["E","L","N"] : ["D","N"];
+  const out = structuredClone(cov);
+  for (const k of keys) {
+    (out[sunday] as any)[k] = (cov[fri] as any)[k] ?? 0;
+    (out[saturday] as any)[k] = (cov[fri] as any)[k] ?? 0;
+  }
+  return out;
+}
+
+export function applyToAllDays(
+  cov: Coverage, system: ShiftSystem, template: Partial<Coverage8h|Coverage12h>
+): Coverage {
+  const keys = system === "8h" ? ["E","L","N"] : ["D","N"];
+  const out = structuredClone(cov);
+  ( [0,1,2,3,4,5,6] as DayIdx[]).forEach(d => {
+    for (const k of keys) (out[d] as any)[k] = clamp((template as any)[k] ?? 0);
+  });
+  return out;
+}
+
+export function parseOrDefault(json: string, system: ShiftSystem): Coverage {
+  try {
+    const obj = JSON.parse(json);
+    const cov = defaultCoverage(system);
+    for (const d of [0,1,2,3,4,5,6] as DayIdx[]) {
+      if (obj[d] && typeof obj[d] === "object") cov[d] = { ...cov[d], ...obj[d] };
+    }
+    return cov;
+  } catch { return defaultCoverage(system); }
+}
+
+export function serialiseCoverage(cov: Coverage): string {
+  // Stable key order Sun..Sat
+  const ordered: any = {};
+  for (const d of [0,1,2,3,4,5,6] as DayIdx[]) ordered[d] = cov[d];
+  return JSON.stringify(ordered, null, 2);
+}
