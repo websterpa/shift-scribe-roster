@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   ShiftSystem, Coverage, parseOrDefault, serialiseCoverage,
   applyPreset, defaultCoverage, copyWeekdaysToWeekend, applyToAllDays, clamp,
-  computeWeeklyTotals
+  computeWeeklyTotals, computeEstimatedWeeklyHours
 } from "@/utils/coveragePresets";
 
 const DAY_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -28,6 +28,7 @@ export default function CoverageBuilderModal({
 
   const keys = useMemo(() => shiftSystem === "8h" ? (["E","L","N"] as const) : (["D","N"] as const), [shiftSystem]);
   const totals = useMemo(() => computeWeeklyTotals(shiftSystem, coverage), [shiftSystem, coverage]);
+  const estHours = useMemo(() => computeEstimatedWeeklyHours(shiftSystem, coverage), [shiftSystem, coverage]);
 
   function setDayShift(d: number, k: string, v: number) {
     setCoverage(prev => {
@@ -132,6 +133,26 @@ export default function CoverageBuilderModal({
               <div className="rounded-lg bg-white border p-3 md:col-span-2">
                 <div className="text-xs uppercase tracking-wide text-slate-500">Overall</div>
                 <div className="text-lg font-semibold">{totals.overall}</div>
+              </div>
+            </div>
+            
+            {/* Estimated weekly hours */}
+            <div className="mt-3 text-sm text-slate-700">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="font-medium">Estimated weekly hours:</span>
+                {keys.map(k => (
+                  <span key={k} className="inline-flex items-center gap-1">
+                    <span className="text-slate-500">Shift {k}:</span>
+                    <span className="font-semibold">{estHours.byShift[k]}h</span>
+                  </span>
+                ))}
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-slate-500">Overall:</span>
+                  <span className="font-semibold">{estHours.overall}h</span>
+                </span>
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                Calculated as {shiftSystem === "8h" ? "8h per E/L/N" : "12h per D/N"} across Sun–Sat coverage.
               </div>
             </div>
           </div>
