@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useRosterGenerator } from "@/hooks/useRosterGenerator";
 import type { ManagerRosterForm } from "@/types/managerUI";
 import { RosterSummaryCard } from "@/components/RosterSummaryCard";
+import CoverageBuilderModal from "@/components/CoverageBuilderModal";
 
 const DEFAULT_COVERAGE_JSON =
 `{
@@ -16,6 +17,7 @@ const DEFAULT_COVERAGE_JSON =
 
 export default function GenerateRosterPanel() {
   const { optimising, result, error, run } = useRosterGenerator();
+  const [covModalOpen, setCovModalOpen] = useState(false);
   const [form, setForm] = useState<ManagerRosterForm>({
     shiftSystem: "8h",
     siteStartLocalTime: "06:00",
@@ -38,6 +40,9 @@ export default function GenerateRosterPanel() {
   function update<K extends keyof ManagerRosterForm>(k: K, v: ManagerRosterForm[K]) {
     setForm(prev => ({ ...prev, [k]: v }));
   }
+
+  function openBuilder() { setCovModalOpen(true); }
+  function saveCoverageJSON(json: string) { setForm(prev => ({ ...prev, coverageJSON: json })); }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,8 +108,13 @@ export default function GenerateRosterPanel() {
         </div>
 
         <div className="md:col-span-3 rounded-xl border p-4">
-          <h3 className="font-semibold text-slate-700 mb-2">Coverage targets (JSON)</h3>
-          <p className="text-xs text-slate-500 mb-2">One object per weekday (0=Sun … 6=Sat). Valid keys depend on system: 8h → E/L/N, 12h → D/N.</p>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-slate-700">Coverage targets</h3>
+            <button type="button" className="btn" onClick={openBuilder}>Open Preset Builder</button>
+          </div>
+          <p className="text-xs text-slate-500 mb-2">
+            One object per weekday (0=Sun … 6=Sat). Valid keys depend on system: 8h → E/L/N, 12h → D/N.
+          </p>
           <textarea className="input h-40 font-mono text-sm" value={form.coverageJSON} onChange={e => update("coverageJSON", e.target.value)} />
         </div>
 
@@ -124,6 +134,14 @@ export default function GenerateRosterPanel() {
           <RosterSummaryCard summary={result.summary} />
         </div>
       )}
+
+      <CoverageBuilderModal
+        open={covModalOpen}
+        onClose={() => setCovModalOpen(false)}
+        shiftSystem={form.shiftSystem}
+        initialJSON={form.coverageJSON}
+        onSaveJSON={(json) => { saveCoverageJSON(json); setCovModalOpen(false); }}
+      />
     </div>
   );
 }
