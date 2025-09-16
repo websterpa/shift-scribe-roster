@@ -128,3 +128,19 @@ export function computeEstimatedWeeklyHours(system: ShiftSystem, cov: Coverage):
   const overall = Object.values(byShift).reduce((a,b) => a + b, 0);
   return { byShift, overall };
 }
+
+// --- Estimated weekly wage cost helpers ---
+
+/** Returns per-shift and overall cost given weekly hours and an average hourly rate. */
+export function computeEstimatedWeeklyWageCost(
+  weeklyHours: { byShift: Record<string, number>; overall: number },
+  avgHourlyRate: number
+): { byShift: Record<string, number>; overall: number } {
+  const rate = Number.isFinite(avgHourlyRate) && avgHourlyRate > 0 ? avgHourlyRate : 0;
+  const byShift: Record<string, number> = {};
+  for (const [k, hrs] of Object.entries(weeklyHours.byShift)) {
+    byShift[k] = +(hrs * rate).toFixed(2);
+  }
+  const overall = +(weeklyHours.overall * rate).toFixed(2);
+  return { byShift, overall };
+}
