@@ -11,7 +11,8 @@ import { ensureShiftSystemConsistency, ShiftSystem, ShiftCode, isWorkCode } from
 import { respectsRestRules, ShiftWindowResolver } from "../restValidation";
 import { getLeaveMap, LeaveMap } from "../leaveManager";
 import { score, ScoreWeights, ScoreContext, PersonStats } from "./scoring";
-import { optimiseRoster } from "./optimizer"; 
+import { optimiseRoster } from "./optimizer";
+import { emit } from "@/utils/events";
 import { checkWeeklyLimits, WeeklySummaries } from "../wtrGate";
 import { calculatePeriodCostSummary, StaffCostSummary } from "../costCalculations";
 import { makeShiftWindowResolver } from "../shiftWindowResolver";
@@ -484,6 +485,7 @@ async function runOptimization(cycle: any[], staffList: StaffMember[], config: a
 
     // Run optimizer with 5 second limit
     console.log('🔄 Running 5-second optimization...');
+    emit("roster:optimisation:start");
     const optimizationStart = Date.now();
     
     // Simple optimization placeholder - in real implementation this would call optimiseRoster
@@ -501,6 +503,7 @@ async function runOptimization(cycle: any[], staffList: StaffMember[], config: a
     };
 
     console.log('✅ Optimization completed', optimizationResult);
+    emit("roster:optimisation:end", { durationMs: optimizationTime });
     return { optimizedCycle: cycle, optimizationResult };
     
   } catch (error) {
