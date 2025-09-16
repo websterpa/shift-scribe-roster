@@ -98,3 +98,33 @@ export function computeWeeklyTotals(system: ShiftSystem, cov: Coverage): WeeklyT
   const overall = Object.values(byShift).reduce((a, b) => a + b, 0);
   return { byShift, overall };
 }
+
+// --- Estimated weekly hours helpers ---
+
+export interface WeeklyHours {
+  byShift: Record<string, number>; // hours per shift code (e.g., {E:280, L:0, N:0} for 8h)
+  overall: number;                 // total hours for all shifts
+}
+
+/**
+ * Given weekly coverage counts and the active system, estimate weekly hours.
+ *  - 8h system: E/L/N = 8h each
+ *  - 12h system: D/N = 12h each
+ */
+export function computeEstimatedWeeklyHours(system: ShiftSystem, cov: Coverage): WeeklyHours {
+  const keys = system === "8h" ? ["E","L","N"] : ["D","N"];
+  const perShiftDuration = system === "8h" ? 8 : 12;
+
+  const byShift: Record<string, number> = {};
+  for (const k of keys) byShift[k] = 0;
+
+  for (const d of [0,1,2,3,4,5,6] as DayIdx[]) {
+    const row = cov[d] as any;
+    for (const k of keys) {
+      const headcount = clamp(Number(row?.[k] ?? 0));
+      byShift[k] += headcount * perShiftDuration;
+    }
+  }
+  const overall = Object.values(byShift).reduce((a,b) => a + b, 0);
+  return { byShift, overall };
+}
