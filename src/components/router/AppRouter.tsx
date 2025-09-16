@@ -12,6 +12,7 @@ import Dashboard from '@/pages/Dashboard';
 import Staff from '@/pages/Staff';
 import RosterConfig from '@/pages/RosterConfig';
 import GenerateRoster from '@/pages/GenerateRoster';
+import GenerateRosterPanel from '@/components/GenerateRosterPanel';
 import RosterViewer from '@/pages/RosterViewer';
 import MyRosters from '@/pages/MyRosters';
 import MyConfigurations from '@/pages/MyConfigurations';
@@ -56,6 +57,7 @@ export function AppRouter() {
               <Route path="staff" element={<Staff />} />
               <Route path="roster-config" element={<RosterConfig />} />
               <Route path="generate-roster" element={<GenerateRoster />} />
+              <Route path="manager/generate" element={<GenerateRosterPanel />} />
               <Route path="roster-viewer" element={<RosterViewer />} />
               <Route path="my-rosters" element={<MyRosters />} />
               <Route path="my-configurations" element={<MyConfigurations />} />
