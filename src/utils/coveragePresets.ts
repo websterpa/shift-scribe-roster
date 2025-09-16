@@ -76,3 +76,25 @@ export function serialiseCoverage(cov: Coverage): string {
   for (const d of [0,1,2,3,4,5,6] as DayIdx[]) ordered[d] = cov[d];
   return JSON.stringify(ordered, null, 2);
 }
+
+// --- Weekly totals helpers ---
+
+export interface WeeklyTotals {
+  byShift: Record<string, number>; // e.g., { E: 18, L: 17, N: 7 } or { D: 20, N: 7 }
+  overall: number;                 // sum of all byShift
+}
+
+/** Compute totals across Sun..Sat for the current system */
+export function computeWeeklyTotals(system: ShiftSystem, cov: Coverage): WeeklyTotals {
+  const keys = system === "8h" ? ["E","L","N"] : ["D","N"];
+  const byShift: Record<string, number> = {};
+  for (const k of keys) byShift[k] = 0;
+
+  for (const d of [0,1,2,3,4,5,6] as DayIdx[]) {
+    const row = cov[d] as any;
+    for (const k of keys) byShift[k] += clamp(Number(row?.[k] ?? 0));
+  }
+
+  const overall = Object.values(byShift).reduce((a, b) => a + b, 0);
+  return { byShift, overall };
+}
