@@ -189,3 +189,19 @@ export function computeRoleBasedWeeklyWageCost(
   
   return { byShift, overall: +overallCost.toFixed(2) };
 }
+
+/**
+ * Alias for computeRoleBasedWeeklyWageCost for backward compatibility.
+ */
+export function computeEstimatedWeeklyWageCostBlended(
+  weeklyHours: { byShift: Record<string, number>; overall: number },
+  roleRates: RoleRates,
+  roleMixByShift: Record<string, number>
+): { byShift: Record<string, number>; overall: number } {
+  const shiftKeys = Object.keys(weeklyHours.byShift);
+  const roleRatesWithMix: RoleRates = {
+    ...roleRates,
+    roleMixByShift
+  };
+  return computeRoleBasedWeeklyWageCost(weeklyHours, roleRatesWithMix, shiftKeys);
+}

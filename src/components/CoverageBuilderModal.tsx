@@ -2,8 +2,9 @@ import React, { useMemo, useState, useEffect } from "react";
 import {
   ShiftSystem, Coverage, parseOrDefault, serialiseCoverage,
   applyPreset, defaultCoverage, copyWeekdaysToWeekend, applyToAllDays, clamp,
-  computeWeeklyTotals, computeEstimatedWeeklyHours, computeEstimatedWeeklyWageCost,
-  RoleRates, computeRoleBasedWeeklyWageCost
+  computeWeeklyTotals, computeEstimatedWeeklyHours,
+  computeEstimatedWeeklyWageCost, // existing simple cost (keep for reference if you still show it)
+  computeEstimatedWeeklyWageCostBlended, RoleRates
 } from "@/utils/coveragePresets";
 import { fetchSiteRateDefaults, SiteRateDefaults } from "@/services/siteSettings";
 
@@ -22,13 +23,13 @@ export default function CoverageBuilderModal({
 }: CoverageBuilderProps) {
   const [tabDay, setTabDay] = useState(1); // default Monday
   const [coverage, setCoverage] = useState<Coverage>(() => parseOrDefault(initialJSON, shiftSystem));
-  const [avgHourlyRate, setAvgHourlyRate] = useState<number>(18.0);
-  
-  // Role-based rate states
-  const [staffRate, setStaffRate] = useState<number>(18.0);
-  const [supervisorRate, setSupervisorRate] = useState<number>(24.0);
-  const [roleMixByShift, setRoleMixByShift] = useState<Record<string, number>>({});
-  const [useRoleBased, setUseRoleBased] = useState<boolean>(false);
+  const [avgHourlyRate, setAvgHourlyRate] = useState<number>(18.0); // keep (legacy simple estimate) if you still display it
+  const [roleRates, setRoleRates] = useState<RoleRates>({ 
+    staffRate: 18, 
+    supervisorRate: 24, 
+    roleMixByShift: {} 
+  });
+  const [roleMixByShift, setRoleMixByShift] = useState<Record<string, number>>({}); // keys: E/L/N or D/N
   const [isLoadingDefaults, setIsLoadingDefaults] = useState<boolean>(true);
 
   // Reset when system changes or modal opens
@@ -36,56 +37,36 @@ export default function CoverageBuilderModal({
     if (open) setCoverage(parseOrDefault(initialJSON, shiftSystem));
   }, [open, initialJSON, shiftSystem]);
 
-  // Load site defaults on modal open
+  // Load site defaults when modal opens or shiftSystem changes
   React.useEffect(() => {
     if (!open) return;
-    
-    const loadDefaults = async () => {
-      console.log("Loading site defaults");
-      setIsLoadingDefaults(true);
+    (async () => {
       try {
         const defaults = await fetchSiteRateDefaults();
-        setStaffRate(defaults.avgStaffRate || 18);
-        setSupervisorRate(defaults.avgSupervisorRate || 24);
-        setAvgHourlyRate(defaults.avgStaffRate || 18);
-        
-        // Set role mix defaults for current shift system
-        if (defaults.roleMixByShift) {
-          setRoleMixByShift(defaults.roleMixByShift);
-        } else {
-          // Default mixes if none in DB
-          const defaultMix = shiftSystem === "8h" ? {E: 10, L: 10, N: 20} : {D: 15, N: 25};
-          setRoleMixByShift(defaultMix);
-        }
-      } catch (err) {
-        console.log("Failed to load defaults:", err);
-        const defaultMix = shiftSystem === "8h" ? {E: 10, L: 10, N: 20} : {D: 15, N: 25};
-        setRoleMixByShift(defaultMix);
-      } finally {
-        setIsLoadingDefaults(false);
+        setRoleRates({
+          staffRate: defaults.avgStaffRate ?? 18,
+          supervisorRate: defaults.avgSupervisorRate ?? 24,
+          roleMixByShift: {}
+        });
+        // Reset role mix keys to current system keys
+        const keys = shiftSystem === "8h" ? ["E","L","N"] : ["D","N"];
+        const m: Record<string, number> = {};
+        for (const k of keys) m[k] = Number(defaults.roleMixByShift?.[k] ?? 0);
+        setRoleMixByShift(m);
+        // Optionally sync legacy simple avg to staff rate if you still show it
+        setAvgHourlyRate(defaults.avgStaffRate ?? 18);
+      } catch {
+        // Ignore; keep fallbacks
       }
-    };
-    
-    loadDefaults();
+    })();
   }, [open, shiftSystem]);
 
   const keys = useMemo(() => shiftSystem === "8h" ? (["E","L","N"] as const) : (["D","N"] as const), [shiftSystem]);
+  const shiftKeys = useMemo(() => shiftSystem === "8h" ? (["E","L","N"] as const) : (["D","N"] as const), [shiftSystem]);
   const totals = useMemo(() => computeWeeklyTotals(shiftSystem, coverage), [shiftSystem, coverage]);
   const estHours = useMemo(() => computeEstimatedWeeklyHours(shiftSystem, coverage), [shiftSystem, coverage]);
-  
-  // Cost calculation - use role-based if enabled, otherwise simple rate
-  const estCost = useMemo(() => {
-    if (useRoleBased) {
-      const roleRates: RoleRates = {
-        staffRate,
-        supervisorRate,
-        roleMixByShift
-      };
-      return computeRoleBasedWeeklyWageCost(estHours, roleRates, [...keys]);
-    } else {
-      return computeEstimatedWeeklyWageCost(estHours, avgHourlyRate);
-    }
-  }, [estHours, avgHourlyRate, useRoleBased, staffRate, supervisorRate, roleMixByShift, keys]);
+  const estCostSimple  = useMemo(() => computeEstimatedWeeklyWageCost(estHours, avgHourlyRate), [estHours, avgHourlyRate]); // keep if you still display "single rate" line
+  const estCostBlended = useMemo(() => computeEstimatedWeeklyWageCostBlended(estHours, roleRates, roleMixByShift), [estHours, roleRates, roleMixByShift]);
 
   function setDayShift(d: number, k: string, v: number) {
     setCoverage(prev => {
@@ -165,25 +146,6 @@ export default function CoverageBuilderModal({
                     />
                     <span className="text-xs text-slate-500">staff</span>
                   </div>
-                  
-                  {/* Supervisor mix percentage when role-based mode is enabled */}
-                  {useRoleBased && (
-                    <div className="mt-3 pt-2 border-t border-slate-200">
-                      <div className="text-xs text-slate-600 mb-1">
-                        Supervisor mix: {roleMixByShift[k] ?? 0}%
-                      </div>
-                      <input
-                        type="range" min={0} max={100}
-                        value={roleMixByShift[k] ?? 0}
-                        onChange={e => setRoleMixByShift(prev => ({...prev, [k]: Number(e.target.value)}))}
-                        className="w-full"
-                        disabled={isLoadingDefaults}
-                      />
-                      <div className="text-xs text-slate-500 mt-1">
-                        0% = all staff, 100% = all supervisors
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -197,56 +159,75 @@ export default function CoverageBuilderModal({
             <button className="btn" onClick={copyWeekdays}>Copy Mon–Fri → Weekend</button>
             <button className="btn" onClick={applyAll}>Apply this day → All days</button>
             <button className="btn" onClick={clearAll}>Clear all</button>
-            {useRoleBased && (
-              <button className="btn" onClick={applyMixToAllShifts}>Apply this mix → All shifts</button>
-            )}
-            <span className="mx-2 hidden md:inline text-slate-300">|</span>
-            
-            {/* Role-based vs Simple rate toggle */}
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={useRoleBased}
-                onChange={(e) => setUseRoleBased(e.target.checked)}
-              />
-              Role-based rates
-            </label>
-            
-            {useRoleBased ? (
-              <>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  Staff rate (£/hr)
-                  <input
-                    className="input w-28"
-                    type="number" min={0} step="0.01"
-                    value={staffRate}
-                    onChange={(e) => setStaffRate(Number(e.target.value))}
-                    disabled={isLoadingDefaults}
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  Supervisor rate (£/hr)
-                  <input
-                    className="input w-28"
-                    type="number" min={0} step="0.01"
-                    value={supervisorRate}
-                    onChange={(e) => setSupervisorRate(Number(e.target.value))}
-                    disabled={isLoadingDefaults}
-                  />
-                </label>
-              </>
-            ) : (
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                Avg hourly rate (£/hr)
+          </div>
+
+          {/* Role rates & mix */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border p-3">
+              <div className="font-semibold text-slate-700 mb-2">Average rates (£/hr)</div>
+              <label className="block text-sm text-slate-700 mb-2">
+                Staff
                 <input
-                  className="input w-28"
+                  className="input w-full mt-1"
                   type="number" min={0} step="0.01"
-                  value={avgHourlyRate}
-                  onChange={(e) => setAvgHourlyRate(Number(e.target.value))}
-                  disabled={isLoadingDefaults}
+                  value={roleRates.staffRate}
+                  onChange={e => setRoleRates(r => ({ ...r, staffRate: Number(e.target.value) }))}
                 />
               </label>
-            )}
+              <label className="block text-sm text-slate-700">
+                Supervisor
+                <input
+                  className="input w-full mt-1"
+                  type="number" min={0} step="0.01"
+                  value={roleRates.supervisorRate}
+                  onChange={e => setRoleRates(r => ({ ...r, supervisorRate: Number(e.target.value) }))}
+                />
+              </label>
+              <p className="text-xs text-slate-500 mt-2">
+                Estimate only — final costs are calculated in the generator with real staff rates, OT multipliers, Sundays/PH rules, etc.
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-3 md:col-span-2">
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-semibold text-slate-700">Supervisor mix by shift (%)</div>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    // Apply current first key's mix to all
+                    const firstKey = shiftKeys[0];
+                    const val = roleMixByShift[firstKey] ?? 0;
+                    const next: Record<string, number> = {};
+                    shiftKeys.forEach(k => next[k] = val);
+                    setRoleMixByShift(next);
+                  }}
+                >
+                  Apply first shift's mix → all
+                </button>
+              </div>
+
+              <div className="grid gap-3" style={{ gridTemplateColumns: "1fr" }}>
+                {shiftKeys.map(k => (
+                  <div key={k} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-600">Shift {k} — Supervisor mix</div>
+                      <div className="text-sm font-semibold">{roleMixByShift[k] ?? 0}%</div>
+                    </div>
+                    <input
+                      type="range"
+                      min={0} max={100}
+                      value={roleMixByShift[k] ?? 0}
+                      onChange={e => setRoleMixByShift(m => ({ ...m, [k]: Number(e.target.value) }))}
+                      className="w-full mt-2"
+                    />
+                    <div className="text-xs text-slate-500 mt-1">
+                      Blended rate = (Supervisor% × Supervisor £/hr) + (Staff% × Staff £/hr)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -290,26 +271,25 @@ export default function CoverageBuilderModal({
               </div>
             </div>
             
-            {/* Rough weekly wage cost (estimate) */}
+            {/* Blended role-based rough cost */}
             <div className="mt-3 text-sm text-slate-700">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span className="font-medium">Estimated weekly wage cost (rough):</span>
-                {keys.map(k => (
+                <span className="font-medium">Estimated weekly wage cost (rough, blended by role):</span>
+                {shiftKeys.map(k => (
                   <span key={k} className="inline-flex items-center gap-1">
                     <span className="text-slate-500">Shift {k}:</span>
-                    <span className="font-semibold">£{estCost.byShift[k]?.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    <span className="font-semibold">
+                      £{(estCostBlended.byShift[k] ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
                   </span>
                 ))}
                 <span className="inline-flex items-center gap-1">
                   <span className="text-slate-500">Overall:</span>
-                  <span className="font-semibold">£{estCost.overall.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  <span className="font-semibold">£{estCostBlended.overall.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                 </span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                {useRoleBased ? 
-                  `Uses blended rates: staff (£${staffRate}/hr) + supervisor mix per shift. Excludes OT multipliers, PH premia, role differentials, and allowances.` :
-                  `Estimate only — uses coverage × average hourly rate. Excludes OT multipliers, PH premia, role differentials, and allowances.`
-                }
+                Estimate only — uses coverage × blended average rates. Excludes OT multipliers, PH premia, role allowances, etc.
               </div>
             </div>
           </div>
