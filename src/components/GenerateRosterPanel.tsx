@@ -138,6 +138,17 @@ export default function GenerateRosterPanel() {
 
           <Label>Budget (optional)</Label>
           <input className="input" type="number" min={0} step="0.01" value={form.budget ?? ""} onChange={e => update("budget", e.target.value === "" ? null : Number(e.target.value))} />
+
+          <Label>Over-budget warning threshold (£)</Label>
+          <input
+            className="input"
+            type="number" min={0} step="1"
+            value={budgetWarnThreshold}
+            onChange={(e) => setBudgetWarnThreshold(Number(e.target.value))}
+          />
+          <p className="text-xs text-slate-500 -mt-1 mb-2">
+            We'll only warn if variance exceeds this amount (e.g., 500 ⇒ warn when over budget by more than £500).
+          </p>
         </div>
 
         <div className="rounded-xl border p-4 space-y-3">
