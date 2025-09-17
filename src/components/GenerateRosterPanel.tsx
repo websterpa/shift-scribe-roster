@@ -141,6 +141,7 @@ export default function GenerateRosterPanel() {
         shiftSystem={form.shiftSystem}
         initialJSON={form.coverageJSON}
         onSaveJSON={(json) => { saveCoverageJSON(json); setCovModalOpen(false); }}
+        siteId={undefined} // Optional: can be set to specific site ID if available
       />
     </div>
   );
