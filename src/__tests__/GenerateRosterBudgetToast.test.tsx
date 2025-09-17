@@ -243,3 +243,78 @@ test("shows no budget toast when no budget is set", async () => {
     });
   });
 });
+
+test("shows budget warning only when variance exceeds loaded threshold", async () => {
+  const overThresholdResult: GenerateRosterResult = {
+    ok: true,
+    summary: {
+      budget: 5000,
+      budgetVariance: 600, // Over budget by £600, exceeds threshold of £500
+      totalCost: 5600,
+      coverageAchievedPct: 95,
+      fairness: {
+        nights: { min: 3, avg: 5, max: 7 },
+        weekends: { min: 6, avg: 8, max: 10 },
+        publicHolidays: { min: 0, avg: 1, max: 3, cap: 2 }
+      },
+      violations: [],
+      notes: []
+    }
+  };
+
+  mockUseRosterGenerator.mockReturnValue({
+    optimising: false,
+    result: overThresholdResult,
+    error: null,
+    run: jest.fn()
+  });
+
+  render(<GenerateRosterPanel />);
+
+  await waitFor(() => {
+    // Verify budget warning toast appears
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "Budget Warning",
+      description: "Over budget by £600",
+      variant: "destructive"
+    });
+  });
+});
+
+test("shows no budget warning when variance is within threshold", async () => {
+  const withinThresholdResult: GenerateRosterResult = {
+    ok: true,
+    summary: {
+      budget: 5000,
+      budgetVariance: 300, // Over budget by £300, within threshold of £500
+      totalCost: 5300,
+      coverageAchievedPct: 95,
+      fairness: {
+        nights: { min: 3, avg: 5, max: 7 },
+        weekends: { min: 6, avg: 8, max: 10 },
+        publicHolidays: { min: 0, avg: 1, max: 3, cap: 2 }
+      },
+      violations: [],
+      notes: []
+    }
+  };
+
+  mockUseRosterGenerator.mockReturnValue({
+    optimising: false,
+    result: withinThresholdResult,
+    error: null,
+    run: jest.fn()
+  });
+
+  render(<GenerateRosterPanel />);
+
+  await waitFor(() => {
+    // Verify only success toast, no budget warning
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "Roster Generated Successfully",
+      description: "Your roster has been optimized and is ready for review 🎉",
+      variant: "default"
+    });
+  });
+});
