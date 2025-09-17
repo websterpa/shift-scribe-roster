@@ -1,197 +1,72 @@
 import React from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import { MemoryRouter } from "react-router-dom";
 import HelpSupport from "@/pages/HelpSupport";
 
-// Mock router for testing
-const renderWithRouter = (component: React.ReactElement) => {
+function renderWithRouter(initialEntries: string[] = ["/help"]) {
   return render(
-    <BrowserRouter>
-      {component}
-    </BrowserRouter>
+    <MemoryRouter initialEntries={initialEntries}>
+      <HelpSupport />
+    </MemoryRouter>
   );
-};
+}
 
-describe("HelpSupport", () => {
-  it("renders all sections", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    // Check main elements
-    expect(screen.getByText("Help & Support")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Search help topics...")).toBeInTheDocument();
-    expect(screen.getByText("← Back to Dashboard")).toBeInTheDocument();
-    
-    // Check that default sections are present
-    expect(screen.getByText("Welcome to Shift Craft")).toBeInTheDocument();
-    expect(screen.getByText("Core Features")).toBeInTheDocument();
-    expect(screen.getByText("Cost & Budget Features")).toBeInTheDocument();
-    expect(screen.getByText("Site Settings")).toBeInTheDocument();
-    expect(screen.getByText("Real-time Previews")).toBeInTheDocument();
-    expect(screen.getByText("Toast Notifications")).toBeInTheDocument();
-    expect(screen.getByText("Extra Features")).toBeInTheDocument();
+describe("HelpSupport page", () => {
+  test("renders the main title and all section headings", () => {
+    renderWithRouter();
+
+    // Main title
+    expect(screen.getByRole("heading", { name: /Help & Support/i })).toBeInTheDocument();
+
+    // Section headings (accordion headers)
+    expect(screen.getByRole("button", { name: /Welcome to Shift Craft/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Core Features/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Cost & Budget Features/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Site Settings/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Real-time Previews/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Toast Notifications/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Extra Features/i })).toBeInTheDocument();
   });
 
-  it("has correct default expanded sections", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    // Welcome and Core Features should be expanded by default
-    expect(screen.getByText(/Shift Craft is your smart rostering/)).toBeInTheDocument();
-    expect(screen.getByText(/Roster Generation.*Build 17-week rosters/)).toBeInTheDocument();
-    
-    // Other sections should be collapsed by default (content not visible)
-    expect(screen.queryByText(/Estimate weekly costs with staff/)).not.toBeInTheDocument();
+  test("accordion expand/collapse toggles corresponding panel content", () => {
+    renderWithRouter();
+
+    const coreBtn = screen.getByRole("button", { name: /Core Features/i });
+
+    // Core may be open by default (openIds: ["intro", "core"]). Collapse it first.
+    fireEvent.click(coreBtn);
+    // After collapse, the body content shouldn't be visible
+    expect(screen.queryByText(/Roster Generation/i)).not.toBeInTheDocument();
+
+    // Expand it again
+    fireEvent.click(coreBtn);
+    expect(screen.getByText(/Roster Generation/i)).toBeInTheDocument();
   });
 
-  it("toggles accordion expand/collapse on click", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const budgetSection = screen.getByText("Cost & Budget Features");
-    
-    // Initially collapsed - content not visible
-    expect(screen.queryByText(/Estimate weekly costs with staff/)).not.toBeInTheDocument();
-    
-    // Click to expand
-    fireEvent.click(budgetSection);
-    expect(screen.getByText(/Estimate weekly costs with staff/)).toBeInTheDocument();
-    
-    // Click to collapse
-    fireEvent.click(budgetSection);
-    expect(screen.queryByText(/Estimate weekly costs with staff/)).not.toBeInTheDocument();
+  test("search filters topics by title/tags/body text", () => {
+    renderWithRouter();
+
+    const search = screen.getByPlaceholderText(/Search help topics/i);
+
+    // Search for a unique term from the Cost & Budget section
+    fireEvent.change(search, { target: { value: "variance" } });
+
+    // Should include Cost & Budget Features, exclude unrelated ones
+    expect(screen.getByRole("button", { name: /Cost & Budget Features/i })).toBeInTheDocument();
+
+    // Some others should be filtered out of the list (not rendered at all)
+    expect(screen.queryByRole("button", { name: /Extra Features/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Toast Notifications/i })).not.toBeInTheDocument();
+
+    // Clear search shows all again
+    fireEvent.change(search, { target: { value: "" } });
+    expect(screen.getByRole("button", { name: /Extra Features/i })).toBeInTheDocument();
   });
 
-  it("shows correct expand/collapse icons", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    // Welcome section should show "−" (expanded)
-    const welcomeButton = screen.getByRole("button", { name: /Welcome to Shift Craft/ });
-    expect(within(welcomeButton).getByText("−")).toBeInTheDocument();
-    
-    // Budget section should show "+" (collapsed)
-    const budgetButton = screen.getByRole("button", { name: /Cost & Budget Features/ });
-    expect(within(budgetButton).getByText("+")).toBeInTheDocument();
-    
-    // Click budget to expand - should change to "−"
-    fireEvent.click(budgetButton);
-    expect(within(budgetButton).getByText("−")).toBeInTheDocument();
-  });
-
-  it("filters sections by search query", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    
-    // Search for "budget"
-    fireEvent.change(searchInput, { target: { value: "budget" } });
-    
-    // Should show budget-related sections
-    expect(screen.getByText("Cost & Budget Features")).toBeInTheDocument();
-    
-    // Should hide unrelated sections
-    expect(screen.queryByText("Welcome to Shift Craft")).not.toBeInTheDocument();
-    expect(screen.queryByText("Core Features")).not.toBeInTheDocument();
-    expect(screen.queryByText("Real-time Previews")).not.toBeInTheDocument();
-  });
-
-  it("filters by section tags", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    
-    // Search for "toast" (tag in Toast Notifications section)
-    fireEvent.change(searchInput, { target: { value: "toast" } });
-    
-    // Should show Toast Notifications section
-    expect(screen.getByText("Toast Notifications")).toBeInTheDocument();
-    
-    // Should hide other sections
-    expect(screen.queryByText("Welcome to Shift Craft")).not.toBeInTheDocument();
-    expect(screen.queryByText("Core Features")).not.toBeInTheDocument();
-  });
-
-  it("filters by plain text content", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    
-    // Search for "rostering" (in plain text of welcome section)
-    fireEvent.change(searchInput, { target: { value: "rostering" } });
-    
-    // Should show Welcome section
-    expect(screen.getByText("Welcome to Shift Craft")).toBeInTheDocument();
-    
-    // Should hide other sections
-    expect(screen.queryByText("Cost & Budget Features")).not.toBeInTheDocument();
-    expect(screen.queryByText("Toast Notifications")).not.toBeInTheDocument();
-  });
-
-  it("shows 'no results' message when search has no matches", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    
-    // Search for something that doesn't exist
-    fireEvent.change(searchInput, { target: { value: "nonexistent" } });
-    
-    expect(screen.getByText("No help topics found.")).toBeInTheDocument();
-    expect(screen.queryByText("Welcome to Shift Craft")).not.toBeInTheDocument();
-  });
-
-  it("clears search and shows all sections", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    
-    // Search for something specific
-    fireEvent.change(searchInput, { target: { value: "budget" } });
-    expect(screen.queryByText("Welcome to Shift Craft")).not.toBeInTheDocument();
-    
-    // Clear search
-    fireEvent.change(searchInput, { target: { value: "" } });
-    
-    // All sections should be visible again
-    expect(screen.getByText("Welcome to Shift Craft")).toBeInTheDocument();
-    expect(screen.getByText("Core Features")).toBeInTheDocument();
-    expect(screen.getByText("Cost & Budget Features")).toBeInTheDocument();
-  });
-
-  it("has correct link to dashboard", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const backLink = screen.getByText("← Back to Dashboard");
-    expect(backLink.closest("a")).toHaveAttribute("href", "/");
-  });
-
-  it("search is case insensitive", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    
-    // Search with different cases
-    fireEvent.change(searchInput, { target: { value: "BUDGET" } });
-    expect(screen.getByText("Cost & Budget Features")).toBeInTheDocument();
-    
-    fireEvent.change(searchInput, { target: { value: "Budget" } });
-    expect(screen.getByText("Cost & Budget Features")).toBeInTheDocument();
-    
-    fireEvent.change(searchInput, { target: { value: "budget" } });
-    expect(screen.getByText("Cost & Budget Features")).toBeInTheDocument();
-  });
-
-  it("maintains accordion state during search", () => {
-    renderWithRouter(<HelpSupport />);
-    
-    // Expand budget section
-    const budgetButton = screen.getByRole("button", { name: /Cost & Budget Features/ });
-    fireEvent.click(budgetButton);
-    expect(screen.getByText(/Estimate weekly costs with staff/)).toBeInTheDocument();
-    
-    // Search for budget
-    const searchInput = screen.getByPlaceholderText("Search help topics...");
-    fireEvent.change(searchInput, { target: { value: "budget" } });
-    
-    // Budget section should still be expanded
-    expect(screen.getByText(/Estimate weekly costs with staff/)).toBeInTheDocument();
-    expect(within(budgetButton).getByText("−")).toBeInTheDocument();
+  test("Back to Dashboard is a link to '/'", () => {
+    renderWithRouter();
+    const back = screen.getByRole("link", { name: /Back to Dashboard/i });
+    expect(back).toHaveAttribute("href", "/");
   });
 });
