@@ -191,17 +191,26 @@ export function computeRoleBasedWeeklyWageCost(
 }
 
 /**
- * Alias for computeRoleBasedWeeklyWageCost for backward compatibility.
+ * roleMixByShift: percent of supervisors per shift key, 0..100 (e.g., {E:10,L:10,N:20} or {D:15,N:25})
+ * weeklyHours: from computeEstimatedWeeklyHours(system, cov)
  */
 export function computeEstimatedWeeklyWageCostBlended(
   weeklyHours: { byShift: Record<string, number>; overall: number },
   roleRates: RoleRates,
   roleMixByShift: Record<string, number>
 ): { byShift: Record<string, number>; overall: number } {
-  const shiftKeys = Object.keys(weeklyHours.byShift);
-  const roleRatesWithMix: RoleRates = {
-    ...roleRates,
-    roleMixByShift
-  };
-  return computeRoleBasedWeeklyWageCost(weeklyHours, roleRatesWithMix, shiftKeys);
+  const staffRate = Number(roleRates.staffRate) > 0 ? Number(roleRates.staffRate) : 0;
+  const supRate   = Number(roleRates.supervisorRate) > 0 ? Number(roleRates.supervisorRate) : 0;
+
+  const byShift: Record<string, number> = {};
+  let overall = 0;
+
+  for (const [shiftKey, hrs] of Object.entries(weeklyHours.byShift)) {
+    const mix = Math.min(100, Math.max(0, Number(roleMixByShift?.[shiftKey] ?? 0))) / 100;
+    const blended = mix * supRate + (1 - mix) * staffRate;
+    const cost = +(hrs * blended).toFixed(2);
+    byShift[shiftKey] = cost;
+    overall += cost;
+  }
+  return { byShift, overall: +overall.toFixed(2) };
 }
