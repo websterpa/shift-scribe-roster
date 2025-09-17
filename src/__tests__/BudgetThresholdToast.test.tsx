@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import GenerateRosterPanel from "@/components/GenerateRosterPanel";
 import { vi } from "vitest";
@@ -70,7 +70,65 @@ test("threshold input has correct attributes", async () => {
 test("displays threshold explanation text", async () => {
   render(<GenerateRosterPanel />);
 
-  const explanationText = await screen.findByText(/We'll only warn if variance exceeds this amount/);
+  const explanationText = await screen.findByText(/We'll warn only if variance exceeds this amount/);
   expect(explanationText).toBeInTheDocument();
-  expect(explanationText).toHaveTextContent("We'll only warn if variance exceeds this amount (e.g., 500 ⇒ warn when over budget by more than £500).");
+  expect(explanationText).toHaveTextContent("We'll warn only if variance exceeds this amount (e.g., 500 ⇒ warn when over budget by more than £500).");
+});
+
+test("auto-saves threshold changes with debouncing", async () => {
+  const mockSave = vi.fn().mockResolvedValue(true);
+  
+  // Mock the saveSiteRateDefaults function
+  vi.mocked(require("@/services/siteSettings").saveSiteRateDefaults).mockImplementation(mockSave);
+  
+  render(<GenerateRosterPanel />);
+
+  const threshInput = await waitFor(() => 
+    screen.getByDisplayValue("500")
+  );
+
+  // Change the threshold value
+  fireEvent.change(threshInput, { target: { value: "750" } });
+  
+  // Should not save immediately (debounced)
+  expect(mockSave).not.toHaveBeenCalled();
+  
+  // Mock timers to test debouncing
+  vi.useFakeTimers();
+  
+  // Fast forward past debounce delay
+  act(() => {
+    vi.advanceTimersByTime(700);
+  });
+  
+  await waitFor(() => {
+    expect(mockSave).toHaveBeenCalledWith({
+      budgetWarnThreshold: 750
+    });
+  });
+  
+  vi.useRealTimers();
+});
+
+test("saves threshold immediately on blur", async () => {
+  const mockSave = vi.fn().mockResolvedValue(true);
+  
+  // Mock the saveSiteRateDefaults function
+  vi.mocked(require("@/services/siteSettings").saveSiteRateDefaults).mockImplementation(mockSave);
+  
+  render(<GenerateRosterPanel />);
+
+  const threshInput = await waitFor(() => 
+    screen.getByDisplayValue("500")
+  );
+
+  // Change and blur
+  fireEvent.change(threshInput, { target: { value: "1000" } });
+  fireEvent.blur(threshInput);
+  
+  await waitFor(() => {
+    expect(mockSave).toHaveBeenCalledWith({
+      budgetWarnThreshold: 1000
+    });
+  });
 });

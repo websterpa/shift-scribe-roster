@@ -56,27 +56,22 @@ export async function fetchSiteRateDefaults(): Promise<SiteRateDefaults> {
  */
 export async function saveSiteRateDefaults(payload: {
   siteId?: string;
-  avgStaffRate: number;
-  avgSupervisorRate: number;
-  roleMixByShift: Record<string, number>;
+  avgStaffRate?: number;
+  avgSupervisorRate?: number;
+  roleMixByShift?: Record<string, number>;
   budgetWarnThreshold?: number;
 }): Promise<boolean> {
   console.log("saveSiteRateDefaults: Starting save", payload);
   
   try {
-    const row: any = {
-      avg_staff_rate: payload.avgStaffRate,
-      avg_supervisor_rate: payload.avgSupervisorRate,
-      role_mix_by_shift: payload.roleMixByShift
-    };
-    
-    if (typeof payload.budgetWarnThreshold === "number") {
-      row.budget_warn_threshold = payload.budgetWarnThreshold;
-    }
-    
-    if (payload.siteId) {
-      row.site_id = payload.siteId;
-    }
+    const row: any = {};
+    if (typeof payload.avgStaffRate === "number") row.avg_staff_rate = payload.avgStaffRate;
+    if (typeof payload.avgSupervisorRate === "number") row.avg_supervisor_rate = payload.avgSupervisorRate;
+    if (payload.roleMixByShift) row.role_mix_by_shift = payload.roleMixByShift;
+    if (typeof payload.budgetWarnThreshold === "number") row.budget_warn_threshold = payload.budgetWarnThreshold;
+    if (payload.siteId) row.site_id = payload.siteId;
+
+    if (Object.keys(row).length === 0) return true; // nothing to save
 
     const { error } = await supabase
       .from("site_settings")

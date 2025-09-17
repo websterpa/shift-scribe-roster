@@ -5,7 +5,8 @@ import { RosterSummaryCard } from "@/components/RosterSummaryCard";
 import CoverageBuilderModal from "@/components/CoverageBuilderModal";
 import { toast } from "@/hooks/use-toast";
 import { budgetVarianceToastData } from "@/utils/budgetToast";
-import { fetchSiteRateDefaults } from "@/services/siteSettings";
+import { fetchSiteRateDefaults, saveSiteRateDefaults } from "@/services/siteSettings";
+import { useDebouncedCallback } from "@/utils/useDebouncedCallback";
 
 const DEFAULT_COVERAGE_JSON =
 `{
@@ -45,6 +46,40 @@ export default function GenerateRosterPanel() {
       console.log("Failed to fetch budget warning threshold:", err);
     });
   }, []);
+
+  // Debounced threshold saver
+  const saveThreshold = React.useCallback(async (value: number) => {
+    try {
+      const ok = await saveSiteRateDefaults({
+        budgetWarnThreshold: value
+      });
+      if (ok) {
+        toast({
+          title: "Threshold Saved",
+          description: `Saved threshold: £${value.toLocaleString()}`,
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Save Failed",
+          description: "Failed to save threshold",
+          variant: "destructive"
+        });
+      }
+    } catch {
+      toast({
+        title: "Save Error",
+        description: "Error saving threshold",
+        variant: "destructive"
+      });
+    }
+  }, []);
+
+  const debouncedSaveThreshold = useDebouncedCallback((v: number) => {
+    // ignore NaN/negative — treat as 0
+    const value = Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    void saveThreshold(value);
+  }, 600);
 
   // Toast notifications for roster generation
   useEffect(() => {
@@ -142,12 +177,25 @@ export default function GenerateRosterPanel() {
           <Label>Over-budget warning threshold (£)</Label>
           <input
             className="input"
-            type="number" min={0} step="1"
+            type="number"
+            min={0}
+            step="1"
             value={budgetWarnThreshold}
-            onChange={(e) => setBudgetWarnThreshold(Number(e.target.value))}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setBudgetWarnThreshold(v);
+              debouncedSaveThreshold(v);
+            }}
+            onBlur={(e) => {
+              const v = Number(e.target.value);
+              // force an immediate save on blur to ensure persistence even if user types fast and navigates away
+              const value = Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+              if (value !== budgetWarnThreshold) setBudgetWarnThreshold(value);
+              void saveThreshold(value);
+            }}
           />
           <p className="text-xs text-slate-500 -mt-1 mb-2">
-            We'll only warn if variance exceeds this amount (e.g., 500 ⇒ warn when over budget by more than £500).
+            We'll warn only if variance exceeds this amount (e.g., 500 ⇒ warn when over budget by more than £500).
           </p>
         </div>
 
