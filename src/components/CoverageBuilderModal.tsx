@@ -23,10 +23,11 @@ export interface CoverageBuilderProps {
   initialJSON: string;
   onSaveJSON: (json: string) => void;
   siteId?: string; // NEW: optional site identifier
+  budgetWarnThreshold?: number; // NEW: optional read-only display
 }
 
 export default function CoverageBuilderModal({
-  open, onClose, shiftSystem, initialJSON, onSaveJSON, siteId
+  open, onClose, shiftSystem, initialJSON, onSaveJSON, siteId, budgetWarnThreshold
 }: CoverageBuilderProps) {
   const [tabDay, setTabDay] = useState(1); // default Monday
   const [coverage, setCoverage] = useState<Coverage>(() => parseOrDefault(initialJSON, shiftSystem));
@@ -117,7 +118,8 @@ export default function CoverageBuilderModal({
           siteId,
           avgStaffRate: Number(roleRates.staffRate) || 0,
           avgSupervisorRate: Number(roleRates.supervisorRate) || 0,
-          roleMixByShift
+          roleMixByShift,
+          budgetWarnThreshold: typeof budgetWarnThreshold === "number" ? budgetWarnThreshold : undefined
         });
         
         if (success) {
@@ -353,6 +355,11 @@ export default function CoverageBuilderModal({
               <div className="text-xs text-slate-500 mt-1">
                 Estimate only — uses coverage × blended average rates. Excludes OT multipliers, PH premia, role allowances, etc.
               </div>
+              {typeof budgetWarnThreshold === "number" && (
+                <div className="text-xs text-slate-500 mt-1">
+                  Current over-budget warning threshold: £{budgetWarnThreshold.toLocaleString()}
+                </div>
+              )}
             </div>
           </div>
         </div>

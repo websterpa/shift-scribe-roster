@@ -195,6 +195,7 @@ export default function GenerateRosterPanel() {
         initialJSON={form.coverageJSON}
         onSaveJSON={(json) => { saveCoverageJSON(json); setCovModalOpen(false); }}
         siteId={undefined} // Optional: can be set to specific site ID if available
+        budgetWarnThreshold={budgetWarnThreshold}
       />
     </div>
   );
