@@ -4,9 +4,14 @@ import {
   applyPreset, defaultCoverage, copyWeekdaysToWeekend, applyToAllDays, clamp,
   computeWeeklyTotals, computeEstimatedWeeklyHours,
   computeEstimatedWeeklyWageCost, // existing simple cost (keep for reference if you still show it)
-  computeEstimatedWeeklyWageCostBlended, RoleRates
+  computeEstimatedWeeklyWageCostBlended
 } from "@/utils/coveragePresets";
 import { fetchSiteRateDefaults, SiteRateDefaults } from "@/services/siteSettings";
+
+interface ModalRateState {
+  staffRate: number;
+  supervisorRate: number;
+}
 
 const DAY_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -24,10 +29,9 @@ export default function CoverageBuilderModal({
   const [tabDay, setTabDay] = useState(1); // default Monday
   const [coverage, setCoverage] = useState<Coverage>(() => parseOrDefault(initialJSON, shiftSystem));
   const [avgHourlyRate, setAvgHourlyRate] = useState<number>(18.0); // keep (legacy simple estimate) if you still display it
-  const [roleRates, setRoleRates] = useState<RoleRates>({ 
+  const [roleRates, setRoleRates] = useState<ModalRateState>({ 
     staffRate: 18, 
-    supervisorRate: 24, 
-    roleMixByShift: {} 
+    supervisorRate: 24
   });
   const [roleMixByShift, setRoleMixByShift] = useState<Record<string, number>>({}); // keys: E/L/N or D/N
   const [isLoadingDefaults, setIsLoadingDefaults] = useState<boolean>(true);
@@ -45,8 +49,7 @@ export default function CoverageBuilderModal({
         const defaults = await fetchSiteRateDefaults();
         setRoleRates({
           staffRate: defaults.avgStaffRate ?? 18,
-          supervisorRate: defaults.avgSupervisorRate ?? 24,
-          roleMixByShift: {}
+          supervisorRate: defaults.avgSupervisorRate ?? 24
         });
         // Reset role mix keys to current system keys
         const keys = shiftSystem === "8h" ? ["E","L","N"] : ["D","N"];
@@ -66,7 +69,14 @@ export default function CoverageBuilderModal({
   const totals = useMemo(() => computeWeeklyTotals(shiftSystem, coverage), [shiftSystem, coverage]);
   const estHours = useMemo(() => computeEstimatedWeeklyHours(shiftSystem, coverage), [shiftSystem, coverage]);
   const estCostSimple  = useMemo(() => computeEstimatedWeeklyWageCost(estHours, avgHourlyRate), [estHours, avgHourlyRate]); // keep if you still display "single rate" line
-  const estCostBlended = useMemo(() => computeEstimatedWeeklyWageCostBlended(estHours, roleRates, roleMixByShift), [estHours, roleRates, roleMixByShift]);
+  const estCostBlended = useMemo(() => {
+    const fullRoleRates = {
+      staffRate: roleRates.staffRate,
+      supervisorRate: roleRates.supervisorRate,
+      roleMixByShift
+    };
+    return computeEstimatedWeeklyWageCostBlended(estHours, fullRoleRates, roleMixByShift)
+  }, [estHours, roleRates, roleMixByShift]);
 
   function setDayShift(d: number, k: string, v: number) {
     setCoverage(prev => {
