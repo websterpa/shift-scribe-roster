@@ -7,6 +7,7 @@ import {
   computeEstimatedWeeklyWageCostBlended
 } from "@/utils/coveragePresets";
 import { fetchSiteRateDefaults, saveSiteRateDefaults, SiteRateDefaults } from "@/services/siteSettings";
+import { toast } from "@/hooks/use-toast";
 
 interface ModalRateState {
   staffRate: number;
@@ -112,15 +113,32 @@ export default function CoverageBuilderModal({
     // Fire-and-forget save of defaults if toggled; don't block UI on failure.
     if (saveAsDefault) {
       try {
-        await saveSiteRateDefaults({
+        const success = await saveSiteRateDefaults({
           siteId,
           avgStaffRate: Number(roleRates.staffRate) || 0,
           avgSupervisorRate: Number(roleRates.supervisorRate) || 0,
           roleMixByShift
         });
-        // (Optional) you could emit a toast/event here on success/failure.
-      } catch {
-        // Silently ignore; this is best-effort.
+        
+        if (success) {
+          toast({
+            title: "Defaults Saved",
+            description: "Staff rates and role mixes have been saved as site defaults.",
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Save Failed",
+            description: "Unable to save defaults. Please try again.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Save Error",
+          description: "An error occurred while saving defaults.",
+          variant: "destructive"
+        });
       }
     }
 
