@@ -40,6 +40,29 @@ export default function GenerateRosterPanel() {
         description: "Your roster has been optimized and is ready for review 🎉",
         variant: "default"
       });
+
+      // Budget variance toasts
+      if (result.summary) {
+        const { budget, budgetVariance } = result.summary;
+        if (typeof budget === "number" && typeof budgetVariance === "number") {
+          if (budgetVariance > 0) {
+            // Over budget
+            toast({
+              title: "Budget Warning",
+              description: `Over budget by £${Math.abs(budgetVariance).toLocaleString()}`,
+              variant: "destructive"
+            });
+          } else if (budgetVariance < 0) {
+            // Under budget
+            toast({
+              title: "Great News!",
+              description: `Under budget by £${Math.abs(budgetVariance).toLocaleString()}`,
+              variant: "default"
+            });
+          }
+          // exactly on budget -> no additional toast
+        }
+      }
     }
   }, [result]);
 
