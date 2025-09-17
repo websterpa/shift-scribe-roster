@@ -46,3 +46,45 @@ export async function fetchSiteRateDefaults(): Promise<SiteRateDefaults> {
     return { avgStaffRate: 18, avgSupervisorRate: 24, roleMixByShift: undefined };
   }
 }
+
+/**
+ * Save/upsert site rate defaults to Supabase.
+ * Returns true if successfully persisted, false if Supabase unavailable or error.
+ */
+export async function saveSiteRateDefaults(payload: {
+  siteId?: string;
+  avgStaffRate: number;
+  avgSupervisorRate: number;
+  roleMixByShift: Record<string, number>;
+}): Promise<boolean> {
+  console.log("saveSiteRateDefaults: Starting save", payload);
+  
+  try {
+    const row: any = {
+      avg_staff_rate: payload.avgStaffRate,
+      avg_supervisor_rate: payload.avgSupervisorRate,
+      role_mix_by_shift: payload.roleMixByShift
+    };
+    
+    if (payload.siteId) {
+      row.site_id = payload.siteId;
+    }
+
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert(row, { onConflict: payload.siteId ? "site_id" : undefined })
+      .select()
+      .single();
+
+    if (error) {
+      console.log("saveSiteRateDefaults: Upsert error:", error);
+      return false;
+    }
+
+    console.log("saveSiteRateDefaults: Successfully saved");
+    return true;
+  } catch (err) {
+    console.log("saveSiteRateDefaults: Exception:", err);
+    return false;
+  }
+}
