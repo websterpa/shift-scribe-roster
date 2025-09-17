@@ -6,7 +6,7 @@ import {
   computeEstimatedWeeklyWageCost, // existing simple cost (keep for reference if you still show it)
   computeEstimatedWeeklyWageCostBlended
 } from "@/utils/coveragePresets";
-import { fetchSiteRateDefaults, SiteRateDefaults } from "@/services/siteSettings";
+import { fetchSiteRateDefaults, saveSiteRateDefaults, SiteRateDefaults } from "@/services/siteSettings";
 
 interface ModalRateState {
   staffRate: number;
@@ -21,10 +21,11 @@ export interface CoverageBuilderProps {
   shiftSystem: ShiftSystem;
   initialJSON: string;
   onSaveJSON: (json: string) => void;
+  siteId?: string; // NEW: optional site identifier
 }
 
 export default function CoverageBuilderModal({
-  open, onClose, shiftSystem, initialJSON, onSaveJSON
+  open, onClose, shiftSystem, initialJSON, onSaveJSON, siteId
 }: CoverageBuilderProps) {
   const [tabDay, setTabDay] = useState(1); // default Monday
   const [coverage, setCoverage] = useState<Coverage>(() => parseOrDefault(initialJSON, shiftSystem));
@@ -35,6 +36,7 @@ export default function CoverageBuilderModal({
   });
   const [roleMixByShift, setRoleMixByShift] = useState<Record<string, number>>({}); // keys: E/L/N or D/N
   const [isLoadingDefaults, setIsLoadingDefaults] = useState<boolean>(true);
+  const [saveAsDefault, setSaveAsDefault] = useState<boolean>(false);
 
   // Reset when system changes or modal opens
   React.useEffect(() => {
@@ -104,7 +106,27 @@ export default function CoverageBuilderModal({
     }
     setRoleMixByShift(prev => ({ ...prev, ...mixTemplate }));
   }
-  function save() { onSaveJSON(serialiseCoverage(coverage)); onClose(); }
+  async function save() {
+    const json = serialiseCoverage(coverage);
+
+    // Fire-and-forget save of defaults if toggled; don't block UI on failure.
+    if (saveAsDefault) {
+      try {
+        await saveSiteRateDefaults({
+          siteId,
+          avgStaffRate: Number(roleRates.staffRate) || 0,
+          avgSupervisorRate: Number(roleRates.supervisorRate) || 0,
+          roleMixByShift
+        });
+        // (Optional) you could emit a toast/event here on success/failure.
+      } catch {
+        // Silently ignore; this is best-effort.
+      }
+    }
+
+    onSaveJSON(json);
+    onClose();
+  }
 
   if (!open) return null;
 
@@ -236,6 +258,18 @@ export default function CoverageBuilderModal({
                     </div>
                   </div>
                 ))}
+              </div>
+              
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  id="save-defaults"
+                  type="checkbox"
+                  checked={saveAsDefault}
+                  onChange={e => setSaveAsDefault(e.target.checked)}
+                />
+                <label htmlFor="save-defaults" className="text-sm text-slate-700">
+                  Save these rates & mixes as site defaults
+                </label>
               </div>
             </div>
           </div>
