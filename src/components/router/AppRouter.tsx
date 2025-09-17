@@ -26,6 +26,7 @@ import SupportPage from '@/pages/SupportPage';
 import TermsPage from '@/pages/TermsPage';
 import PrivacyPage from '@/pages/PrivacyPage';
 import PatternManagement from '@/pages/PatternManagement';
+import HelpSupport from '@/pages/HelpSupport';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient({
@@ -68,6 +69,7 @@ export function AppRouter() {
               <Route path="roster-testing" element={<RosterTesting />} />
               <Route path="test-pro" element={<TestPro />} />
               <Route path="support" element={<SupportPage />} />
+              <Route path="help" element={<HelpSupport />} />
               <Route path="patterns" element={<PatternManagement />} />
             </Route>
             
