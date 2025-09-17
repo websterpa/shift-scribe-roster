@@ -427,6 +427,7 @@ export type Database = {
         Row: {
           avg_staff_rate: number
           avg_supervisor_rate: number
+          budget_warn_threshold: number | null
           created_at: string
           id: string
           role_mix_by_shift: Json | null
@@ -435,6 +436,7 @@ export type Database = {
         Insert: {
           avg_staff_rate?: number
           avg_supervisor_rate?: number
+          budget_warn_threshold?: number | null
           created_at?: string
           id?: string
           role_mix_by_shift?: Json | null
@@ -443,6 +445,7 @@ export type Database = {
         Update: {
           avg_staff_rate?: number
           avg_supervisor_rate?: number
+          budget_warn_threshold?: number | null
           created_at?: string
           id?: string
           role_mix_by_shift?: Json | null

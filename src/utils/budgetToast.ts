@@ -1,6 +1,9 @@
 import type { GenerateRosterResult } from "@/types/managerUI";
 
-export function budgetVarianceToastData(result: GenerateRosterResult): { 
+export function budgetVarianceToastData(
+  result: GenerateRosterResult,
+  threshold: number = 0
+): { 
   title: string; 
   description: string; 
   variant: "default" | "destructive" 
@@ -11,7 +14,7 @@ export function budgetVarianceToastData(result: GenerateRosterResult): {
   
   if (typeof budget !== "number" || typeof budgetVariance !== "number") return null;
   
-  if (budgetVariance > 0) {
+  if (budgetVariance > threshold) {
     return { 
       title: "Budget Warning",
       description: `Over budget by £${Math.abs(budgetVariance).toLocaleString()}`,
@@ -27,5 +30,5 @@ export function budgetVarianceToastData(result: GenerateRosterResult): {
     };
   }
   
-  return null; // exactly on budget
+  return null; // exactly on budget or within threshold
 }

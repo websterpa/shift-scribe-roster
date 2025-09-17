@@ -22,6 +22,16 @@ jest.mock("@/utils/roster/rosterGeneration", () => ({
   fetchStaffMembers: jest.fn().mockResolvedValue([])
 }));
 
+// Mock the site settings service
+jest.mock("@/services/siteSettings", () => ({
+  fetchSiteRateDefaults: jest.fn().mockResolvedValue({
+    avgStaffRate: 18,
+    avgSupervisorRate: 24,
+    roleMixByShift: undefined,
+    budgetWarnThreshold: 500
+  })
+}));
+
 beforeEach(() => {
   mockToast.mockClear();
   mockUseRosterGenerator.mockReturnValue({
@@ -32,13 +42,13 @@ beforeEach(() => {
   });
 });
 
-test("shows budget warning toast when over budget", async () => {
+test("shows budget warning toast when over budget and exceeds threshold", async () => {
   const overBudgetResult: GenerateRosterResult = {
     ok: true,
     summary: {
       budget: 5000,
-      budgetVariance: 1234,
-      totalCost: 6234,
+      budgetVariance: 600, // Over budget by £600, exceeds threshold of £500
+      totalCost: 5600,
       coverageAchievedPct: 95,
       fairness: {
         nights: { min: 3, avg: 5, max: 7 },
@@ -70,8 +80,46 @@ test("shows budget warning toast when over budget", async () => {
     // Verify budget warning toast
     expect(mockToast).toHaveBeenCalledWith({
       title: "Budget Warning",
-      description: "Over budget by £1,234",
+      description: "Over budget by £600",
       variant: "destructive"
+    });
+  });
+});
+
+test("shows no budget warning toast when over budget but within threshold", async () => {
+  const withinThresholdResult: GenerateRosterResult = {
+    ok: true,
+    summary: {
+      budget: 5000,
+      budgetVariance: 300, // Over budget by £300, within threshold of £500
+      totalCost: 5300,
+      coverageAchievedPct: 95,
+      fairness: {
+        nights: { min: 3, avg: 5, max: 7 },
+        weekends: { min: 6, avg: 8, max: 10 },
+        publicHolidays: { min: 0, avg: 1, max: 3, cap: 2 }
+      },
+      violations: [],
+      notes: []
+    }
+  };
+
+  mockUseRosterGenerator.mockReturnValue({
+    optimising: false,
+    result: withinThresholdResult,
+    error: null,
+    run: jest.fn()
+  });
+
+  render(<GenerateRosterPanel />);
+
+  await waitFor(() => {
+    // Verify only success toast, no budget warning toast
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "Roster Generated Successfully",
+      description: "Your roster has been optimized and is ready for review 🎉",
+      variant: "default"
     });
   });
 });

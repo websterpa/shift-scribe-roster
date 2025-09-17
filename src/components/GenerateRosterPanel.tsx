@@ -5,6 +5,7 @@ import { RosterSummaryCard } from "@/components/RosterSummaryCard";
 import CoverageBuilderModal from "@/components/CoverageBuilderModal";
 import { toast } from "@/hooks/use-toast";
 import { budgetVarianceToastData } from "@/utils/budgetToast";
+import { fetchSiteRateDefaults } from "@/services/siteSettings";
 
 const DEFAULT_COVERAGE_JSON =
 `{
@@ -20,6 +21,7 @@ const DEFAULT_COVERAGE_JSON =
 export default function GenerateRosterPanel() {
   const { optimising, result, error, run } = useRosterGenerator();
   const [covModalOpen, setCovModalOpen] = useState(false);
+  const [budgetWarnThreshold, setBudgetWarnThreshold] = useState<number>(500);
   const [form, setForm] = useState<ManagerRosterForm>({
     shiftSystem: "8h",
     siteStartLocalTime: "06:00",
@@ -33,6 +35,17 @@ export default function GenerateRosterPanel() {
     coverageJSON: DEFAULT_COVERAGE_JSON
   });
 
+  // Load budget warning threshold on mount
+  useEffect(() => {
+    fetchSiteRateDefaults().then(settings => {
+      if (settings.budgetWarnThreshold !== undefined) {
+        setBudgetWarnThreshold(settings.budgetWarnThreshold);
+      }
+    }).catch(err => {
+      console.log("Failed to fetch budget warning threshold:", err);
+    });
+  }, []);
+
   // Toast notifications for roster generation
   useEffect(() => {
     if (result?.ok) {
@@ -43,7 +56,7 @@ export default function GenerateRosterPanel() {
       });
 
       // Budget variance toast
-      const budgetToast = budgetVarianceToastData(result);
+      const budgetToast = budgetVarianceToastData(result, budgetWarnThreshold);
       if (budgetToast) {
         toast(budgetToast);
       }
