@@ -4,6 +4,7 @@ import type { ManagerRosterForm } from "@/types/managerUI";
 import { RosterSummaryCard } from "@/components/RosterSummaryCard";
 import CoverageBuilderModal from "@/components/CoverageBuilderModal";
 import { toast } from "@/hooks/use-toast";
+import { budgetVarianceToastData } from "@/utils/budgetToast";
 
 const DEFAULT_COVERAGE_JSON =
 `{
@@ -41,27 +42,10 @@ export default function GenerateRosterPanel() {
         variant: "default"
       });
 
-      // Budget variance toasts
-      if (result.summary) {
-        const { budget, budgetVariance } = result.summary;
-        if (typeof budget === "number" && typeof budgetVariance === "number") {
-          if (budgetVariance > 0) {
-            // Over budget
-            toast({
-              title: "Budget Warning",
-              description: `Over budget by £${Math.abs(budgetVariance).toLocaleString()}`,
-              variant: "destructive"
-            });
-          } else if (budgetVariance < 0) {
-            // Under budget
-            toast({
-              title: "Great News!",
-              description: `Under budget by £${Math.abs(budgetVariance).toLocaleString()}`,
-              variant: "default"
-            });
-          }
-          // exactly on budget -> no additional toast
-        }
+      // Budget variance toast
+      const budgetToast = budgetVarianceToastData(result);
+      if (budgetToast) {
+        toast(budgetToast);
       }
     }
   }, [result]);
