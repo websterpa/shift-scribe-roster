@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRosterGenerator } from "@/hooks/useRosterGenerator";
 import type { ManagerRosterForm } from "@/types/managerUI";
 import { RosterSummaryCard } from "@/components/RosterSummaryCard";
 import CoverageBuilderModal from "@/components/CoverageBuilderModal";
+import { toast } from "@/hooks/use-toast";
 
 const DEFAULT_COVERAGE_JSON =
 `{
@@ -30,6 +31,27 @@ export default function GenerateRosterPanel() {
     defaultOtStartLocalTime: "10:00",
     coverageJSON: DEFAULT_COVERAGE_JSON
   });
+
+  // Toast notifications for roster generation
+  useEffect(() => {
+    if (result?.ok) {
+      toast({
+        title: "Roster Generated Successfully",
+        description: "Your roster has been optimized and is ready for review 🎉",
+        variant: "default"
+      });
+    }
+  }, [result]);
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Generation Failed",
+        description: `Error: ${error} ❌`,
+        variant: "destructive"
+      });
+    }
+  }, [error]);
 
   const budgetVarianceStr = useMemo(() => {
     const v = result?.summary?.budgetVariance;
