@@ -100,6 +100,45 @@ export function computeRestRiskBetweenDays(args: {
   return results;
 }
 
+function RestRiskHeatmap({
+  edges
+}: {
+  edges: Array<{ index:number; prev:Token; next:Token; restHours:number; severity:"ok"|"warn"|"risk"; message:string }>;
+}) {
+  if (!edges.length) return null;
+  return (
+    <div className="mt-3">
+      <div className="text-sm font-semibold text-muted-foreground mb-1">Rest risk across the sequence</div>
+      <div className="flex flex-wrap gap-1">
+        {edges.map(e => (
+          <div
+            key={e.index}
+            title={`${e.prev} → ${e.next}: ${e.message}`}
+            className={`w-4 h-4 rounded ${e.severity === "risk" ? "bg-red-500" : e.severity === "warn" ? "bg-amber-400" : "bg-emerald-500"}`}
+            aria-label={`${e.prev} to ${e.next}: ${e.message}`}
+          />
+        ))}
+      </div>
+      {/* Summary line with first few issues */}
+      {edges.some(e => e.severity !== "ok") && (
+        <ul className="mt-2 text-sm text-muted-foreground list-disc list-inside">
+          {edges.filter(e => e.severity !== "ok").slice(0, 3).map(e => (
+            <li key={`issue-${e.index}`}>
+              <b>{e.prev}→{e.next}</b> — {e.message}
+            </li>
+          ))}
+          {edges.filter(e => e.severity !== "ok").length > 3 && (
+            <li>+ more potential rest constraints</li>
+          )}
+        </ul>
+      )}
+      {!edges.some(e => e.severity !== "ok") && (
+        <p className="mt-2 text-xs text-emerald-700">All adjacent days have ≥13h rest or an off day in between.</p>
+      )}
+    </div>
+  );
+}
+
 interface WizardState {
   // Step 1
   system: ShiftSystem;
@@ -435,45 +474,7 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
         </div>
 
         {/* Rest-Risk Heatmap */}
-        {(state.pattern as any).sequence.length >= 2 && (
-          <div className="mt-3 space-y-2">
-            <div className="text-sm font-medium">Rest Risk Analysis</div>
-            <div className="flex gap-1 items-center">
-              {restRisks.map((risk, idx) => (
-                <div
-                  key={idx}
-                  className={`w-6 h-6 rounded text-xs flex items-center justify-center border ${
-                    risk.severity === "risk" ? "bg-red-100 border-red-300 text-red-800" :
-                    risk.severity === "warn" ? "bg-amber-100 border-amber-300 text-amber-800" :
-                    "bg-green-100 border-green-300 text-green-800"
-                  }`}
-                  title={`${risk.prev}→${risk.next}: ${risk.message}`}
-                >
-                  {idx + 1}
-                </div>
-              ))}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Hover blocks for details. Red = &lt;11h rest, Amber = 11-13h, Green = ≥13h
-            </div>
-            
-            {/* Issues Summary */}
-            {topIssues.length > 0 && (
-              <div className="mt-2 p-2 rounded-lg bg-muted/50 border">
-                <div className="text-sm font-medium mb-1">Rest Issues</div>
-                <ul className="text-xs space-y-1">
-                  {topIssues.map((issue, idx) => (
-                    <li key={idx} className={
-                      issue.severity === "risk" ? "text-red-700" : "text-amber-700"
-                    }>
-                      Day {issue.index + 1}→{issue.index + 2}: {issue.prev}→{issue.next} ({issue.message})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
+        <RestRiskHeatmap edges={restRisks} />
 
         <p className="text-xs text-muted-foreground mt-2">
           Tip: include <code>O</code> (Off) days to avoid rest violations; supervisors typically excluded from <code>N</code> (Nights).
