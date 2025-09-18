@@ -63,11 +63,11 @@ describe("computeRestRiskBetweenDays", () => {
     expect(edges[0].severity).toBe("risk");
   });
 
-  it("8h: E→O next day is safe (24h)", () => {
+  it("8h: E→R next day is safe (24h)", () => {
     const edges = computeRestRiskBetweenDays({
       system: "8h",
       siteStartLocalTime: "06:00",
-      sequence: ["E","O"] as any
+      sequence: ["E","R"] as any
     });
     expect(edges[0].restHours).toBe(24);
     expect(edges[0].severity).toBe("ok");
@@ -165,7 +165,7 @@ describe("RosterWizard Step 2 heatmap smoke", () => {
     
     // Add safe sequence first
     fireEvent.click(screen.getByRole("button", { name: "E" }));
-    fireEvent.click(screen.getByRole("button", { name: "O" }));
+    fireEvent.click(screen.getByRole("button", { name: "R" }));
     
     // Should show safe message
     expect(screen.getByText(/All adjacent days have ≥13h rest/i)).toBeInTheDocument();

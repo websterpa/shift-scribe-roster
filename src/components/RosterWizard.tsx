@@ -509,7 +509,7 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
           {!(state.pattern as any).sequence.length && <span className="text-muted-foreground text-sm">Empty — add tokens above</span>}
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          Tip: include <code>O</code> (Off) days to avoid rest violations; supervisors typically excluded from <code>N</code> (Nights).
+          Tip: include <code>R</code> (Rest Day) to avoid rest violations; supervisors typically excluded from <code>N</code> (Nights).
         </p>
 
         {/* NEW: rest-risk heatmap */}

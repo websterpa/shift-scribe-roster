@@ -118,7 +118,7 @@ describe('RosterWizard', () => {
     fireEvent.click(nextButton);
     
     await waitFor(() => {
-      expect(screen.getByText('2E–2L–2N–4O')).toBeInTheDocument();
+      expect(screen.getByText('2E–2L–2N–4R')).toBeInTheDocument();
       expect(screen.getByText('4 on 4 off (E/L mix)')).toBeInTheDocument();
       expect(screen.getByText('Nights-leaning')).toBeInTheDocument();
     });
@@ -136,9 +136,9 @@ describe('RosterWizard', () => {
     fireEvent.click(nextButton);
     
     await waitFor(() => {
-      expect(screen.getByText('4D–4O–4N–4O')).toBeInTheDocument();
+      expect(screen.getByText('4D–4R–4N–4R')).toBeInTheDocument();
       expect(screen.getByText('Days-only 4 on 4 off')).toBeInTheDocument();
-      expect(screen.getByText('2D–2N–4O')).toBeInTheDocument();
+      expect(screen.getByText('2D–2N–4R')).toBeInTheDocument();
     });
   });
 
@@ -154,7 +154,7 @@ describe('RosterWizard', () => {
       expect(screen.getByRole('button', { name: 'E' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'L' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'N' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'O' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'R' })).toBeInTheDocument();
     });
   });
 
