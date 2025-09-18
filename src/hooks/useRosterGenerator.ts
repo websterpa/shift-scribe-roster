@@ -165,7 +165,9 @@ export function useRosterGenerator() {
         setResult(res);
       } catch (e: any) {
         console.error('❌ useRosterGenerator.run: Generation failed:', e);
-        setError(e?.message || "Failed to generate roster");
+        const raw = e?.message || "Failed to generate roster";
+        const msg = /forEach/.test(raw) ? "Pattern looks invalid. Please pick a preset or add tokens, then try again." : raw;
+        setError(msg);
       } finally {
         setOptimising(false);
       }

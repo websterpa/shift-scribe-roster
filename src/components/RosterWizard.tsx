@@ -454,9 +454,11 @@ export default function RosterWizard() {
         description: "Roster generated successfully 🎉"
       });
     } catch (e:any) {
+      const raw = e?.message || "Error generating roster ❌";
+      const msg = /forEach/.test(raw) ? "Pattern looks invalid. Please pick a preset or add tokens, then try again." : raw;
       toast({
         title: "Generation Error",
-        description: e?.message || "Error generating roster ❌",
+        description: msg,
         variant: "destructive"
       });
     }
