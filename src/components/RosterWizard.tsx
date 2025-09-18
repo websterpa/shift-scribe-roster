@@ -127,7 +127,7 @@ function RestRiskHeatmap({
   if (!edges.length) return null;
   return (
     <div className="mt-3">
-      <div className="text-sm font-semibold text-muted-foreground mb-1">Rest risk across the sequence</div>
+      <div className="text-sm font-semibold text-slate-700 mb-1">Rest risk across the sequence</div>
       <div className="flex flex-wrap gap-1">
         {edges.map(e => (
           <div
@@ -138,10 +138,13 @@ function RestRiskHeatmap({
           />
         ))}
       </div>
+
+      {/* NEW: tiny legend */}
       <RestRiskLegend />
-      {/* Summary line with first few issues */}
+
+      {/* Existing issues list ... */}
       {edges.some(e => e.severity !== "ok") && (
-        <ul className="mt-2 text-sm text-muted-foreground list-disc list-inside">
+        <ul className="mt-2 text-sm text-slate-700 list-disc list-inside">
           {edges.filter(e => e.severity !== "ok").slice(0, 3).map(e => (
             <li key={`issue-${e.index}`}>
               <b>{e.prev}→{e.next}</b> — {e.message}
