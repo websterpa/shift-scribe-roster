@@ -548,23 +548,25 @@ function StepCoverage({ state, update }:{ state: WizardState; update:any }) {
         <button className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" onClick={()=>applyPreset("Large")}>Preset: Large</button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-        {dayLabels.map((d,idx)=>(
-          <div key={d} className="rounded-xl border p-3">
-            <div className="font-semibold text-sm mb-2">{d}</div>
-            <div className="space-y-2">
-              {is8 ? (["E","L","N"] as const).map(k=>(
-                <Row key={k} label={`Shift ${k}`}>
-                  <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
-                </Row>
-              )) : (["D","N"] as const).map(k=>(
-                <Row key={k} label={`Shift ${k}`}>
-                  <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
-                </Row>
-              ))}
+      <div className="overflow-x-auto">
+        <div className="grid auto-cols-max grid-flow-col md:grid-flow-row gap-3 md:grid-cols-7">
+          {dayLabels.map((d,idx)=>(
+            <div key={d} className="rounded-xl border p-3 min-w-[140px] md:min-w-0 md:w-auto">
+              <div className="font-semibold text-sm mb-2">{d}</div>
+              <div className="space-y-2">
+                {is8 ? (["E","L","N"] as const).map(k=>(
+                  <Row key={k} label={`Shift ${k}`}>
+                    <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
+                  </Row>
+                )) : (["D","N"] as const).map(k=>(
+                  <Row key={k} label={`Shift ${k}`}>
+                    <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
+                  </Row>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
