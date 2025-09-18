@@ -15,6 +15,91 @@ type PatternSpec =
 
 type CoverageShape = Record<Weekday, Partial<Record<"E"|"L"|"N"|"D", number>>>;
 
+/* --- Rest-risk helpers --- */
+
+function parseHHmm(hhmm: string): number {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
+  if (!m) return 6 * 60; // default 06:00 in minutes
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+type Token = "E"|"L"|"N"|"O"|"D"; // union of all possible tokens
+
+function isOff(tok?: string) { return tok === "O"; }
+
+function shiftWindowMinutes(system: "8h"|"12h", tok: Token): [number, number] | null {
+  // Returns [startOffsetMin, endOffsetMin] from site start T, or null for off
+  if (tok === "O") return null;
+  if (system === "8h") {
+    if (tok === "E") return [0, 8*60];
+    if (tok === "L") return [8*60, 16*60];
+    if (tok === "N") return [16*60, 24*60];
+    return null;
+  } else {
+    if (tok === "D") return [0, 12*60];
+    if (tok === "N") return [12*60, 24*60];
+    return null;
+  }
+}
+
+/** Compute rest hours between adjacent tokens in a per-day sequence. */
+export function computeRestRiskBetweenDays(args: {
+  system: "8h"|"12h",
+  siteStartLocalTime: string,
+  sequence: Token[]
+}): Array<{
+  index: number;          // edge between day index and index+1
+  prev: Token;
+  next: Token;
+  restHours: number;      // hours between prev end and next start
+  severity: "ok"|"warn"|"risk";
+  message: string;
+}> {
+  const results: Array<any> = [];
+  if (!args.sequence || args.sequence.length < 2) return results;
+  const sys = args.system;
+  const T = parseHHmm(args.siteStartLocalTime); // minutes from midnight; used only for semantics
+
+  for (let i = 0; i < args.sequence.length - 1; i++) {
+    const prev = args.sequence[i] as Token;
+    const next = args.sequence[i+1] as Token;
+
+    // If either side is off: rest is at least a calendar day gap ⇒ safe
+    if (isOff(prev) || isOff(next)) {
+      results.push({
+        index: i, prev, next, restHours: 24,
+        severity: "ok",
+        message: "Includes an off day — ample rest."
+      });
+      continue;
+    }
+
+    const prevWin = shiftWindowMinutes(sys, prev);
+    const nextWin = shiftWindowMinutes(sys, next);
+    if (!prevWin || !nextWin) {
+      results.push({ index: i, prev, next, restHours: 24, severity: "ok", message: "Off day present." });
+      continue;
+    }
+
+    // Day i ends at T + prevWin[1] (same day)
+    const prevEndAbs = T + prevWin[1];
+
+    // Day i+1 starts at next calendar day at T + nextWin[0] + 24h
+    const nextStartAbs = (T + 24*60) + nextWin[0];
+
+    const restMin = nextStartAbs - prevEndAbs;
+    const restHours = Math.round((restMin / 60) * 10) / 10; // one decimal
+
+    let severity: "ok"|"warn"|"risk" = "ok";
+    let message = `Rest ${restHours}h`;
+    if (restHours < 11) { severity = "risk"; message = `Rest ${restHours}h (<11h)`; }
+    else if (restHours < 13) { severity = "warn"; message = `Rest ${restHours}h (11–13h)`; }
+
+    results.push({ index: i, prev, next, restHours, severity, message });
+  }
+  return results;
+}
+
 interface WizardState {
   // Step 1
   system: ShiftSystem;
@@ -294,6 +379,17 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
   const presets = is8 ? PRESETS_8H : PRESETS_12H;
   const keys = is8 ? (["E","L","N","O"] as const) : (["D","N","O"] as const);
 
+  // Compute rest risks for current sequence
+  const restRisks = useMemo(() => {
+    const seq = (state.pattern as any).sequence || [];
+    if (seq.length < 2) return [];
+    return computeRestRiskBetweenDays({
+      system: state.system,
+      siteStartLocalTime: state.siteStartLocalTime,
+      sequence: seq
+    });
+  }, [state.system, state.siteStartLocalTime, (state.pattern as any).sequence]);
+
   function addToken(tok: string) {
     const seq:any[] = [...(state.pattern as any).sequence, tok];
     update("pattern", { system: state.system, sequence: seq, repeatWeeks: state.weeks });
@@ -303,6 +399,11 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
     seq.pop();
     update("pattern", { system: state.system, sequence: seq, repeatWeeks: state.weeks });
   }
+
+  // Filter issues for display
+  const riskIssues = restRisks.filter(r => r.severity === "risk");
+  const warnIssues = restRisks.filter(r => r.severity === "warn");
+  const topIssues = [...riskIssues.slice(0, 3), ...warnIssues.slice(0, 2)];
 
   return (
     <div className="space-y-4">
@@ -332,6 +433,48 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
           ))}
           {!(state.pattern as any).sequence.length && <span className="text-muted-foreground text-sm">Empty — add tokens above</span>}
         </div>
+
+        {/* Rest-Risk Heatmap */}
+        {(state.pattern as any).sequence.length >= 2 && (
+          <div className="mt-3 space-y-2">
+            <div className="text-sm font-medium">Rest Risk Analysis</div>
+            <div className="flex gap-1 items-center">
+              {restRisks.map((risk, idx) => (
+                <div
+                  key={idx}
+                  className={`w-6 h-6 rounded text-xs flex items-center justify-center border ${
+                    risk.severity === "risk" ? "bg-red-100 border-red-300 text-red-800" :
+                    risk.severity === "warn" ? "bg-amber-100 border-amber-300 text-amber-800" :
+                    "bg-green-100 border-green-300 text-green-800"
+                  }`}
+                  title={`${risk.prev}→${risk.next}: ${risk.message}`}
+                >
+                  {idx + 1}
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Hover blocks for details. Red = &lt;11h rest, Amber = 11-13h, Green = ≥13h
+            </div>
+            
+            {/* Issues Summary */}
+            {topIssues.length > 0 && (
+              <div className="mt-2 p-2 rounded-lg bg-muted/50 border">
+                <div className="text-sm font-medium mb-1">Rest Issues</div>
+                <ul className="text-xs space-y-1">
+                  {topIssues.map((issue, idx) => (
+                    <li key={idx} className={
+                      issue.severity === "risk" ? "text-red-700" : "text-amber-700"
+                    }>
+                      Day {issue.index + 1}→{issue.index + 2}: {issue.prev}→{issue.next} ({issue.message})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground mt-2">
           Tip: include <code>O</code> (Off) days to avoid rest violations; supervisors typically excluded from <code>N</code> (Nights).
         </p>
