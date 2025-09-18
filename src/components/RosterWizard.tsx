@@ -671,7 +671,7 @@ function InputNumber({ value, onChange, min=0, max=999, step=1 }:{
   value:number; onChange:(v:number)=>void; min?:number; max?:number; step?:number;
 }) {
   return (
-    <input className="flex h-10 w-28 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" type="number" min={min} max={max} step={step}
+    <input className="flex h-10 w-full text-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" type="number" min={min} max={max} step={step}
       value={Number.isFinite(value)? value : 0}
       onChange={e=>onChange(Number(e.target.value))}
     />
