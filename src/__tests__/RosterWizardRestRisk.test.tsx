@@ -176,4 +176,18 @@ describe("RosterWizard Step 2 heatmap smoke", () => {
     // Should no longer show safe message
     expect(screen.queryByText(/All adjacent days have ≥13h rest/i)).not.toBeInTheDocument();
   });
+
+  it("shows rest-risk legend (🟢 ≥13h, 🟡 11–13h, 🔴 <11h)", () => {
+    renderWithRouter(<RosterWizard />);
+    // Step 1 -> Step 2
+    fireEvent.click(screen.getByRole("button", { name: /Next/i }));
+
+    // Legend should be present
+    expect(screen.getByLabelText(/Rest risk legend/i)).toBeInTheDocument();
+
+    // Sanity: the three ranges are visible
+    expect(screen.getByText(/≥13h/)).toBeInTheDocument();
+    expect(screen.getByText(/11–13h/)).toBeInTheDocument();
+    expect(screen.getByText(/<11h/)).toBeInTheDocument();
+  });
 });
