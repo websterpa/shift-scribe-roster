@@ -55,7 +55,8 @@ export function testShiftGrouping() {
     let currentBlockLength = 0;
     let inWorkBlock = false;
     
-    pattern.forEach(shift => {
+    const seq = Array.isArray(pattern) ? pattern : [];
+    seq.forEach(shift => {
       if (shift !== 'R') {
         if (!inWorkBlock) {
           workBlocks++;

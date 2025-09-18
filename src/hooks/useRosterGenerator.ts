@@ -37,6 +37,15 @@ function calculateFairnessStats(result: any, type: 'nights' | 'weekends' | 'publ
 async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRosterResult> {
   console.log('🚀 apiGenerateRoster: Starting with form:', form);
   
+  // Validate pattern sequence is provided and is an array
+  if (!Array.isArray(form.patternSequence)) {
+    throw new Error('No pattern sequence provided.');
+  }
+  
+  if (form.patternSequence.length === 0) {
+    throw new Error('Pattern sequence is empty.');
+  }
+  
   // Fetch staff data using the existing helper
   const staffData = await fetchStaffMembers();
     
@@ -68,6 +77,8 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
     budget: form.budget ?? undefined,
     // Map coverage to staffing requirements if available
     staffing_requirements: coverage.staffing_requirements || undefined,
+    // Pass the validated pattern sequence
+    pattern: form.patternSequence,
   };
 
   console.log('🔧 apiGenerateRoster: Built config:', config);

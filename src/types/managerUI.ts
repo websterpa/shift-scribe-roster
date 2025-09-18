@@ -11,6 +11,7 @@ export interface ManagerRosterForm {
   defaultOtHours?: number | null;  // e.g., 4
   defaultOtStartLocalTime?: string | null; // "HH:mm" or null
   coverageJSON: string;            // JSON string the manager can paste/edit
+  patternSequence?: string[];      // Array of pattern tokens
 }
 
 export interface RosterSummary {

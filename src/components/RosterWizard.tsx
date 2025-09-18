@@ -420,6 +420,20 @@ export default function RosterWizard() {
     // Build config for generator
     const coverage = state.coverage;
 
+    // Normalize pattern sequence before calling generator
+    const { normalizePatternSequence } = await import("@/utils/normalizePattern");
+    const sequence = normalizePatternSequence(state.pattern);
+
+    // Warn if empty pattern
+    if (sequence.length === 0) {
+      toast({
+        title: "Pattern Error",
+        description: "Pattern sequence is empty. Please add tokens before generating.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       await run({
         shiftSystem: state.system,
@@ -431,7 +445,8 @@ export default function RosterWizard() {
         budget: state.budget ?? null,
         defaultOtHours: 4,
         defaultOtStartLocalTime: "10:00",
-        coverageJSON: JSON.stringify(coverage)
+        coverageJSON: JSON.stringify(coverage),
+        patternSequence: sequence
       });
       // Success toast already wired in your panel; add here too for standalone use
       toast({
