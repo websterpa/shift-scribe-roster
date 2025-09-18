@@ -106,14 +106,37 @@ function RestRiskLegend() {
       className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-700"
       aria-label="Rest risk legend"
     >
-      <span className="inline-flex items-center gap-1">
-        <span className="inline-block w-3 h-3 rounded bg-emerald-500" aria-hidden="true" /> 🟢 ≥13h
+      <span
+        className="inline-flex items-center gap-1 cursor-help"
+        title="Green means ≥13h rest between adjacent days"
+      >
+        <span
+          className="inline-block w-3 h-3 rounded bg-emerald-500"
+          aria-hidden="true"
+        />
+        🟢 ≥13h
       </span>
-      <span className="inline-flex items-center gap-1">
-        <span className="inline-block w-3 h-3 rounded bg-amber-400" aria-hidden="true" /> 🟡 11–13h
+
+      <span
+        className="inline-flex items-center gap-1 cursor-help"
+        title="Yellow means 11–13h rest between adjacent days"
+      >
+        <span
+          className="inline-block w-3 h-3 rounded bg-amber-400"
+          aria-hidden="true"
+        />
+        🟡 11–13h
       </span>
-      <span className="inline-flex items-center gap-1">
-        <span className="inline-block w-3 h-3 rounded bg-red-500" aria-hidden="true" /> 🔴 &lt;11h
+
+      <span
+        className="inline-flex items-center gap-1 cursor-help"
+        title="Red means <11h rest between adjacent days"
+      >
+        <span
+          className="inline-block w-3 h-3 rounded bg-red-500"
+          aria-hidden="true"
+        />
+        🔴 &lt;11h
       </span>
     </div>
   );
