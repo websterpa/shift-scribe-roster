@@ -22,6 +22,7 @@ describe("HelpSupport page", () => {
     // Section headings (accordion headers)
     expect(screen.getByRole("button", { name: /Welcome to Shift Craft/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Core Features/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Patterns vs Configurations/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Cost & Budget Features/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Site Settings/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Real-time Previews/i })).toBeInTheDocument();
@@ -68,5 +69,31 @@ describe("HelpSupport page", () => {
     renderWithRouter();
     const back = screen.getByRole("link", { name: /Back to Dashboard/i });
     expect(back).toHaveAttribute("href", "/");
+  });
+
+  test("renders Patterns vs Configurations section and shows body text when expanded", () => {
+    renderWithRouter();
+    
+    const patternsConfigButton = screen.getByRole("button", { name: /Patterns vs Configurations/i });
+    expect(patternsConfigButton).toBeInTheDocument();
+    
+    fireEvent.click(patternsConfigButton);
+    
+    expect(screen.getByText(/rota template or repeating cycle/i)).toBeInTheDocument();
+    expect(screen.getByText(/site-specific setup and constraints/i)).toBeInTheDocument();
+  });
+
+  test("finds Patterns vs Configurations section via search", () => {
+    renderWithRouter();
+    
+    const searchInput = screen.getByPlaceholderText(/Search help topics/i);
+    fireEvent.change(searchInput, { target: { value: "patterns" } });
+    
+    expect(screen.getByRole("button", { name: /Patterns vs Configurations/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Extra Features/i })).not.toBeInTheDocument();
+    
+    // Also test "configurations" search
+    fireEvent.change(searchInput, { target: { value: "configurations" } });
+    expect(screen.getByRole("button", { name: /Patterns vs Configurations/i })).toBeInTheDocument();
   });
 });

@@ -66,6 +66,28 @@ export default function HelpSupport() {
           "Roster generation coverage builder leave absence overtime fairness",
       },
       {
+        id: "patterns-config",
+        title: "Patterns vs Configurations",
+        tags: ["patterns", "configurations", "templates", "setup", "constraints"],
+        body: (
+          <div className="space-y-3">
+            <p>
+              <strong>Pattern</strong>: The rota template or repeating cycle that defines when staff work.
+              Examples: "4 on, 4 off", "DDNNRRDD" (Day-Day-Night-Night-Rest-Rest-Day-Day), or custom shift sequences.
+            </p>
+            <p>
+              <strong>Configuration</strong>: The site-specific setup and constraints applied to patterns.
+              Examples: minimum staffing levels, overtime rules, handover requirements, budget thresholds, or compliance settings.
+            </p>
+            <p>
+              <strong>In simple terms</strong>: A pattern is <em>what</em> the schedule looks like, 
+              while a configuration is <em>how</em> the rules and constraints shape that schedule for your specific workplace.
+            </p>
+          </div>
+        ),
+        plainText: "patterns configurations templates setup constraints rota cycle staff work schedule rules",
+      },
+      {
         id: "budget",
         title: "Cost & Budget Features",
         tags: ["costs", "budget", "variance", "threshold"],
