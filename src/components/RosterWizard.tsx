@@ -418,17 +418,6 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
   const presets = is8 ? PRESETS_8H : PRESETS_12H;
   const keys = is8 ? (["E","L","N","O"] as const) : (["D","N","O"] as const);
 
-  // Compute rest risks for current sequence
-  const restRisks = useMemo(() => {
-    const seq = (state.pattern as any).sequence || [];
-    if (seq.length < 2) return [];
-    return computeRestRiskBetweenDays({
-      system: state.system,
-      siteStartLocalTime: state.siteStartLocalTime,
-      sequence: seq
-    });
-  }, [state.system, state.siteStartLocalTime, (state.pattern as any).sequence]);
-
   function addToken(tok: string) {
     const seq:any[] = [...(state.pattern as any).sequence, tok];
     update("pattern", { system: state.system, sequence: seq, repeatWeeks: state.weeks });
@@ -439,10 +428,11 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
     update("pattern", { system: state.system, sequence: seq, repeatWeeks: state.weeks });
   }
 
-  // Filter issues for display
-  const riskIssues = restRisks.filter(r => r.severity === "risk");
-  const warnIssues = restRisks.filter(r => r.severity === "warn");
-  const topIssues = [...riskIssues.slice(0, 3), ...warnIssues.slice(0, 2)];
+  const edges = computeRestRiskBetweenDays({
+    system: state.system,
+    siteStartLocalTime: state.siteStartLocalTime,
+    sequence: (state.pattern as any).sequence as Token[],
+  });
 
   return (
     <div className="space-y-4">
@@ -472,13 +462,12 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
           ))}
           {!(state.pattern as any).sequence.length && <span className="text-muted-foreground text-sm">Empty — add tokens above</span>}
         </div>
-
-        {/* Rest-Risk Heatmap */}
-        <RestRiskHeatmap edges={restRisks} />
-
         <p className="text-xs text-muted-foreground mt-2">
           Tip: include <code>O</code> (Off) days to avoid rest violations; supervisors typically excluded from <code>N</code> (Nights).
         </p>
+
+        {/* NEW: rest-risk heatmap */}
+        <RestRiskHeatmap edges={edges} />
       </div>
     </div>
   );
