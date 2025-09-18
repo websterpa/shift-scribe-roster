@@ -552,7 +552,7 @@ function StepCoverage({ state, update }:{ state: WizardState; update:any }) {
         <div className="grid auto-cols-max grid-flow-col md:grid-flow-row gap-3 md:grid-cols-7">
           {dayLabels.map((d,idx)=>(
             <div key={d} className="rounded-xl border p-3 min-w-[140px] md:min-w-0 md:w-auto">
-              <div className="font-semibold text-sm mb-2">{d}</div>
+              <div className="font-semibold text-xs md:text-sm mb-2">{d}</div>
               <div className="space-y-2">
                 {is8 ? (["E","L","N"] as const).map(k=>(
                   <Row key={k} label={`Shift ${k}`}>
@@ -662,7 +662,7 @@ function StepReview({ state, totals, estHours }:{ state: WizardState; totals:any
 function Row({label, children}:{label:string; children:React.ReactNode}) {
   return (
     <div className="flex items-center gap-3">
-      <div className="text-sm text-slate-700 flex-1 min-w-0">{label}</div>
+      <div className="text-[11px] md:text-sm text-slate-700 flex-1 min-w-0">{label}</div>
       <div className="w-20 sm:w-24 md:w-28 lg:w-32">
         {children}
       </div>
