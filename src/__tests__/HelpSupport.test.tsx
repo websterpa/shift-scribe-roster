@@ -128,4 +128,10 @@ describe("HelpSupport page", () => {
     fireEvent.change(searchInput, { target: { value: "Rest Day" } });
     expect(screen.getByRole("button", { name: /Shift tokens cheat-sheet/i })).toBeInTheDocument();
   });
+
+  test("help page documents R = Rest Day", () => {
+    renderWithRouter();
+    // Expand Core Features or search if needed
+    expect(screen.getByText(/R \(Rest Day\)/i)).toBeInTheDocument();
+  });
 });

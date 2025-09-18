@@ -190,4 +190,12 @@ describe("RosterWizard Step 2 heatmap smoke", () => {
     expect(screen.getByText(/11–13h/)).toBeInTheDocument();
     expect(screen.getByText(/<11h/)).toBeInTheDocument();
   });
+
+  it("pattern token button shows tooltip for R = Rest Day", () => {
+    renderWithRouter(<RosterWizard />);
+    // Step 1 -> Step 2
+    fireEvent.click(screen.getByRole("button", { name: /Next/i }));
+    // Hover tooltip is based on title attribute; assert presence
+    expect(screen.getByTitle(/R = Rest Day/i)).toBeInTheDocument();
+  });
 });
