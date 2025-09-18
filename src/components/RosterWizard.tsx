@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useRosterGenerator } from "@/hooks/useRosterGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { computeWeeklyTotals, computeEstimatedWeeklyHours } from "@/utils/coveragePresets";
+import { normalizePatternSequence, validatePattern } from "@/utils/normalizePattern";
 import { listPatterns, savePattern, deletePattern, SavedPattern, PatternToken } from "@/services/patterns";
 
 type ShiftSystem = "8h" | "12h";
@@ -382,6 +383,12 @@ export default function RosterWizard() {
       if (state.weeks < 1 || state.weeks > 26) issues.push("Weeks must be between 1 and 26.");
     }
     if (s >= 2) {
+      // Check if pattern is empty using validator
+      const { sequence, issues: patternIssues } = validatePattern((state.pattern as any)?.sequence ?? state.pattern);
+      if (sequence.length === 0) {
+        issues.push("Pattern cannot be empty. Please add tokens or select a preset.");
+      }
+      
       // disallow mixing codes across systems
       if (state.system === "8h" && (state.pattern as any).sequence.some((t: string)=> t==="D")) {
         issues.push("8h system cannot include 'D' (12h day) in pattern.");
@@ -638,6 +645,9 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
     sequence: (state.pattern as any).sequence as Token[],
   });
 
+  // Validate current pattern
+  const { sequence: validatedSeq, issues } = validatePattern((state.pattern as any)?.sequence ?? state.pattern);
+
   return (
     <div className="space-y-4">
       {/* Saved Patterns Section */}
@@ -754,6 +764,18 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
           ))}
           {!(state.pattern as any).sequence.length && <span className="text-muted-foreground text-sm">Empty — add tokens above</span>}
         </div>
+
+        {/* Pattern validation warnings */}
+        {issues.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {issues.map((msg, idx) => (
+              <p key={idx} className="text-xs text-destructive flex items-center gap-1">
+                ⚠️ {msg}
+              </p>
+            ))}
+          </div>
+        )}
+
         <p className="text-xs text-slate-500 mt-2">
           Tip: include <code>R</code> (<strong>Rest Day</strong>) to avoid rest violations; supervisors are typically excluded from <code>N</code> (Nights).
         </p>
