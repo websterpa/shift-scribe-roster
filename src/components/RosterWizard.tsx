@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRosterGenerator } from "@/hooks/useRosterGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { computeWeeklyTotals, computeEstimatedWeeklyHours } from "@/utils/coveragePresets";
+import { listPatterns, savePattern, deletePattern, SavedPattern, PatternToken } from "@/services/patterns";
 
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
@@ -235,6 +236,10 @@ export default function RosterWizard() {
   const { optimising, result, error, run } = useRosterGenerator();
 
   const [step, setStep] = useState(1);
+  const [savedPatterns, setSavedPatterns] = useState<SavedPattern[]>([]);
+  const [loadingPatterns, setLoadingPatterns] = useState(false);
+  const [savingPattern, setSavingPattern] = useState(false);
+  
   const [state, setState] = useState<WizardState>(() => ({
     system: "8h",
     siteStartLocalTime: "06:00",
@@ -250,6 +255,114 @@ export default function RosterWizard() {
     allowSupervisorNights: false,
     capPublicHolidaysPerPerson: 2
   }));
+
+  // Load saved patterns on mount and when system changes
+  useEffect(() => {
+    loadSavedPatterns();
+  }, [state.system]);
+
+  async function loadSavedPatterns() {
+    setLoadingPatterns(true);
+    try {
+      // Using a simple site ID based on current user - you could make this more sophisticated
+      const siteId = "default-site";
+      const patterns = await listPatterns(siteId);
+      // Filter patterns by current system
+      const filteredPatterns = patterns.filter(p => p.system === state.system);
+      setSavedPatterns(filteredPatterns);
+    } catch (err) {
+      toast({
+        title: "Error Loading Patterns",
+        description: "Failed to load saved patterns",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingPatterns(false);
+    }
+  }
+
+  async function handleSavePattern(name: string) {
+    if (!name.trim()) {
+      toast({
+        title: "Pattern Name Required",
+        description: "Please enter a name for your pattern",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingPattern(true);
+    try {
+      const result = await savePattern({
+        siteId: "default-site",
+        name: name.trim(),
+        system: state.system,
+        sequence: (state.pattern as any).sequence,
+        repeatWeeks: state.weeks
+      });
+
+      if (result.ok) {
+        toast({
+          title: "Pattern Saved",
+          description: `Pattern "${name}" saved successfully`,
+        });
+        await loadSavedPatterns(); // Refresh the list
+      } else {
+        throw new Error("Save failed");
+      }
+    } catch (err) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save pattern",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingPattern(false);
+    }
+  }
+
+  async function handleDeletePattern(id: string, name: string) {
+    try {
+      const success = await deletePattern(id);
+      if (success) {
+        toast({
+          title: "Pattern Deleted",
+          description: `Pattern "${name}" deleted successfully`,
+        });
+        await loadSavedPatterns(); // Refresh the list
+      } else {
+        throw new Error("Delete failed");
+      }
+    } catch (err) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete pattern",
+        variant: "destructive"
+      });
+    }
+  }
+
+  function handleApplyPattern(pattern: SavedPattern) {
+    // Ensure pattern system matches current system before applying
+    if (pattern.system !== state.system) {
+      toast({
+        title: "System Mismatch",
+        description: `Pattern is for ${pattern.system} system, but current system is ${state.system}`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    update("pattern", { 
+      system: pattern.system, 
+      sequence: pattern.sequence as any, // Safe cast since we validated system match
+      repeatWeeks: state.weeks 
+    });
+    toast({
+      title: "Pattern Applied",
+      description: `Applied pattern "${pattern.name}"`,
+    });
+  }
 
   // Derived previews
   const totals = useMemo(() => computeWeeklyTotals(state.system, state.coverage as any), [state.system, state.coverage]);
@@ -357,7 +470,16 @@ export default function RosterWizard() {
 
       <div className="rounded-2xl border bg-card shadow-sm p-4 md:p-6 mt-4">
         {step === 1 && <StepBasics state={state} update={update} />}
-        {step === 2 && <StepPattern state={state} update={update} />}
+        {step === 2 && <StepPattern 
+          state={state} 
+          update={update} 
+          savedPatterns={savedPatterns}
+          loadingPatterns={loadingPatterns}
+          savingPattern={savingPattern}
+          onSavePattern={handleSavePattern}
+          onDeletePattern={handleDeletePattern}
+          onApplyPattern={handleApplyPattern}
+        />}
         {step === 3 && <StepCoverage state={state} update={update} />}
         {step === 4 && <StepRatesBudget state={state} update={update} />}
         {step === 5 && <StepReview state={state} totals={totals} estHours={estHours} />}
@@ -459,7 +581,19 @@ function StepBasics({ state, update }:{ state: WizardState; update: <K extends k
   );
 }
 
-function StepPattern({ state, update }:{ state: WizardState; update: any }) {
+function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPattern, onSavePattern, onDeletePattern, onApplyPattern }:{ 
+  state: WizardState; 
+  update: any;
+  savedPatterns: SavedPattern[];
+  loadingPatterns: boolean;
+  savingPattern: boolean;
+  onSavePattern: (name: string) => Promise<void>;
+  onDeletePattern: (id: string, name: string) => Promise<void>;
+  onApplyPattern: (pattern: SavedPattern) => void;
+}) {
+  const [savePatternName, setSavePatternName] = useState("");
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  
   const is8 = state.system==="8h";
   const presets = is8 ? PRESETS_8H : PRESETS_12H;
   const keys = is8 ? (["E","L","N","R"] as const) : (["D","N","R"] as const);
@@ -474,6 +608,13 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
     update("pattern", { system: state.system, sequence: seq, repeatWeeks: state.weeks });
   }
 
+  async function handleSave() {
+    if (!savePatternName.trim()) return;
+    await onSavePattern(savePatternName);
+    setSavePatternName("");
+    setShowSaveForm(false);
+  }
+
   const edges = computeRestRiskBetweenDays({
     system: state.system,
     siteStartLocalTime: state.siteStartLocalTime,
@@ -482,6 +623,81 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
 
   return (
     <div className="space-y-4">
+      {/* Saved Patterns Section */}
+      {savedPatterns.length > 0 && (
+        <div className="rounded-xl border p-3">
+          <div className="font-semibold mb-2">Saved Patterns</div>
+          {loadingPatterns ? (
+            <div className="text-sm text-muted-foreground">Loading saved patterns...</div>
+          ) : (
+            <div className="space-y-2">
+              {savedPatterns.map(pattern => (
+                <div key={pattern.id} className="flex items-center gap-2 p-2 rounded-lg border bg-background">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{pattern.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {pattern.sequence.join(" • ")} ({pattern.sequence.length} days)
+                    </div>
+                  </div>
+                  <button 
+                    className="px-3 py-1 rounded text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    onClick={() => onApplyPattern(pattern)}
+                  >
+                    Apply
+                  </button>
+                  <button 
+                    className="px-2 py-1 rounded text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    onClick={() => onDeletePattern(pattern.id, pattern.name)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Save Current Pattern Section */}
+      <div className="rounded-xl border p-3">
+        <div className="font-semibold mb-2">Save Current Pattern</div>
+        {!showSaveForm ? (
+          <button 
+            className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors"
+            onClick={() => setShowSaveForm(true)}
+            disabled={(state.pattern as any).sequence.length === 0}
+          >
+            Save Current Pattern
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <input 
+              className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Pattern name..."
+              value={savePatternName}
+              onChange={e => setSavePatternName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+            />
+            <button 
+              className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              onClick={handleSave}
+              disabled={!savePatternName.trim() || savingPattern}
+            >
+              {savingPattern ? "Saving..." : "Save"}
+            </button>
+            <button 
+              className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors"
+              onClick={() => {
+                setShowSaveForm(false);
+                setSavePatternName("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="rounded-xl border p-3">
         <div className="font-semibold mb-2">Choose a preset</div>
         <div className="flex flex-wrap gap-2">

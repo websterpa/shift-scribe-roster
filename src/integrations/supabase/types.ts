@@ -423,6 +423,39 @@ export type Database = {
         }
         Relationships: []
       }
+      site_patterns: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          repeat_weeks: number
+          sequence: Json
+          site_id: string
+          system: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          repeat_weeks?: number
+          sequence: Json
+          site_id: string
+          system: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          repeat_weeks?: number
+          sequence?: Json
+          site_id?: string
+          system?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           avg_staff_rate: number
