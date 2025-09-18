@@ -6,8 +6,8 @@ import { computeWeeklyTotals, computeEstimatedWeeklyHours } from "@/utils/covera
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
 
-type PatternToken8h = "E"|"L"|"N"|"O"; // O = off
-type PatternToken12h = "D"|"N"|"O";
+type PatternToken8h = "E"|"L"|"N"|"R"; // R = rest
+type PatternToken12h = "D"|"N"|"R";
 
 type PatternSpec =
   | { system: "8h"; sequence: PatternToken8h[]; repeatWeeks: number }
@@ -23,13 +23,13 @@ function parseHHmm(hhmm: string): number {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-type Token = "E"|"L"|"N"|"O"|"D"; // union of all possible tokens
+type Token = "E"|"L"|"N"|"R"|"D"; // union of all possible tokens
 
-function isOff(tok?: string) { return tok === "O"; }
+function isRest(tok?: string) { return tok === "R"; }
 
 function shiftWindowMinutes(system: "8h"|"12h", tok: Token): [number, number] | null {
-  // Returns [startOffsetMin, endOffsetMin] from site start T, or null for off
-  if (tok === "O") return null;
+  // Returns [startOffsetMin, endOffsetMin] from site start T, or null for rest
+  if (tok === "R") return null;
   if (system === "8h") {
     if (tok === "E") return [0, 8*60];
     if (tok === "L") return [8*60, 16*60];
@@ -64,12 +64,12 @@ export function computeRestRiskBetweenDays(args: {
     const prev = args.sequence[i] as Token;
     const next = args.sequence[i+1] as Token;
 
-    // If either side is off: rest is at least a calendar day gap ⇒ safe
-    if (isOff(prev) || isOff(next)) {
+    // If either side is rest: rest is at least a calendar day gap ⇒ safe
+    if (isRest(prev) || isRest(next)) {
       results.push({
         index: i, prev, next, restHours: 24,
         severity: "ok",
-        message: "Includes an off day — ample rest."
+        message: "Includes a rest day — ample rest."
       });
       continue;
     }
@@ -77,7 +77,7 @@ export function computeRestRiskBetweenDays(args: {
     const prevWin = shiftWindowMinutes(sys, prev);
     const nextWin = shiftWindowMinutes(sys, next);
     if (!prevWin || !nextWin) {
-      results.push({ index: i, prev, next, restHours: 24, severity: "ok", message: "Off day present." });
+      results.push({ index: i, prev, next, restHours: 24, severity: "ok", message: "Rest day present." });
       continue;
     }
 
@@ -179,7 +179,7 @@ function RestRiskHeatmap({
         </ul>
       )}
       {!edges.some(e => e.severity !== "ok") && (
-        <p className="mt-2 text-xs text-emerald-700">All adjacent days have ≥13h rest or an off day in between.</p>
+        <p className="mt-2 text-xs text-emerald-700">All adjacent days have ≥13h rest or a rest day in between.</p>
       )}
     </div>
   );
@@ -219,15 +219,15 @@ const DEFAULT_COVERAGE_12H: CoverageShape = {
 };
 
 const PRESETS_8H: Array<{name:string, seq:PatternToken8h[]}> = [
-  { name:"2E–2L–2N–4O", seq:["E","E","L","L","N","N","O","O","O","O"] },
-  { name:"4 on 4 off (E/L mix)", seq:["E","E","E","E","O","O","O","O"] },
-  { name:"Nights-leaning", seq:["E","L","N","N","N","O","O"] },
+  { name:"2E–2L–2N–4R", seq:["E","E","L","L","N","N","R","R","R","R"] },
+  { name:"4 on 4 off (E/L mix)", seq:["E","E","E","E","R","R","R","R"] },
+  { name:"Nights-leaning", seq:["E","L","N","N","N","R","R"] },
 ];
 
 const PRESETS_12H: Array<{name:string, seq:PatternToken12h[]}> = [
-  { name:"4D–4O–4N–4O", seq:["D","D","D","D","O","O","O","O","N","N","N","N","O","O","O","O"] },
-  { name:"Days-only 4 on 4 off", seq:["D","D","D","D","O","O","O","O"] },
-  { name:"2D–2N–4O", seq:["D","D","N","N","O","O","O","O"] },
+  { name:"4D–4R–4N–4R", seq:["D","D","D","D","R","R","R","R","N","N","N","N","R","R","R","R"] },
+  { name:"Days-only 4 on 4 off", seq:["D","D","D","D","R","R","R","R"] },
+  { name:"2D–2N–4R", seq:["D","D","N","N","R","R","R","R"] },
 ];
 
 export default function RosterWizard() {
@@ -462,7 +462,7 @@ function StepBasics({ state, update }:{ state: WizardState; update: <K extends k
 function StepPattern({ state, update }:{ state: WizardState; update: any }) {
   const is8 = state.system==="8h";
   const presets = is8 ? PRESETS_8H : PRESETS_12H;
-  const keys = is8 ? (["E","L","N","O"] as const) : (["D","N","O"] as const);
+  const keys = is8 ? (["E","L","N","R"] as const) : (["D","N","R"] as const);
 
   function addToken(tok: string) {
     const seq:any[] = [...(state.pattern as any).sequence, tok];

@@ -61,26 +61,26 @@ describe('Rest Risk Calculator', () => {
     });
   });
 
-  it('treats off days as safe rest', () => {
+  it('treats rest days as safe rest', () => {
     const result = computeRestRiskBetweenDays({
       system: "8h",
       siteStartLocalTime: "06:00", 
-      sequence: ["N", "O", "E"]
+      sequence: ["N", "R", "E"]
     });
 
     expect(result).toHaveLength(2);
     
-    // N→O should be safe
+    // N→R should be safe
     expect(result[0]).toMatchObject({
       prev: "N",
-      next: "O",
+      next: "R",
       restHours: 24,
       severity: "ok"
     });
 
-    // O→E should be safe  
+    // R→E should be safe  
     expect(result[1]).toMatchObject({
-      prev: "O", 
+      prev: "R", 
       next: "E",
       restHours: 24,
       severity: "ok"
