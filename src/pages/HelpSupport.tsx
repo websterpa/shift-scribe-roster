@@ -38,29 +38,40 @@ export default function HelpSupport() {
         title: "Core Features",
         tags: ["roster", "coverage", "leave", "overtime", "fairness"],
         body: (
-          <ul className="list-disc list-inside space-y-1">
-            <li>
-              <strong>Roster Generation</strong>: Build 17-week rosters in 8h
-              (E/L/N) or 12h (D/N) systems with compliance rules (11h rest,
-              supervisor/night policy).
-            </li>
-            <li>
-              <strong>Coverage Builder</strong>: Configure daily shift needs,
-              apply patterns, and preview weekly totals, hours, and costs.
-            </li>
-            <li>
-              <strong>Leave & Absence Codes</strong>: Use A/L, S, SP, CL to
-              mark staff leave.
-            </li>
-            <li>
-              <strong>Overtime</strong>: Fill coverage gaps with 4h+ top-ups at
-              correct cost multipliers.
-            </li>
-            <li>
-              <strong>Fairness Rules</strong>: Balance nights, weekends, and PHs
-              across staff.
-            </li>
-          </ul>
+          <div className="space-y-3">
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                <strong>Roster Generation</strong>: Build 17-week rosters in 8h
+                (E/L/N) or 12h (D/N) systems with compliance rules (11h rest,
+                supervisor/night policy).
+              </li>
+              <li>
+                <strong>Coverage Builder</strong>: Configure daily shift needs,
+                apply patterns, and preview weekly totals, hours, and costs.
+              </li>
+              <li>
+                <strong>Leave & Absence Codes</strong>: Use A/L, S, SP, CL to
+                mark staff leave.
+              </li>
+              <li>
+                <strong>Overtime</strong>: Fill coverage gaps with 4h+ top-ups at
+                correct cost multipliers.
+              </li>
+              <li>
+                <strong>Fairness Rules</strong>: Balance nights, weekends, and PHs
+                across staff.
+              </li>
+            </ul>
+            <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li><strong>8h system tokens</strong>: E (Early), L (Late), N (Night), <strong>R (Rest Day)</strong></li>
+                <li><strong>12h system tokens</strong>: D (Day), N (Night), <strong>R (Rest Day)</strong></li>
+              </ul>
+              <p className="text-sm text-slate-600 mt-2">
+                <strong>R = Rest Day</strong>. Include Rest Days in patterns to ensure compliant recovery time (≥ 11h between shifts).
+              </p>
+            </div>
+          </div>
         ),
         plainText:
           "Roster generation coverage builder leave absence overtime fairness",
@@ -73,7 +84,7 @@ export default function HelpSupport() {
           <div className="space-y-3">
             <p>
               <strong>Pattern</strong>: The rota template or repeating cycle that defines when staff work.
-              Examples: "4 on, 4 off", "DDNNRRDD" (Day-Day-Night-Night-Rest-Rest-Day-Day), or custom shift sequences.
+              Examples: "4D–4<strong>R</strong>–4N–4<strong>R</strong>" (12h), "2E–2L–2N–4<strong>R</strong>" (8h), or custom shift sequences.
             </p>
             <p>
               <strong>Configuration</strong>: The site-specific setup and constraints applied to patterns.
@@ -165,6 +176,21 @@ export default function HelpSupport() {
         ),
         plainText: "role mix presets optimisation progress accessibility",
       },
+      {
+        id: "token-cheatsheet",
+        title: "Shift tokens cheat-sheet",
+        tags: ["tokens", "legend", "rest"],
+        body: (
+          <div className="text-slate-700 space-y-2">
+            <div><strong>E</strong> Early (8h), <strong>L</strong> Late (8h), <strong>N</strong> Night (8h/12h)</div>
+            <div><strong>D</strong> Day (12h), <strong>R</strong> Rest Day</div>
+            <p className="text-sm text-slate-600">
+              Use <strong>R (Rest Day)</strong> to create recovery time and avoid rest-risk warnings.
+            </p>
+          </div>
+        ),
+        plainText: "tokens legend E L N D R Rest Day cheat sheet"
+      }
     ],
     []
   );

@@ -69,7 +69,7 @@ export function computeRestRiskBetweenDays(args: {
       results.push({
         index: i, prev, next, restHours: 24,
         severity: "ok",
-        message: "Includes a rest day — ample rest."
+        message: "Includes a Rest Day — ample rest."
       });
       continue;
     }
@@ -77,7 +77,7 @@ export function computeRestRiskBetweenDays(args: {
     const prevWin = shiftWindowMinutes(sys, prev);
     const nextWin = shiftWindowMinutes(sys, next);
     if (!prevWin || !nextWin) {
-      results.push({ index: i, prev, next, restHours: 24, severity: "ok", message: "Rest day present." });
+      results.push({ index: i, prev, next, restHours: 24, severity: "ok", message: "Rest Day present." });
       continue;
     }
 
@@ -179,7 +179,7 @@ function RestRiskHeatmap({
         </ul>
       )}
       {!edges.some(e => e.severity !== "ok") && (
-        <p className="mt-2 text-xs text-emerald-700">All adjacent days have ≥13h rest or a rest day in between.</p>
+        <p className="mt-2 text-xs text-emerald-700">All adjacent days have ≥13h rest or a Rest Day in between.</p>
       )}
     </div>
   );
@@ -497,7 +497,20 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
         <div className="font-semibold mb-2">Or build a custom sequence</div>
         <div className="flex flex-wrap gap-2 mb-2">
           {keys.map(k=>(
-            <button key={k} className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" onClick={()=>addToken(k)}>{k}</button>
+            <button 
+              key={k} 
+              className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" 
+              onClick={()=>addToken(k)}
+              title={
+                k === "R" ? "R = Rest Day"
+                : k === "E" ? "E = Early (8h)"
+                : k === "L" ? "L = Late (8h)"
+                : k === "D" ? "D = Day (12h)"
+                : "N = Night"
+              }
+            >
+              {k}
+            </button>
           ))}
           <button className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" onClick={removeLast}>⌫ Remove last</button>
         </div>
@@ -508,8 +521,8 @@ function StepPattern({ state, update }:{ state: WizardState; update: any }) {
           ))}
           {!(state.pattern as any).sequence.length && <span className="text-muted-foreground text-sm">Empty — add tokens above</span>}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Tip: include <code>R</code> (Rest Day) to avoid rest violations; supervisors typically excluded from <code>N</code> (Nights).
+        <p className="text-xs text-slate-500 mt-2">
+          Tip: include <code>R</code> (<strong>Rest Day</strong>) to avoid rest violations; supervisors are typically excluded from <code>N</code> (Nights).
         </p>
 
         {/* NEW: rest-risk heatmap */}
