@@ -661,9 +661,11 @@ function StepReview({ state, totals, estHours }:{ state: WizardState; totals:any
 /* small UI helpers */
 function Row({label, children}:{label:string; children:React.ReactNode}) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div>{children}</div>
+    <div className="flex items-center gap-3">
+      <div className="text-sm text-slate-700 flex-1 min-w-0">{label}</div>
+      <div className="w-20 sm:w-24 md:w-28 lg:w-32">
+        {children}
+      </div>
     </div>
   );
 }
