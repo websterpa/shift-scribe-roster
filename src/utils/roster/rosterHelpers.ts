@@ -72,12 +72,35 @@ export async function saveRosterVersion(
   try {
     logger.info('Saving roster version...', { configId, assignmentCount: assignments.length });
 
-    // Create new roster version
+    // Validate configId is a proper UUID
+    if (!configId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(configId)) {
+      throw new Error('Invalid configId - must be a valid UUID');
+    }
+
+    // Get next version number
+    const { data: existingVersions, error: versionQueryError } = await supabase
+      .from("roster_versions")
+      .select("version_number")
+      .eq("config_id", configId)
+      .order("version_number", { ascending: false })
+      .limit(1);
+
+    if (versionQueryError) {
+      logger.error(new Error('Error querying existing versions'), { error: versionQueryError });
+      throw versionQueryError;
+    }
+
+    const nextVersionNumber = existingVersions && existingVersions.length > 0 
+      ? existingVersions[0].version_number + 1 
+      : 1;
+
+    // Create new roster version - let DB generate the UUID
     const { data: versionData, error: versionError } = await supabase
       .from('roster_versions')
       .insert({
         config_id: configId,
-        version_number: 1 // In a real implementation, this would increment
+        version_number: nextVersionNumber,
+        version_name: `Version ${nextVersionNumber}`
       })
       .select()
       .single();

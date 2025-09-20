@@ -4,6 +4,8 @@ import type { ManagerRosterForm, GenerateRosterResult } from "@/types/managerUI"
 import { generateAndSaveRoster, fetchStaffMembers } from "@/utils/roster/rosterGeneration";
 import type { StaffMember } from "@/types/roster";
 import { createLogger } from "@/utils/errorLogger";
+import { createRosterConfig } from "@/services/roster";
+import { supabase } from "@/integrations/supabase/client";
 
 const logger = createLogger('useRosterGenerator');
 
@@ -63,8 +65,9 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
   }
 
   // Build config for your back-end generator (keep existing function signatures):
-  const config = {
-    id: `temp-${Date.now()}`, // Generate a temporary ID
+  const configData = {
+    // Don't pass temp ID - let DB generate UUID
+    config_name: `Manager Roster - ${new Date().toLocaleDateString()}`,
     cycle_length_weeks: form.weeks,
     shift_type: form.shiftSystem,
     operational_hours_per_day: form.shiftSystem === "8h" ? 24 : 24, // Always 24h operation
@@ -74,11 +77,18 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
     timezone: form.timezone,
     default_ot_hours: form.defaultOtHours ?? undefined,
     default_ot_start_local_time: form.defaultOtStartLocalTime ?? undefined,
-    budget: form.budget ?? undefined,
     // Map coverage to staffing requirements if available
     staffing_requirements: coverage.staffing_requirements || undefined,
     // Pass the validated pattern sequence
     pattern: form.patternSequence,
+  };
+
+  // Create roster config first and get real UUID
+  const configId = await createRosterConfig(configData);
+  
+  const config = {
+    ...configData,
+    id: configId, // Now we have a real UUID
   };
 
   console.log('🔧 apiGenerateRoster: Built config:', config);
@@ -166,7 +176,17 @@ export function useRosterGenerator() {
       } catch (e: any) {
         console.error('❌ useRosterGenerator.run: Generation failed:', e);
         const raw = e?.message || "Failed to generate roster";
-        const msg = /forEach/.test(raw) ? "Pattern looks invalid. Please pick a preset or add tokens, then try again." : raw;
+        
+        // Better error mapping for UUID issues
+        let msg = raw;
+        if (/invalid input syntax for type uuid/i.test(raw)) {
+          msg = "An internal ID was not valid. Please try again. If this persists, contact support.";
+        } else if (/forEach/.test(raw)) {
+          msg = "Pattern looks invalid. Please pick a preset or add tokens, then try again.";
+        } else if (/violates row-level security policy/i.test(raw)) {
+          msg = "Access denied. Please ensure you're logged in and have the necessary permissions.";
+        }
+        
         setError(msg);
       } finally {
         setOptimising(false);
