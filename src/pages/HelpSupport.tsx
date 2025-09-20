@@ -36,7 +36,7 @@ export default function HelpSupport() {
       {
         id: "core",
         title: "Core Features",
-        tags: ["roster", "coverage", "leave", "overtime", "fairness"],
+        tags: ["roster", "staffing", "leave", "overtime", "fairness"],
         body: (
           <div className="space-y-3">
             <ul className="list-disc list-inside space-y-1">
@@ -46,7 +46,7 @@ export default function HelpSupport() {
                 supervisor/night policy).
               </li>
               <li>
-                <strong>Coverage Builder</strong>: Configure daily shift needs,
+                <strong>Staffing Levels (Required staffing per shift)</strong>: Configure daily shift needs,
                 apply patterns, and preview weekly totals, hours, and costs.
               </li>
               <li>
@@ -54,7 +54,7 @@ export default function HelpSupport() {
                 mark staff leave.
               </li>
               <li>
-                <strong>Overtime</strong>: Fill coverage gaps with 4h+ top-ups at
+                <strong>Overtime</strong>: Fill staffing gaps with 4h+ top-ups at
                 correct cost multipliers.
               </li>
               <li>
@@ -74,7 +74,7 @@ export default function HelpSupport() {
           </div>
         ),
         plainText:
-          "Roster generation coverage builder leave absence overtime fairness",
+          "Roster generation staffing levels builder leave absence overtime fairness",
       },
       {
         id: "patterns-config",
@@ -142,7 +142,7 @@ export default function HelpSupport() {
         body: (
           <p>
             Totals, hours, costs, and variance all update live as you edit
-            coverage, rates, or mixes, giving visibility before saving.
+            staffing levels, rates, or mixes, giving visibility before saving.
           </p>
         ),
         plainText: "real time previews totals hours costs variance",
@@ -169,7 +169,7 @@ export default function HelpSupport() {
         body: (
           <ul className="list-disc list-inside space-y-1">
             <li>Role mix sliders: set % Supervisors vs Staff per shift.</li>
-            <li>Preset coverage patterns for quick setup.</li>
+            <li>Preset staffing patterns for quick setup.</li>
             <li>Optimisation progress indicator (up to 5s).</li>
             <li>Accessible labels, error states, keyboard support.</li>
           </ul>
