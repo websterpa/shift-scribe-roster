@@ -7,6 +7,7 @@ import { listPatterns, savePattern, deletePattern, SavedPattern, PatternToken } 
 import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import WizardHelp from "./WizardHelp";
 import InlineTip from "./InlineTip";
+import GettingStartedCard from "./GettingStartedCard";
 
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
@@ -334,6 +335,9 @@ export default function RosterWizard() {
   const [inlineTips, setInlineTips] = useState<boolean>(() => {
     try { return localStorage.getItem("wizard:inlineTips") === "1"; } catch { return false; }
   });
+  const [showIntro, setShowIntro] = useState<boolean>(() => {
+    try { return localStorage.getItem("wizard:hideIntro") !== "1"; } catch { return true; }
+  });
   const [savedPatterns, setSavedPatterns] = useState<SavedPattern[]>([]);
   const [loadingPatterns, setLoadingPatterns] = useState(false);
   const [savingPattern, setSavingPattern] = useState(false);
@@ -572,6 +576,11 @@ export default function RosterWizard() {
     }
   }
 
+  function handleNeverShowIntro() {
+    try { localStorage.setItem("wizard:hideIntro", "1"); } catch {}
+    setShowIntro(false);
+  }
+
   function next() {
     const issues = validateStep(step);
     if (issues.length) {
@@ -612,6 +621,14 @@ export default function RosterWizard() {
         </div>
       </div>
       <p className="text-muted-foreground mb-6">Quickly define a repeating pattern and site configuration, then generate your roster.</p>
+
+      {showIntro && (
+        <GettingStartedCard
+          open={showIntro}
+          onToggle={setShowIntro}
+          onNeverShowAgain={handleNeverShowIntro}
+        />
+      )}
 
       <Steps current={step} />
 
