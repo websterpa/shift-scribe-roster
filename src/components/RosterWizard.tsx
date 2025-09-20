@@ -692,7 +692,7 @@ function Steps({ current }: { current:number }) {
   );
 }
 
-function StepBasics({ state, update, inlineTips }:{ state: WizardState; update: <K extends keyof WizardState>(k:K,v:WizardState[K])=>void; inlineTips: boolean }) {
+function StepBasics({ state, update, inlineTips }:{ state: WizardState; update: <K extends keyof WizardState>(k:K,v:WizardState[K])=>void; inlineTips?: boolean }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
@@ -748,7 +748,7 @@ function StepBasics({ state, update, inlineTips }:{ state: WizardState; update: 
 function StepPattern({ state, update, inlineTips, savedPatterns, loadingPatterns, savingPattern, onSavePattern, onDeletePattern, onApplyPattern }:{ 
   state: WizardState; 
   update: any;
-  inlineTips: boolean;
+  inlineTips?: boolean;
   savedPatterns: SavedPattern[];
   loadingPatterns: boolean;
   savingPattern: boolean;
@@ -931,7 +931,7 @@ function StepPattern({ state, update, inlineTips, savedPatterns, loadingPatterns
   );
 }
 
-function StepStaffingLevels({ state, update, inlineTips }:{ state: WizardState; update:any; inlineTips: boolean }) {
+function StepStaffingLevels({ state, update, inlineTips }:{ state: WizardState; update:any; inlineTips?: boolean }) {
   const is8 = state.system==="8h";
   const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -988,7 +988,7 @@ function StepStaffingLevels({ state, update, inlineTips }:{ state: WizardState; 
   );
 }
 
-function StepRatesBudget({ state, update, inlineTips }:{ state: WizardState; update:any; inlineTips: boolean }) {
+function StepRatesBudget({ state, update, inlineTips }:{ state: WizardState; update:any; inlineTips?: boolean }) {
   const shiftKeys = state.system==="8h" ? (["E","L","N"] as const) : (["D","N"] as const);
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1037,7 +1037,7 @@ function StepRatesBudget({ state, update, inlineTips }:{ state: WizardState; upd
   );
 }
 
-function StepReview({ state, totals, estHours, inlineTips }:{ state: WizardState; totals:any; estHours:any; inlineTips: boolean }) {
+function StepReview({ state, totals, estHours, inlineTips }:{ state: WizardState; totals:any; estHours:any; inlineTips?: boolean }) {
   const shiftKeys = state.system==="8h" ? ["E","L","N"] : ["D","N"];
   return (
     <div className="space-y-4">

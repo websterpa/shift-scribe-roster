@@ -7,7 +7,7 @@ export default function InlineTip({
   return (
     <div
       id={id}
-      className="mt-1 text-xs text-muted-foreground flex items-start gap-1"
+      className="mt-1 text-xs text-muted-foreground flex items-start gap-1 transition-opacity duration-300 ease-in-out animate-in fade-in"
       role="note"
       aria-live="polite"
     >
