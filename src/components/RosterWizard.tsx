@@ -988,6 +988,10 @@ function StepStaffingLevels({ state, update, inlineTips }:{ state: WizardState; 
     update("coverage", base);
   }
 
+  const shiftLabels = is8 
+    ? { E: "Early (E)", L: "Late (L)", N: "Night (N)" }
+    : { D: "Day (D)", N: "Night (N)" };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -998,28 +1002,54 @@ function StepStaffingLevels({ state, update, inlineTips }:{ state: WizardState; 
       {inlineTips && <InlineTip>Start with a preset, then fine-tune each day/shift. Values are required people per shift.</InlineTip>}
 
       <div className="overflow-x-auto">
-        <div className="min-w-[760px] md:min-w-0 grid grid-flow-col auto-cols-[minmax(140px,1fr)] gap-3 md:grid-flow-row md:grid-cols-7">
+        <div className="min-w-[760px] md:min-w-0 grid grid-flow-col auto-cols-[minmax(180px,1fr)] gap-4 md:grid-flow-row md:grid-cols-7">
           {dayLabels.map((d,idx)=>(
-            <div key={d} className="rounded-xl border p-3 min-w-[140px] md:min-w-0 md:w-auto">
-              <div className="font-semibold text-xs md:text-sm mb-2" title="Required people per shift for this day">{d}</div>
-              <div className="space-y-2">
+            <div key={d} className="rounded-2xl border p-4 bg-white shadow-sm min-w-[180px] md:min-w-0">
+              <h3 className="font-semibold text-center mb-3">{d}</h3>
+              <div className="space-y-3">
                 {is8 ? (["E","L","N"] as const).map(k=>(
-                  <Row key={k} label={`Shift ${k}`}>
-                    <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
-                  </Row>
+                  <div key={k} className="space-y-1">
+                    <label className="block text-xs text-slate-500 font-medium">
+                      {shiftLabels[k]}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      className="w-full h-10 text-center rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)}
+                      onChange={(e) => setVal(idx as Weekday, k, Number(e.target.value))}
+                      aria-label={`${d} ${shiftLabels[k]} required headcount`}
+                    />
+                  </div>
                 )) : (["D","N"] as const).map(k=>(
-                  <Row key={k} label={`Shift ${k}`}>
-                    <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
-                  </Row>
-                 ))}
-               </div>
-               {inlineTips && idx === 0 && (
-                 <InlineTip>Numbers are whole persons per shift. On small screens, scroll horizontally to see all days.</InlineTip>
-               )}
-             </div>
-           ))}
-         </div>
-       </div>
+                  <div key={k} className="space-y-1">
+                    <label className="block text-xs text-slate-500 font-medium">
+                      {shiftLabels[k as keyof typeof shiftLabels]}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      className="w-full h-10 text-center rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)}
+                      onChange={(e) => setVal(idx as Weekday, k, Number(e.target.value))}
+                      aria-label={`${d} ${shiftLabels[k as keyof typeof shiftLabels]} required headcount`}
+                    />
+                  </div>
+                ))}
+              </div>
+              {inlineTips && idx === 0 && (
+                <InlineTip>Numbers are whole persons per shift. On small screens, scroll horizontally to see all days.</InlineTip>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
