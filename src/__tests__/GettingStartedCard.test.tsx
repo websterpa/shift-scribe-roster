@@ -77,4 +77,22 @@ describe("Getting Started card", () => {
     expect(screen.getByText(/Key terms/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open Help & Support/i })).toBeInTheDocument();
   });
+
+  test("Show intro again restores the Getting Started card", () => {
+    render(<RosterWizardWrapper />);
+    
+    // Hide the intro first
+    fireEvent.click(screen.getByRole("button", { name: /Don't show again/i }));
+    
+    // Link should appear
+    const showLink = screen.getByRole("button", { name: /Show Getting Started intro again/i });
+    expect(showLink).toBeInTheDocument();
+    
+    // Click to bring it back
+    fireEvent.click(showLink);
+    expect(screen.getByRole("heading", { name: /Getting Started/i })).toBeInTheDocument();
+    
+    // Link should be hidden again
+    expect(screen.queryByRole("button", { name: /Show Getting Started intro again/i })).not.toBeInTheDocument();
+  });
 });

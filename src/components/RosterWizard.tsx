@@ -581,6 +581,15 @@ export default function RosterWizard() {
     setShowIntro(false);
   }
 
+  function handleShowIntroAgain() {
+    try { localStorage.removeItem("wizard:hideIntro"); } catch {}
+    setShowIntro(true);
+    toast({
+      title: "Getting Started intro shown",
+      description: "The Getting Started card is now visible"
+    });
+  }
+
   function next() {
     const issues = validateStep(step);
     if (issues.length) {
@@ -618,6 +627,16 @@ export default function RosterWizard() {
             />
             Inline tips
           </label>
+
+          {!showIntro && (
+            <button
+              className="text-sm text-primary underline underline-offset-2 hover:no-underline"
+              onClick={handleShowIntroAgain}
+              aria-label="Show Getting Started intro again"
+            >
+              Show intro again
+            </button>
+          )}
         </div>
       </div>
       <p className="text-muted-foreground mb-6">Quickly define a repeating pattern and site configuration, then generate your roster.</p>
