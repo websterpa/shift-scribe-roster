@@ -5,6 +5,7 @@ import { computeWeeklyTotals, computeEstimatedWeeklyHours } from "@/utils/covera
 import { normalizePatternSequence, validatePattern } from "@/utils/normalizePattern";
 import { listPatterns, savePattern, deletePattern, SavedPattern, PatternToken } from "@/services/patterns";
 import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
+import WizardHelp from "./WizardHelp";
 
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
@@ -328,6 +329,7 @@ export default function RosterWizard() {
   const { optimising, result, error, run } = useRosterGenerator();
 
   const [step, setStep] = useState(1);
+  const [showHelp, setShowHelp] = useState(false);
   const [savedPatterns, setSavedPatterns] = useState<SavedPattern[]>([]);
   const [loadingPatterns, setLoadingPatterns] = useState(false);
   const [savingPattern, setSavingPattern] = useState(false);
@@ -578,7 +580,17 @@ export default function RosterWizard() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-1">Roster Wizard</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-2xl font-bold">Roster Wizard</h1>
+        <button 
+          className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" 
+          onClick={()=>setShowHelp(s=>!s)} 
+          aria-expanded={showHelp} 
+          aria-controls="wizard-help"
+        >
+          {showHelp ? "Hide Help" : "Show Help"}
+        </button>
+      </div>
       <p className="text-muted-foreground mb-6">Quickly define a repeating pattern and site configuration, then generate your roster.</p>
 
       <Steps current={step} />
@@ -638,6 +650,8 @@ export default function RosterWizard() {
           </div>
         )}
       </div>
+      
+      {showHelp && <WizardHelp step={step as 1|2|3|4|5} onClose={()=>setShowHelp(false)} />}
     </div>
   );
 }
@@ -913,7 +927,7 @@ function StepStaffingLevels({ state, update }:{ state: WizardState; update:any }
         <div className="min-w-[760px] md:min-w-0 grid grid-flow-col auto-cols-[minmax(140px,1fr)] gap-3 md:grid-flow-row md:grid-cols-7">
           {dayLabels.map((d,idx)=>(
             <div key={d} className="rounded-xl border p-3 min-w-[140px] md:min-w-0 md:w-auto">
-              <div className="font-semibold text-xs md:text-sm mb-2">{d}</div>
+              <div className="font-semibold text-xs md:text-sm mb-2" title="Required people per shift for this day">{d}</div>
               <div className="space-y-2">
                 {is8 ? (["E","L","N"] as const).map(k=>(
                   <Row key={k} label={`Shift ${k}`}>
