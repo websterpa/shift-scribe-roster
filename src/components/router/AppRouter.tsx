@@ -28,6 +28,7 @@ import PrivacyPage from '@/pages/PrivacyPage';
 import PatternManagement from '@/pages/PatternManagement';
 import HelpSupport from '@/pages/HelpSupport';
 import Wizard from '@/pages/Wizard';
+import RosterSummary from '@/pages/RosterSummary';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient({
@@ -72,7 +73,8 @@ export function AppRouter() {
               <Route path="support" element={<SupportPage />} />
               <Route path="help" element={<HelpSupport />} />
               <Route path="patterns" element={<PatternManagement />} />
-              <Route path="wizard" element={<Wizard />} />
+            <Route path="roster/summary" element={<RosterSummary />} />
+            <Route path="wizard" element={<Wizard />} />
             </Route>
             
             {/* 404 route */}

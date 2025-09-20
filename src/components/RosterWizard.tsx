@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useRosterGenerator } from "@/hooks/useRosterGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { computeWeeklyTotals, computeEstimatedWeeklyHours } from "@/utils/coveragePresets";
@@ -8,6 +9,7 @@ import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import WizardHelp from "./WizardHelp";
 import InlineTip from "./InlineTip";
 import GettingStartedCard from "./GettingStartedCard";
+import { MANAGER_PAGE_PATH } from "@/config/app";
 
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
@@ -702,8 +704,15 @@ export default function RosterWizard() {
           </div>
         )}
         {result?.ok && (
-          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-green-800">
-            Generation complete. See summary on the Manager page.
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-green-800">
+            <span>Generation complete.</span>
+            <Link
+              to={`${MANAGER_PAGE_PATH}?version=${encodeURIComponent(result.versionId ?? "")}`}
+              className="px-3 py-2 rounded-lg bg-green-600 text-white hover:opacity-90"
+              aria-label="Open roster summary"
+            >
+              Open Roster Summary →
+            </Link>
           </div>
         )}
       </div>

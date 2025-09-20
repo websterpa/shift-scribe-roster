@@ -30,6 +30,7 @@ export interface RosterSummary {
 
 export interface GenerateRosterResult {
   ok: boolean;
+  versionId?: string;
   summary: RosterSummary;
   // You likely already return assignments/ids; keep them if present.
   // assignments?: any;

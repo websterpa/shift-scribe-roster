@@ -134,6 +134,7 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
 
     return {
       ok: !!result.versionId,
+      versionId: result.versionId,
       summary
     };
     
