@@ -62,3 +62,18 @@ test("Staffing Levels label appears instead of Coverage", () => {
   fireEvent.click(screen.getByRole("button", { name: /Next/i })); // Staffing Levels
   expect(screen.getByText(/Staffing Levels/i)).toBeInTheDocument();
 });
+
+test("inline tips toggle works", () => {
+  renderWithRouter(<RosterWizard />);
+  const inlineTipsCheckbox = screen.getByLabelText(/Toggle inline tips/i);
+  
+  // Tips should be off by default
+  expect(inlineTipsCheckbox).not.toBeChecked();
+  
+  // Turn on inline tips
+  fireEvent.click(inlineTipsCheckbox);
+  expect(inlineTipsCheckbox).toBeChecked();
+  
+  // Should show inline tips content
+  expect(screen.getByText(/Choose.*8h.*or.*12h/i)).toBeInTheDocument();
+});

@@ -6,6 +6,7 @@ import { normalizePatternSequence, validatePattern } from "@/utils/normalizePatt
 import { listPatterns, savePattern, deletePattern, SavedPattern, PatternToken } from "@/services/patterns";
 import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import WizardHelp from "./WizardHelp";
+import InlineTip from "./InlineTip";
 
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
@@ -330,9 +331,16 @@ export default function RosterWizard() {
 
   const [step, setStep] = useState(1);
   const [showHelp, setShowHelp] = useState(false);
+  const [inlineTips, setInlineTips] = useState<boolean>(() => {
+    try { return localStorage.getItem("wizard:inlineTips") === "1"; } catch { return false; }
+  });
   const [savedPatterns, setSavedPatterns] = useState<SavedPattern[]>([]);
   const [loadingPatterns, setLoadingPatterns] = useState(false);
   const [savingPattern, setSavingPattern] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem("wizard:inlineTips", inlineTips ? "1" : "0"); } catch {}
+  }, [inlineTips]);
   
   const [state, setState] = useState<WizardState>(() => ({
     system: "8h",
@@ -582,14 +590,26 @@ export default function RosterWizard() {
     <div className="max-w-5xl mx-auto p-6">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold">Roster Wizard</h1>
-        <button 
-          className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" 
-          onClick={()=>setShowHelp(s=>!s)} 
-          aria-expanded={showHelp} 
-          aria-controls="wizard-help"
-        >
-          {showHelp ? "Hide Help" : "Show Help"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" 
+            onClick={()=>setShowHelp(s=>!s)} 
+            aria-expanded={showHelp} 
+            aria-controls="wizard-help"
+          >
+            {showHelp ? "Hide Help" : "Show Help"}
+          </button>
+
+          <label className="flex items-center gap-2 text-sm select-none">
+            <input
+              type="checkbox"
+              checked={inlineTips}
+              onChange={(e)=>setInlineTips(e.target.checked)}
+              aria-label="Toggle inline tips"
+            />
+            Inline tips
+          </label>
+        </div>
       </div>
       <p className="text-muted-foreground mb-6">Quickly define a repeating pattern and site configuration, then generate your roster.</p>
 
@@ -598,10 +618,11 @@ export default function RosterWizard() {
       <ContextualHelp step={step} />
 
       <div className="rounded-2xl border bg-card shadow-sm p-4 md:p-6 mt-4">
-        {step === 1 && <StepBasics state={state} update={update} />}
+        {step === 1 && <StepBasics state={state} update={update} inlineTips={inlineTips} />}
         {step === 2 && <StepPattern 
           state={state} 
           update={update} 
+          inlineTips={inlineTips}
           savedPatterns={savedPatterns}
           loadingPatterns={loadingPatterns}
           savingPattern={savingPattern}
@@ -609,9 +630,9 @@ export default function RosterWizard() {
           onDeletePattern={handleDeletePattern}
           onApplyPattern={handleApplyPattern}
         />}
-        {step === 3 && <StepStaffingLevels state={state} update={update} />}
-        {step === 4 && <StepRatesBudget state={state} update={update} />}
-        {step === 5 && <StepReview state={state} totals={totals} estHours={estHours} />}
+        {step === 3 && <StepStaffingLevels state={state} update={update} inlineTips={inlineTips} />}
+        {step === 4 && <StepRatesBudget state={state} update={update} inlineTips={inlineTips} />}
+        {step === 5 && <StepReview state={state} totals={totals} estHours={estHours} inlineTips={inlineTips} />}
 
         <div className="mt-6 flex items-center justify-between">
           <button 
@@ -671,7 +692,7 @@ function Steps({ current }: { current:number }) {
   );
 }
 
-function StepBasics({ state, update }:{ state: WizardState; update: <K extends keyof WizardState>(k:K,v:WizardState[K])=>void }) {
+function StepBasics({ state, update, inlineTips }:{ state: WizardState; update: <K extends keyof WizardState>(k:K,v:WizardState[K])=>void; inlineTips: boolean }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
@@ -691,14 +712,23 @@ function StepBasics({ state, update }:{ state: WizardState; update: <K extends k
           <option value="8h">8h (E/L/N)</option>
           <option value="12h">12h (D/N)</option>
         </select>
+        {inlineTips && (
+          <InlineTip>Choose <b>8h</b> (E/L/N) or <b>12h</b> (D/N). You can't mix systems in one roster.</InlineTip>
+        )}
       </div>
       <div>
         <label className="block text-sm text-muted-foreground mb-1">Site start time</label>
         <input className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" type="time" value={state.siteStartLocalTime} onChange={e=>update("siteStartLocalTime", e.target.value)} />
+        {inlineTips && (
+          <InlineTip>Local shift anchor (e.g., 06:00 or 07:00). All shift windows are offset from this.</InlineTip>
+        )}
       </div>
       <div>
         <label className="block text-sm text-muted-foreground mb-1">Timezone (IANA)</label>
         <input className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" placeholder="Europe/London" value={state.timezone} onChange={e=>update("timezone", e.target.value)} />
+        {inlineTips && (
+          <InlineTip>Use an IANA timezone (e.g., <code>Europe/London</code>) for correct DST handling.</InlineTip>
+        )}
       </div>
       <div>
         <label className="block text-sm text-muted-foreground mb-1">Horizon (weeks)</label>
@@ -707,14 +737,18 @@ function StepBasics({ state, update }:{ state: WizardState; update: <K extends k
           update("weeks", w);
           update("pattern", { ...state.pattern, repeatWeeks: w } as PatternSpec);
         }} />
+        {inlineTips && (
+          <InlineTip>Default is <b>17 weeks</b> to balance nights/weekends fairly across the cycle.</InlineTip>
+        )}
       </div>
     </div>
   );
 }
 
-function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPattern, onSavePattern, onDeletePattern, onApplyPattern }:{ 
+function StepPattern({ state, update, inlineTips, savedPatterns, loadingPatterns, savingPattern, onSavePattern, onDeletePattern, onApplyPattern }:{ 
   state: WizardState; 
   update: any;
+  inlineTips: boolean;
   savedPatterns: SavedPattern[];
   loadingPatterns: boolean;
   savingPattern: boolean;
@@ -830,6 +864,7 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
             </button>
           </div>
         )}
+        {inlineTips && <InlineTip>Save named patterns to reuse across this site. You can apply or delete them later.</InlineTip>}
       </div>
 
       <div className="rounded-xl border p-3">
@@ -841,6 +876,7 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
             </button>
           ))}
         </div>
+        {inlineTips && <InlineTip>Presets are good starting points. You can customise tokens after applying.</InlineTip>}
       </div>
 
       <div className="rounded-xl border p-3">
@@ -864,6 +900,7 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
           ))}
           <button className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" onClick={removeLast}>⌫ Remove last</button>
         </div>
+        {inlineTips && <InlineTip><b>R = Rest Day</b>. Include rest between sequences (≥ 11h) to avoid warnings.</InlineTip>}
         <div className="text-sm text-muted-foreground">Sequence:</div>
         <div className="mt-2 flex flex-wrap gap-1">
           {(state.pattern as any).sequence.map((t:string, i:number)=>(
@@ -894,7 +931,7 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
   );
 }
 
-function StepStaffingLevels({ state, update }:{ state: WizardState; update:any }) {
+function StepStaffingLevels({ state, update, inlineTips }:{ state: WizardState; update:any; inlineTips: boolean }) {
   const is8 = state.system==="8h";
   const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -922,6 +959,7 @@ function StepStaffingLevels({ state, update }:{ state: WizardState; update:any }
         <button className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" onClick={()=>applyPreset("Standard")}>Preset: Standard</button>
         <button className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" onClick={()=>applyPreset("Large")}>Preset: Large</button>
       </div>
+      {inlineTips && <InlineTip>Start with a preset, then fine-tune each day/shift. Values are required people per shift.</InlineTip>}
 
       <div className="overflow-x-auto">
         <div className="min-w-[760px] md:min-w-0 grid grid-flow-col auto-cols-[minmax(140px,1fr)] gap-3 md:grid-flow-row md:grid-cols-7">
@@ -937,17 +975,20 @@ function StepStaffingLevels({ state, update }:{ state: WizardState; update:any }
                   <Row key={k} label={`Shift ${k}`}>
                     <InputNumber value={Number((state.coverage[idx as Weekday] as any)?.[k] ?? 0)} onChange={v=>setVal(idx as Weekday, k, v)} />
                   </Row>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+                 ))}
+               </div>
+               {inlineTips && idx === 0 && (
+                 <InlineTip>Numbers are whole persons per shift. On small screens, scroll horizontally to see all days.</InlineTip>
+               )}
+             </div>
+           ))}
+         </div>
+       </div>
     </div>
   );
 }
 
-function StepRatesBudget({ state, update }:{ state: WizardState; update:any }) {
+function StepRatesBudget({ state, update, inlineTips }:{ state: WizardState; update:any; inlineTips: boolean }) {
   const shiftKeys = state.system==="8h" ? (["E","L","N"] as const) : (["D","N"] as const);
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -960,6 +1001,7 @@ function StepRatesBudget({ state, update }:{ state: WizardState; update:any }) {
           <InputNumber value={state.supervisorRate} step={0.5} onChange={v=>update("supervisorRate", Math.max(0,v))} />
         </Row>
         <div className="text-xs text-muted-foreground">Estimates; definitive costing happens at generation with real rates & OT multipliers.</div>
+        {inlineTips && <InlineTip>Rates here drive <b>estimates</b> only. Final costs at generation use real staff rates & OT multipliers.</InlineTip>}
       </div>
 
       <div className="rounded-xl border p-3 space-y-2 md:col-span-2">
@@ -975,6 +1017,7 @@ function StepRatesBudget({ state, update }:{ state: WizardState; update:any }) {
         <Row label="Allow supervisor nights">
           <input type="checkbox" className="ml-2" checked={state.allowSupervisorNights} onChange={e=>update("allowSupervisorNights", e.target.checked)} />
         </Row>
+        {inlineTips && <InlineTip>Role mix (%) blends Supervisor vs Staff cost per shift for the estimate.</InlineTip>}
       </div>
 
       <div className="rounded-xl border p-3 space-y-2">
@@ -988,12 +1031,13 @@ function StepRatesBudget({ state, update }:{ state: WizardState; update:any }) {
         <Row label="PH cap per person">
           <InputNumber value={state.capPublicHolidaysPerPerson} onChange={v=>update("capPublicHolidaysPerPerson", Math.max(0, Math.floor(v||0)))} />
         </Row>
+        {inlineTips && <InlineTip>We'll warn if estimated cost exceeds your budget by more than the threshold.</InlineTip>}
       </div>
     </div>
   );
 }
 
-function StepReview({ state, totals, estHours }:{ state: WizardState; totals:any; estHours:any }) {
+function StepReview({ state, totals, estHours, inlineTips }:{ state: WizardState; totals:any; estHours:any; inlineTips: boolean }) {
   const shiftKeys = state.system==="8h" ? ["E","L","N"] : ["D","N"];
   return (
     <div className="space-y-4">
@@ -1009,6 +1053,7 @@ function StepReview({ state, totals, estHours }:{ state: WizardState; totals:any
 
       <div className="rounded-xl border p-3">
         <div className="font-semibold mb-2">Weekly totals & estimated hours</div>
+        {inlineTips && <InlineTip>Hours are estimated based on shift system: 8h for E/L/N, 12h for D/N.</InlineTip>}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           {shiftKeys.map(k=>(
             <div key={k} className="rounded-lg border p-3 bg-muted">
@@ -1028,6 +1073,10 @@ function StepReview({ state, totals, estHours }:{ state: WizardState; totals:any
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
           Heads-up: Supervisor mix for Nights is &gt; 0% but "Allow supervisor nights" is off.
         </div>
+      )}
+      
+      {inlineTips && (
+        <InlineTip>Generation runs a short optimisation (~5s). You'll see success and budget toasts.</InlineTip>
       )}
     </div>
   );
