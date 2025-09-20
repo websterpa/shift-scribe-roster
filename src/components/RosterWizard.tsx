@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { computeWeeklyTotals, computeEstimatedWeeklyHours } from "@/utils/coveragePresets";
 import { normalizePatternSequence, validatePattern } from "@/utils/normalizePattern";
 import { listPatterns, savePattern, deletePattern, SavedPattern, PatternToken } from "@/services/patterns";
+import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 
 type ShiftSystem = "8h" | "12h";
 type Weekday = 0|1|2|3|4|5|6;
@@ -232,6 +233,96 @@ const PRESETS_12H: Array<{name:string, seq:PatternToken12h[]}> = [
   { name:"2D–2N–4R", seq:["D","D","N","N","R","R","R","R"] },
 ];
 
+function ContextualHelp({ step }: { step: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const helpContent = {
+    1: {
+      title: "Basic Configuration",
+      tips: [
+        "Choose 8h system for Early/Late/Night shifts or 12h for Day/Night",
+        "Site start time determines when your first shift begins",
+        "Timezone should match your operational location (e.g., Europe/London)",
+        "Horizon sets how many weeks ahead to generate"
+      ]
+    },
+    2: {
+      title: "Shift Pattern",
+      tips: [
+        "Use presets for common patterns or build custom sequences",
+        "Include 'R' (Rest Day) tokens to prevent rest violations",
+        "Supervisors are typically excluded from 'N' (Night) shifts",
+        "Pattern length affects rotation fairness"
+      ]
+    },
+    3: {
+      title: "Staffing Levels",
+      tips: [
+        "Set how many people needed per shift each day",
+        "Use presets as starting points, then adjust for your needs",
+        "Higher numbers ensure better coverage but increase costs",
+        "Consider varying weekend vs weekday requirements"
+      ]
+    },
+    4: {
+      title: "Rates & Budget",
+      tips: [
+        "Rates are estimates - final costing uses actual rates",
+        "Supervisor mix percentage controls staff vs supervisor ratio",
+        "Budget warnings help prevent overspend",
+        "Public holiday caps limit individual holiday assignments"
+      ]
+    },
+    5: {
+      title: "Review & Generate",
+      tips: [
+        "Check all settings before generating",
+        "Weekly totals show expected staffing levels",
+        "Hour estimates help with budget planning",
+        "Generation may take a few moments for complex rosters"
+      ]
+    }
+  };
+
+  const content = helpContent[step as keyof typeof helpContent];
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 mb-4">
+      <button
+        className="flex items-center gap-2 w-full text-left"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <HelpCircle className="h-4 w-4 text-blue-600" />
+        <span className="font-medium text-blue-900">{content.title} Help</span>
+        {isExpanded ? (
+          <ChevronUp className="h-4 w-4 text-blue-600 ml-auto" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-blue-600 ml-auto" />
+        )}
+      </button>
+      
+      {isExpanded && (
+        <div className="mt-3 space-y-2">
+          <ul className="space-y-1">
+            {content.tips.map((tip, idx) => (
+              <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
+                <span className="text-blue-600 font-medium">•</span>
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="pt-2 border-t border-blue-200">
+            <p className="text-xs text-blue-700">
+              Need more help? Check our{" "}
+              <button className="underline hover:no-underline">full documentation</button>
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RosterWizard() {
   const { toast } = useToast();
   const { optimising, result, error, run } = useRosterGenerator();
@@ -400,8 +491,8 @@ export default function RosterWizard() {
     if (s >= 3) {
       // coverage keys compat check
       const json = JSON.stringify(state.coverage);
-      if (state.system === "8h" && json.includes("\"D\"")) issues.push("8h coverage cannot include 'D'.");
-      if (state.system === "12h" && (json.includes("\"E\"") || json.includes("\"L\""))) issues.push("12h coverage cannot include 'E'/'L'.");
+      if (state.system === "8h" && json.includes("\"D\"")) issues.push("8h staffing levels cannot include 'D'.");
+      if (state.system === "12h" && (json.includes("\"E\"") || json.includes("\"L\""))) issues.push("12h staffing levels cannot include 'E'/'L'.");
     }
     if (s >= 4) {
       if (state.staffRate < 0 || state.supervisorRate < 0) issues.push("Rates must be positive.");
@@ -492,6 +583,8 @@ export default function RosterWizard() {
 
       <Steps current={step} />
 
+      <ContextualHelp step={step} />
+
       <div className="rounded-2xl border bg-card shadow-sm p-4 md:p-6 mt-4">
         {step === 1 && <StepBasics state={state} update={update} />}
         {step === 2 && <StepPattern 
@@ -504,7 +597,7 @@ export default function RosterWizard() {
           onDeletePattern={handleDeletePattern}
           onApplyPattern={handleApplyPattern}
         />}
-        {step === 3 && <StepCoverage state={state} update={update} />}
+        {step === 3 && <StepStaffingLevels state={state} update={update} />}
         {step === 4 && <StepRatesBudget state={state} update={update} />}
         {step === 5 && <StepReview state={state} totals={totals} estHours={estHours} />}
 
@@ -552,7 +645,7 @@ export default function RosterWizard() {
 /* ————— UI bits ————— */
 
 function Steps({ current }: { current:number }) {
-  const items = ["Basics","Pattern","Coverage","Rates & Budget","Review & Generate"];
+  const items = ["Basics","Pattern","Staffing Levels","Rates & Budget","Review & Generate"];
   return (
     <ol className="flex flex-wrap gap-2 text-sm">
       {items.map((t,i)=>(
@@ -787,7 +880,7 @@ function StepPattern({ state, update, savedPatterns, loadingPatterns, savingPatt
   );
 }
 
-function StepCoverage({ state, update }:{ state: WizardState; update:any }) {
+function StepStaffingLevels({ state, update }:{ state: WizardState; update:any }) {
   const is8 = state.system==="8h";
   const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -817,7 +910,7 @@ function StepCoverage({ state, update }:{ state: WizardState; update:any }) {
       </div>
 
       <div className="overflow-x-auto">
-        <div className="grid auto-cols-max grid-flow-col md:grid-flow-row gap-3 md:grid-cols-7">
+        <div className="min-w-[760px] md:min-w-0 grid grid-flow-col auto-cols-[minmax(140px,1fr)] gap-3 md:grid-flow-row md:grid-cols-7">
           {dayLabels.map((d,idx)=>(
             <div key={d} className="rounded-xl border p-3 min-w-[140px] md:min-w-0 md:w-auto">
               <div className="font-semibold text-xs md:text-sm mb-2">{d}</div>
@@ -930,7 +1023,7 @@ function StepReview({ state, totals, estHours }:{ state: WizardState; totals:any
 function Row({label, children}:{label:string; children:React.ReactNode}) {
   return (
     <div className="flex items-center gap-3">
-      <div className="text-[11px] md:text-sm text-slate-700 flex-1 min-w-0">{label}</div>
+      <div className="text-sm text-slate-700 flex-1 min-w-0">{label}</div>
       <div className="w-20 sm:w-24 md:w-28 lg:w-32">
         {children}
       </div>
@@ -941,7 +1034,7 @@ function InputNumber({ value, onChange, min=0, max=999, step=1 }:{
   value:number; onChange:(v:number)=>void; min?:number; max?:number; step?:number;
 }) {
   return (
-    <input className="flex h-10 w-full text-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" type="number" min={min} max={max} step={step}
+    <input className="w-full text-center flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" type="number" min={min} max={max} step={step}
       value={Number.isFinite(value)? value : 0}
       onChange={e=>onChange(Number(e.target.value))}
     />

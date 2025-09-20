@@ -43,7 +43,7 @@ const renderWithRouter = (component: React.ReactElement) => {
   );
 };
 
-test("coverage grid is horizontally scrollable and inputs are fluid", () => {
+test("staffing levels grid is horizontally scrollable and inputs are fluid", () => {
   renderWithRouter(<RosterWizard />);
   
   // Step 1 -> Step 2 -> Step 3
@@ -54,7 +54,7 @@ test("coverage grid is horizontally scrollable and inputs are fluid", () => {
   const scroller = screen.getByText("Sun").closest("div")?.parentElement?.parentElement;
   expect(scroller).toHaveClass("overflow-x-auto");
 
-  // inputs under coverage should be full width inside their containers
+  // inputs under staffing levels should be full width inside their containers
   const anyNumberInput = screen.getAllByRole("spinbutton")[0] as HTMLInputElement;
   expect(anyNumberInput.className).toMatch(/w-full/);
 });
