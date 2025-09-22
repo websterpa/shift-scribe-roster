@@ -15,13 +15,48 @@ export default function RosterSummary() {
     (async () => {
       try {
         if (!versionId) throw new Error("Missing roster version id.");
-        const { data, error } = await supabase
-          .from("roster_versions")
-          .select("id, config_id, version_number, version_name, generated_at")
-          .eq("id", versionId)
-          .single();
-        if (error) throw new Error(error.message);
-        if (active) setData(data);
+        
+        // Fetch version details and aggregated metrics in parallel
+        const [versionResult, metricsResult] = await Promise.all([
+          supabase
+            .from("roster_versions")
+            .select("id, config_id, version_number, version_name, generated_at")
+            .eq("id", versionId)
+            .single(),
+          supabase
+            .from("roster_assignments")
+            .select("cost, hours, date")
+            .eq("version_id", versionId)
+        ]);
+
+        if (versionResult.error) throw new Error(versionResult.error.message);
+        if (metricsResult.error) throw new Error(metricsResult.error.message);
+
+        const assignments = metricsResult.data || [];
+        const totalCost = assignments.reduce((sum, a) => sum + (a.cost || 0), 0);
+        const totalHours = assignments.reduce((sum, a) => sum + (a.hours || 0), 0);
+        const totalAssignments = assignments.length;
+
+        // Calculate coverage percentage (simplified based on assignments vs expected)
+        const expectedAssignments = totalHours > 0 ? Math.ceil(totalHours / 8) : totalAssignments;
+        const coveragePercentage = expectedAssignments > 0 ? Math.min((totalAssignments / expectedAssignments) * 100, 100) : 0;
+
+        // Mock budget for variance calculation (you can enhance this later)
+        const estimatedBudget = 50000; // £50k baseline
+        const budgetVariance = totalCost - estimatedBudget;
+
+        if (active) {
+          setData({
+            ...versionResult.data,
+            metrics: {
+              totalCost: totalCost,
+              totalHours: totalHours,
+              totalAssignments: totalAssignments,
+              coveragePercentage: Math.round(coveragePercentage),
+              budgetVariance: budgetVariance
+            }
+          });
+        }
       } catch (e: any) {
         if (active) setError(e?.message || "Failed to load roster version.");
       } finally {
@@ -58,19 +93,26 @@ export default function RosterSummary() {
               <div className="text-sm">Version Number: {data.version_number}</div>
             </div>
 
-            {/* KPI stubs — wire to your data when ready */}
+            {/* Real KPI data */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-xl border bg-white p-4">
                 <div className="text-xs uppercase text-slate-500">Coverage</div>
-                <div className="text-lg font-semibold">TBD</div>
+                <div className="text-lg font-semibold">{data.metrics?.coveragePercentage ?? 0}%</div>
+                <div className="text-sm text-slate-600">{data.metrics?.totalAssignments ?? 0} assignments</div>
               </div>
               <div className="rounded-xl border bg-white p-4">
                 <div className="text-xs uppercase text-slate-500">Estimated Cost</div>
-                <div className="text-lg font-semibold">TBD</div>
+                <div className="text-lg font-semibold">£{(data.metrics?.totalCost ?? 0).toLocaleString()}</div>
+                <div className="text-sm text-slate-600">{data.metrics?.totalHours ?? 0} total hours</div>
               </div>
               <div className="rounded-xl border bg-white p-4">
                 <div className="text-xs uppercase text-slate-500">Budget Variance</div>
-                <div className="text-lg font-semibold">TBD</div>
+                <div className={`text-lg font-semibold ${(data.metrics?.budgetVariance ?? 0) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {(data.metrics?.budgetVariance ?? 0) >= 0 ? '+' : ''}£{(data.metrics?.budgetVariance ?? 0).toLocaleString()}
+                </div>
+                <div className="text-sm text-slate-600">
+                  {(data.metrics?.budgetVariance ?? 0) >= 0 ? 'Over budget' : 'Under budget'}
+                </div>
               </div>
             </div>
           </div>
