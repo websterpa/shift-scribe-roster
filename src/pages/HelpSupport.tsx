@@ -190,6 +190,36 @@ export default function HelpSupport() {
           </div>
         ),
         plainText: "tokens legend E L N D R Rest Day cheat sheet"
+      },
+      {
+        id: "rosters",
+        title: "Understanding Rosters in Shift Craft",
+        tags: ["rosters", "systems", "coverage", "fairness", "rest", "budget"],
+        body: (
+          <div className="space-y-4">
+            <p>Shift Craft supports both 8-hour and 12-hour systems. Here's how to read and use them:</p>
+            <ul className="list-disc ml-5 space-y-2">
+              <li><strong>12-hour patterns</strong>: Teams rotate 3D-3R-3N-3R or 2D-2N-4R. Two teams rest, two cover.</li>
+              <li><strong>8-hour patterns</strong>: Early (E), Late (L), Night (N), plus Long Day (LD) or Long Night (LN) to cover peaks.</li>
+              <li><strong>Tokens</strong>: D=Day, N=Night, E=Early, L=Late, R=Rest, A/L=Annual Leave, S=Sickness, SP=Special, CL=Compassionate.</li>
+              <li><strong>Coverage strip</strong>: Shows planned vs required staff, with deficits highlighted.</li>
+              <li><strong>Rest rules</strong>: ≥11h required between shifts; Day→Night same day blocked.</li>
+              <li><strong>Fairness counters</strong>: Balance weekends, nights, public holidays, and overtime fairly.</li>
+              <li><strong>Budget awareness</strong>: Preview wage cost vs site budget; Overtime is costed at 1.5× weekdays, 2× Sundays/PHs.</li>
+            </ul>
+            <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+              <h4 className="font-medium mb-2">Reading the Roster Views:</h4>
+              <ul className="list-disc ml-5 space-y-1 text-sm">
+                <li><strong>Coverage Strip</strong>: Green = adequate staffing, Red = deficit, Blue = overstaffed</li>
+                <li><strong>Team Lanes</strong>: Horizontal view of each staff member's shifts over time</li>
+                <li><strong>Rest-Risk Heatmap</strong>: 🟢 ≥13h rest, 🟡 11–13h rest, 🔴 &lt;11h rest between shifts</li>
+                <li><strong>Monthly Calendar</strong>: Traditional calendar view with export options (CSV, iCal)</li>
+              </ul>
+            </div>
+            <p>This design ensures safe, fair, and budget-aware rosters aligned with real-world shift work practices.</p>
+          </div>
+        ),
+        plainText: "Understanding rosters shift craft 8h 12h systems coverage fairness rest budget team lanes calendar heatmap"
       }
     ],
     []
