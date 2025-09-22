@@ -1,62 +1,90 @@
+import React from "react";
 import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import TeamLaneRoster from "@/components/roster/TeamLaneRoster";
 
 // Mock Supabase client
 jest.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          data: [
-            {
-              day: '2024-01-01',
-              day_idx: 0,
-              shift: 'D',
-              staff: {
-                id: 'staff-1',
-                display_name: 'John Doe',
-                team: 'Team 1',
-                role: 'Supervisor'
-              }
-            }
-          ],
-          error: null
-        }))
-      }))
-    }))
+    from: jest.fn().mockImplementation((table: string) => {
+      if (table === 'roster_assignments') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({
+              data: [
+                {
+                  date: "2025-09-20",
+                  shift_code: "D",
+                  staff_id: "s1",
+                  shift_start: "2025-09-20T07:00:00Z",
+                  shift_end: "2025-09-20T19:00:00Z"
+                },
+                {
+                  date: "2025-09-21", 
+                  shift_code: "D",
+                  staff_id: "s1",
+                  shift_start: "2025-09-21T07:00:00Z",
+                  shift_end: "2025-09-21T19:00:00Z"
+                }
+              ],
+              error: null
+            })
+          })
+        };
+      } else if (table === 'staff_profiles') {
+        return {
+          select: jest.fn().mockReturnValue({
+            in: jest.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 's1',
+                  name: null,
+                  first_name: 'Alex',
+                  last_name: 'Doe', 
+                  role: 'Staff'
+                }
+              ],
+              error: null
+            })
+          })
+        };
+      }
+      // Default fallback
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({ data: [], error: null })
+        })
+      };
+    })
   }
 }));
 
-test("renders team header when data present", () => {
-  render(<TeamLaneRoster versionId="test" />);
-  // Initially shows loading
-  expect(screen.getByText(/Loading roster/)).toBeInTheDocument();
+test("renders rest-risk legend", async () => {
+  render(<TeamLaneRoster versionId="v1" />);
+  expect(await screen.findByText(/Rest-risk legend/i)).toBeInTheDocument();
+  expect(screen.getByText(/≥13h/)).toBeInTheDocument();
+  expect(screen.getByText(/11–13h/)).toBeInTheDocument();
+  expect(screen.getByText(/11h/)).toBeInTheDocument();
 });
 
-test("renders team roster table structure", async () => {
-  render(<TeamLaneRoster versionId="test" />);
-  
-  // Wait for component to load
-  await screen.findByText('Team');
-  
-  // Should have table structure
-  const table = screen.getByRole('table');
-  expect(table).toBeInTheDocument();
+test("renders fairness column header", async () => {
+  render(<TeamLaneRoster versionId="v1" />);
+  expect(await screen.findByText(/Fairness/i)).toBeInTheDocument();
 });
 
 test("displays error state when fetch fails", async () => {
-  // Mock error response
-  const mockFrom = jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({
-        data: null,
-        error: { message: 'Database connection failed' }
-      }))
-    }))
-  }));
-
+  // Create a new mock that returns an error
   jest.doMock('@/integrations/supabase/client', () => ({
-    supabase: { from: mockFrom }
+    supabase: {
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({
+            data: null,
+            error: { message: 'Database connection failed' }
+          })
+        })
+      })
+    }
   }));
 
   render(<TeamLaneRoster versionId="test" />);
