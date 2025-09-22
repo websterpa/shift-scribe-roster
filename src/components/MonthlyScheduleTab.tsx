@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeShiftCode } from "@/utils/roster/normalizeShift";
 
 type Props = { versionId: string; siteTz: string };
 type Row = {
@@ -81,7 +82,7 @@ export default function MonthlyScheduleTab({ versionId, siteTz }: Props) {
             
           return {
             day: r.date,
-            shift: r.shift_code || "D",
+            shift: normalizeShiftCode(r.shift_code) as "E"|"L"|"N"|"D",
             start_local: r.shift_start ? new Date(r.shift_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null,
             end_local: r.shift_end ? new Date(r.shift_end).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null,
             role: staff?.role || null,

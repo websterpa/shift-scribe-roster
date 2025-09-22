@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeShiftCode } from "@/utils/roster/normalizeShift";
 
 type Props = { versionId: string };
 
@@ -137,7 +138,7 @@ export default function TeamLaneRoster({ versionId }: Props) {
         const data: Assignment[] = (resp.data || []).map((r: any) => ({
           day: r.date,
           day_idx: new Date(r.date).getDay(),
-          shift: r.shift_code || "R",
+          shift: normalizeShiftCode(r.shift_code),
           start_local: r.shift_start ? new Date(r.shift_start).toTimeString().slice(0, 8) : null,
           end_local: r.shift_end ? new Date(r.shift_end).toTimeString().slice(0, 8) : null,
           overtime_hours: r.hours && r.hours > 8 ? r.hours - 8 : 0,
