@@ -705,6 +705,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _hours_for_shift: {
+        Args: { token: string }
+        Returns: number
+      }
       get_admin_status: {
         Args: { check_user_id?: string }
         Returns: boolean
@@ -716,6 +720,22 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never> | { user_id?: string }
         Returns: boolean
+      }
+      rpc_roster_budget: {
+        Args: { version_id: string }
+        Returns: Json
+      }
+      rpc_roster_kpis: {
+        Args: { version_id: string }
+        Returns: Json
+      }
+      rpc_roster_staffing_matrix: {
+        Args: { version_id: string }
+        Returns: Json[]
+      }
+      rpc_roster_tours: {
+        Args: { version_id: string }
+        Returns: Json[]
       }
     }
     Enums: {
