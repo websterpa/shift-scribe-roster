@@ -24,10 +24,13 @@ export default function MonthlyScheduleTab({ versionId, siteTz }: Props) {
 
   React.useEffect(() => {
     let active = true;
+    let dataSource = "roster_assignments";
+    
     (async () => {
       setLoading(true); setError(null);
       try {
-        const { data, error } = await supabase
+        // Try main table first
+        let resp = await supabase
           .from("roster_assignments")
           .select(`
             date,
@@ -39,21 +42,43 @@ export default function MonthlyScheduleTab({ versionId, siteTz }: Props) {
           .eq("version_id", versionId)
           .gte("date", monthStart.toISOString().slice(0,10))
           .lte("date", monthEnd.toISOString().slice(0,10));
-        if (error) throw new Error(error.message);
+
+        // If no data or date column missing, try alternative approaches
+        if (resp.error && /column.*date/i.test(resp.error.message)) {
+          // Fallback: could implement calendar view here if needed
+          throw new Error("Date column not found in roster_assignments table");
+        }
+        
+        if (resp.error) throw new Error(resp.error.message);
+
+        const data = resp.data || [];
+        console.log(`MonthlyScheduleTab: Loaded ${data.length} assignments from ${dataSource}`);
 
         // Get staff details for the assignments
-        const staffIds = [...new Set((data || []).map(r => r.staff_id))];
-        const { data: staffData, error: staffError } = await supabase
-          .from("staff_profiles")
-          .select("id, name, role")
-          .in("id", staffIds);
+        const staffIds = [...new Set(data.map(r => r.staff_id))];
+        let staffData: any[] = [];
+        
+        if (staffIds.length > 0) {
+          const { data: staffResp, error: staffError } = await supabase
+            .from("staff_profiles")
+            .select("id, name, role, first_name, last_name")
+            .in("id", staffIds);
 
-        if (staffError) throw new Error(staffError.message);
+          if (staffError) {
+            console.warn("Failed to load staff details:", staffError.message);
+          } else {
+            staffData = staffResp || [];
+          }
+        }
 
-        const staffMap = new Map(staffData?.map(s => [s.id, s]) || []);
+        const staffMap = new Map(staffData.map(s => [s.id, s]));
 
-        const mapped: Row[] = (data || []).map((r:any) => {
+        const mapped: Row[] = data.map((r:any) => {
           const staff = staffMap.get(r.staff_id);
+          const staffName = staff?.name || 
+            (staff?.first_name && staff?.last_name ? `${staff.first_name} ${staff.last_name}` : null) ||
+            "Unknown Staff";
+            
           return {
             day: r.date,
             shift: r.shift_code || "D",
@@ -61,12 +86,16 @@ export default function MonthlyScheduleTab({ versionId, siteTz }: Props) {
             end_local: r.shift_end ? new Date(r.shift_end).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null,
             role: staff?.role || null,
             staff_id: r.staff_id,
-            staff_name: staff?.name || "Unknown",
+            staff_name: staffName,
             team: null,
           };
         });
+        
         if (active) setRows(mapped);
-      } catch (e:any) { if (active) setError(e?.message || "Failed to load monthly schedule."); }
+      } catch (e:any) { 
+        console.error("MonthlyScheduleTab error:", e);
+        if (active) setError(e?.message || "Failed to load monthly schedule."); 
+      }
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
@@ -81,6 +110,15 @@ export default function MonthlyScheduleTab({ versionId, siteTz }: Props) {
 
   return (
     <section className="rounded-xl border bg-white p-3 md:p-4">
+      {/* Diagnostics banner */}
+      <div className="mb-3 text-xs rounded-md border bg-slate-50 text-slate-700 p-2">
+        <strong>Monthly Schedule Diagnostics:</strong> Loaded rows: {rows.length} • 
+        Filtered: {filtered.length} • 
+        Version: {versionId.slice(0,8)}... • 
+        Month: {monthStart.toLocaleString(undefined, { month:"long", year:"numeric" })}
+        {error && <span className="text-red-600"> • Error: {error}</span>}
+      </div>
+      
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button className="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50" onClick={()=>setCursor(new Date(cursor.getFullYear(), cursor.getMonth()-1, 1))}>← Prev</button>
         <div className="font-semibold">{monthStart.toLocaleString(undefined, { month:"long", year:"numeric" })}</div>
@@ -109,6 +147,12 @@ export default function MonthlyScheduleTab({ versionId, siteTz }: Props) {
 
       {loading && <div className="h-48 rounded-xl border bg-slate-50 animate-pulse" />}
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">{error}</div>}
+      {!loading && !error && filtered.length === 0 && (
+        <div className="rounded-md border bg-amber-50 text-amber-900 p-3 text-sm">
+          No assignments found for this month. Check the roster version's data,
+          RLS permissions, or whether shifts were generated into <code>roster_assignments</code>.
+        </div>
+      )}
       {!loading && !error && <CalendarGrid monthStart={monthStart} rows={filtered} siteTz={siteTz} />}
       <p className="mt-3 text-xs text-slate-500">Legend: <b>E</b> Early • <b>L</b> Late • <b>N</b> Night • <b>D</b> Day</p>
     </section>

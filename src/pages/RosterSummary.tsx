@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useRosterSummary } from "@/hooks/useRosterSummary";
+import MonthlyScheduleTab from "@/components/MonthlyScheduleTab";
 
 // Formatting helpers
 function fmtPounds(n: number | null) { return n==null ? "—" : `£${Math.round(n).toLocaleString()}`; }
@@ -10,6 +11,7 @@ function fmtHours(n: number | null)  { return n==null ? "—" : `${Math.round(n)
 export default function RosterSummary() {
   const [params] = useSearchParams();
   const versionId = params.get("version") || "";
+  const [activeTab, setActiveTab] = useState<"summary" | "month">("summary");
 
   const { loading, error, version, kpis, matrix, tours, budget, diag } = useRosterSummary(versionId);
 
@@ -19,6 +21,32 @@ export default function RosterSummary() {
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Roster Summary</h1>
           <Link to="/wizard" className="px-3 py-2 rounded-lg border bg-white hover:bg-slate-50">← Back to Wizard</Link>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab("summary")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "summary"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Summary
+            </button>
+            <button
+              onClick={() => setActiveTab("month")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "month"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Monthly Schedule
+            </button>
+          </nav>
         </div>
 
         {/* Diagnostics banner for debugging */}
@@ -40,7 +68,8 @@ export default function RosterSummary() {
           </div>
         )}
 
-        {version && (
+        {/* Tab Content */}
+        {activeTab === "summary" && version && (
           <div className="space-y-4">
             <div className="rounded-xl border bg-white p-4">
               <div className="text-sm text-slate-500">Version</div>
@@ -75,6 +104,13 @@ export default function RosterSummary() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === "month" && (
+          <MonthlyScheduleTab
+            versionId={versionId}
+            siteTz={version?.timezone ?? "Europe/London"}
+          />
         )}
       </div>
     </div>
