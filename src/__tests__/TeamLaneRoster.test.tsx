@@ -17,14 +17,16 @@ jest.mock('@/integrations/supabase/client', () => ({
                   shift_code: "D",
                   staff_id: "s1",
                   shift_start: "2025-09-20T07:00:00Z",
-                  shift_end: "2025-09-20T19:00:00Z"
+                  shift_end: "2025-09-20T19:00:00Z",
+                  hours: 12
                 },
                 {
-                  date: "2025-09-21", 
-                  shift_code: "D",
+                  date: "2025-09-20", 
+                  shift_code: "N",
                   staff_id: "s1",
-                  shift_start: "2025-09-21T07:00:00Z",
-                  shift_end: "2025-09-21T19:00:00Z"
+                  shift_start: "2025-09-20T19:00:00Z",
+                  shift_end: "2025-09-21T07:00:00Z",
+                  hours: 12
                 }
               ],
               error: null
@@ -59,12 +61,17 @@ jest.mock('@/integrations/supabase/client', () => ({
   }
 }));
 
+test("prefers Night token when both Day and Night exist for the same day", async () => {
+  render(<TeamLaneRoster versionId="v1" />);
+  expect(await screen.findAllByText("N")).toBeTruthy();
+});
+
 test("renders rest-risk legend", async () => {
   render(<TeamLaneRoster versionId="v1" />);
   expect(await screen.findByText(/Rest-risk legend/i)).toBeInTheDocument();
   expect(screen.getByText(/≥13h/)).toBeInTheDocument();
   expect(screen.getByText(/11–13h/)).toBeInTheDocument();
-  expect(screen.getByText(/11h/)).toBeInTheDocument();
+  expect(screen.getByText(/<11h/)).toBeInTheDocument();
 });
 
 test("renders fairness column header", async () => {

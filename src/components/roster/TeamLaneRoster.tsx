@@ -1,19 +1,19 @@
 import React from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// -------------------- Types --------------------
 type Props = { versionId: string };
 
 type Assignment = {
-  day: string;            // ISO date e.g. 2025-09-22
+  day: string;            // ISO date, e.g. "2025-09-22"
   day_idx: number;        // 0=Sun..6=Sat
   shift: "D"|"N"|"E"|"L"|string;
   staff_id: string;
   staff_name: string;
   team: string | null;
   role: string | null;
-  start_local: string | null; // HH:MM:SS or null
-  end_local: string | null;   // HH:MM:SS or null
+  start_local: string | null; // "HH:MM:SS" or null
+  end_local: string | null;   // "HH:MM:SS" or null
+  overtime_hours?: number | null;
 };
 
 type StaffFairness = {
@@ -21,83 +21,84 @@ type StaffFairness = {
   nights: number;
   weekends: number;
   publicHolidays: number;
-  overtimeHours: number; // placeholder (0 unless you store it)
+  overtimeHours: number;
 };
 
-// -------------------- Nominal shift time fallbacks --------------------
-// Used only if start_local/end_local are missing.
 const NOMINAL_SCHEDULE: Record<string, { start: string; end: string }> = {
   D: { start: "07:00", end: "19:00" },
   N: { start: "19:00", end: "07:00" },
   E: { start: "06:00", end: "14:00" },
   L: { start: "14:00", end: "22:00" },
-  // default for unknown: treat as 8h day starting 09:00
   _: { start: "09:00", end: "17:00" },
 };
 
-// -------------------- Utils --------------------
-function toMinutes(hhmm: string) {
-  const [h, m] = hhmm.split(":").map(Number);
-  return (h * 60) + (m || 0);
-}
 function toDate(dateISO: string, hhmm: string) {
-  const d = new Date(dateISO + "T" + (hhmm.length===5? hhmm + ":00" : hhmm));
-  return d;
+  const s = hhmm.length === 5 ? `${hhmm}:00` : hhmm;
+  return new Date(`${dateISO}T${s}`);
 }
-function addDays(dateISO: string, days: number) {
+function addDaysISO(dateISO: string, n: number) {
   const d = new Date(dateISO);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
 }
-function weekendFromIdx(day_idx: number) {
-  return day_idx === 0 || day_idx === 6;
-}
+function weekend(day_idx: number) { return day_idx === 0 || day_idx === 6; }
 
-// Compute actual start/end Date objects for an assignment using real times if present,
-// otherwise nominal. Handles overnight end (end on next calendar day if end <= start).
-function resolveAssignmentWindow(a: Assignment) {
+function resolveWindow(a: Assignment) {
   const token = (a.shift || "_").toUpperCase();
-  const fallback = NOMINAL_SCHEDULE[token] || NOMINAL_SCHEDULE["_"];
-  const startStr = (a.start_local ?? fallback.start).slice(0,5);
-  const endStr   = (a.end_local   ?? fallback.end).slice(0,5);
-
+  const cfg = NOMINAL_SCHEDULE[token] || NOMINAL_SCHEDULE["_"];
+  const startStr = (a.start_local ?? cfg.start).slice(0, 5);
+  const endStr   = (a.end_local   ?? cfg.end).slice(0, 5);
   const start = toDate(a.day, startStr);
   let end = toDate(a.day, endStr);
-  // If end is earlier/equal than start, assume overnight to next day
-  if (end <= start) {
-    const nextDay = addDays(a.day, 1);
-    end = toDate(nextDay, endStr);
-  }
+  if (end <= start) end = toDate(addDaysISO(a.day, 1), endStr); // overnight
   return { start, end };
 }
 
-// Compute rest (gap) in hours between A and B (A before B).
 function restHoursBetween(a: Assignment, b: Assignment) {
-  const { end } = resolveAssignmentWindow(a);
-  const { start } = resolveAssignmentWindow(b);
-  const ms = start.getTime() - end.getTime();
-  return ms / (1000 * 60 * 60);
+  const { end } = resolveWindow(a);
+  const { start } = resolveWindow(b);
+  return (start.getTime() - end.getTime()) / 36e5; // ms->h
 }
 
-function riskToColor(hours: number | null) {
-  if (hours == null) return { dot: "bg-slate-300", text: "text-slate-500", label: "Unknown rest" };
-  if (hours < 11) return { dot: "bg-red-500", text: "text-red-700", label: `<11h rest` };
-  if (hours < 13) return { dot: "bg-amber-500", text: "text-amber-700", label: `11–13h rest` };
-  return { dot: "bg-emerald-500", text: "text-emerald-700", label: `≥13h rest` };
+function riskBadge(hours: number | null) {
+  if (hours == null || !isFinite(hours)) return { dot: "bg-slate-300", label: "Unknown rest" };
+  if (hours < 11) return { dot: "bg-red-500", label: "<11h rest" };
+  if (hours < 13) return { dot: "bg-amber-500", label: "11–13h rest" };
+  return { dot: "bg-emerald-500", label: "≥13h rest" };
 }
 
-// -------------------- Component --------------------
+const tokenClass = (t: string) =>
+  t === "R" ? "bg-slate-100 text-slate-500"
+  : t === "N" ? "bg-indigo-50 text-indigo-700"
+  : t === "D" ? "bg-blue-50 text-blue-700"
+  : t === "E" ? "bg-emerald-50 text-emerald-700"
+  : t === "L" ? "bg-amber-50 text-amber-700"
+  : "bg-slate-50 text-slate-700";
+
+// Prefer Night if multiple same-day tokens exist (safety against rare duplicates)
+function chooseTokenForDay(list: Assignment[], dayISO: string) {
+  const sameDay = list.filter(x => x.day === dayISO);
+  if (sameDay.length === 0) return "R";
+  // If any Night exists, show 'N' (so Nights never get hidden behind 'D')
+  if (sameDay.some(x => x.shift === "N")) return "N";
+  // Else prefer D/E/L in a stable order
+  if (sameDay.some(x => x.shift === "D")) return "D";
+  if (sameDay.some(x => x.shift === "E")) return "E";
+  if (sameDay.some(x => x.shift === "L")) return "L";
+  // Fallback to first token
+  return (sameDay[0].shift || "R").toUpperCase();
+}
+
 export default function TeamLaneRoster({ versionId }: Props) {
   const [rows, setRows] = React.useState<Assignment[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string|null>(null);
-  const [holidays, setHolidays] = React.useState<Set<string>>(new Set()); // optional
+  const [error, setError] = React.useState<string | null>(null);
+  const [holidays, setHolidays] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
-    let active = true;
+    let alive = true;
     (async () => {
       setLoading(true); setError(null);
-
       try {
         let resp: any = await supabase
           .from("roster_assignments")
@@ -106,7 +107,8 @@ export default function TeamLaneRoster({ versionId }: Props) {
             shift_code,
             staff_id,
             shift_start,
-            shift_end
+            shift_end,
+            hours
           `)
           .eq("version_id", versionId);
         
@@ -132,40 +134,40 @@ export default function TeamLaneRoster({ versionId }: Props) {
           ])
         );
 
-        const mapped: Assignment[] = (resp.data || []).map((r: any) => ({
+        const data: Assignment[] = (resp.data || []).map((r: any) => ({
           day: r.date,
           day_idx: new Date(r.date).getDay(),
           shift: r.shift_code || "R",
           start_local: r.shift_start ? new Date(r.shift_start).toTimeString().slice(0, 8) : null,
           end_local: r.shift_end ? new Date(r.shift_end).toTimeString().slice(0, 8) : null,
+          overtime_hours: r.hours && r.hours > 8 ? r.hours - 8 : 0,
           staff_id: r.staff_id,
           staff_name: staffMap.get(r.staff_id)?.display_name ?? "Unknown",
           team: `Team ${Math.floor(Math.random() * 4) + 1}`, // Temporary team assignment
           role: staffMap.get(r.staff_id)?.role ?? "Staff",
         }));
         
-        if (active) setRows(mapped);
+        if (alive) setRows(data);
 
       } catch (e: any) {
-        if (active) setError(e.message || "Failed to load team lanes.");
+        alive && setError(e.message || "Failed to load team lanes.");
       } finally {
-        if (active) setLoading(false);
+        alive && setLoading(false);
       }
     })();
-    return () => { active = false; };
+    return () => { alive = false; };
   }, [versionId]);
 
   if (loading) return <div className="p-4">Loading roster…</div>;
   if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
   if (!rows.length) return <div className="p-4 text-slate-600">No assignments found for this roster version.</div>;
 
-  // ---- Group by team then by staff, build ordered day columns ----
-  const allDays = Array.from(new Set(rows.map(r => r.day))).sort(); // ISO strings
-  type StaffKey = string;
-  type TeamKey = string;
+  // Build day headers, group by team -> staff
+  const allDays = Array.from(new Set(rows.map(r => r.day))).sort();
 
-  // Map: team -> staff -> assignments[]
+  type StaffKey = string; type TeamKey = string;
   const teamMap = new Map<TeamKey, Map<StaffKey, Assignment[]>>();
+
   rows.forEach(r => {
     const team = r.team || "Unassigned";
     if (!teamMap.has(team)) teamMap.set(team, new Map());
@@ -175,28 +177,42 @@ export default function TeamLaneRoster({ versionId }: Props) {
     staffMap.get(staffKey)!.push(r);
   });
 
-  // Sort each staff's assignments by actual start time
+  // Sort each staff's list by start time
   teamMap.forEach(staffMap => {
     staffMap.forEach(list => {
-      list.sort((a,b) => resolveAssignmentWindow(a).start.getTime() - resolveAssignmentWindow(b).start.getTime());
+      list.sort((a, b) => resolveWindow(a).start.getTime() - resolveWindow(b).start.getTime());
     });
   });
 
-  // Compute fairness counters
+  // Fairness counters
   const fairnessByStaff = new Map<StaffKey, StaffFairness>();
   teamMap.forEach(staffMap => {
     staffMap.forEach((list, staffKey) => {
-      const counters: StaffFairness = { shifts: 0, nights: 0, weekends: 0, publicHolidays: 0, overtimeHours: 0 };
+      const f: StaffFairness = { shifts: 0, nights: 0, weekends: 0, publicHolidays: 0, overtimeHours: 0 };
       list.forEach(a => {
-        counters.shifts += 1;
-        if (a.shift === "N") counters.nights += 1;
-        if (weekendFromIdx(a.day_idx)) counters.weekends += 1;
-        if (holidays.has(a.day)) counters.publicHolidays += 1;
-        // overtimeHours: set to 0 for now (fill from assignments column if available)
+        f.shifts += 1;
+        if (a.shift === "N") f.nights += 1;
+        if (weekend(a.day_idx)) f.weekends += 1;
+        if (holidays.has(a.day)) f.publicHolidays += 1;
+        if (typeof a.overtime_hours === "number") f.overtimeHours += a.overtime_hours || 0;
       });
-      fairnessByStaff.set(staffKey, counters);
+      fairnessByStaff.set(staffKey, f);
     });
   });
+
+  // Precompute rest-risk gaps per staff
+  function restDotBetween(list: Assignment[], dayISO: string) {
+    // find current assignment on day and the next assignment in time
+    const today = list.filter(x => x.day === dayISO)
+                      .sort((a,b)=> resolveWindow(a).start.getTime() - resolveWindow(b).start.getTime());
+    const next = list.find(x => x.day > dayISO);
+    if (!today.length || !next) return null;
+    // Use the last duty of today (in case of >1)
+    const lastToday = today[today.length - 1];
+    const hrs = restHoursBetween(lastToday, next);
+    const { dot, label } = riskBadge(isFinite(hrs) ? hrs : null);
+    return { hrs: isFinite(hrs) ? hrs : null, dot, label };
+  }
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-white shadow">
@@ -206,10 +222,8 @@ export default function TeamLaneRoster({ versionId }: Props) {
             <th className="p-2 text-left">Team</th>
             <th className="p-2 text-left">Staff</th>
             {allDays.map(d => (
-              <th key={d} className="p-2 text-left align-bottom">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">{new Date(d).getDate()}</span>
-                </div>
+              <th key={d} className="p-2 text-left">
+                <div className="text-xs text-slate-500">{new Date(d).getDate()}</div>
               </th>
             ))}
             <th className="p-2 text-left">Fairness</th>
@@ -218,80 +232,43 @@ export default function TeamLaneRoster({ versionId }: Props) {
         <tbody>
           {Array.from(teamMap.entries()).map(([team, staffMap]) => {
             const staffEntries = Array.from(staffMap.entries());
-
             return staffEntries.map(([staffKey, list], idx) => {
-              const [, staffName] = staffKey.split("|");
-              // Build a quick lookup day->assignment for token cell fill
-              const byDay = new Map<string, Assignment>();
-              list.forEach(a => byDay.set(a.day, a));
-
-              // Compute rest-risk dots between consecutive shifts:
-              const dots: Record<string, { hours: number|null; color: string; title: string }> = {};
-              for (let i = 0; i < list.length - 1; i++) {
-                const a = list[i], b = list[i+1];
-                const hrs = restHoursBetween(a, b);
-                const c = riskToColor(Number.isFinite(hrs) ? hrs : null);
-                dots[`${a.day}→${b.day}`] = { hours: Number.isFinite(hrs) ? hrs : null, color: c.dot, title: c.label };
-              }
-
+              const [, name] = staffKey.split("|");
               const fairness = fairnessByStaff.get(staffKey)!;
-              const fairnessEl = (
-                <div className="text-xs text-slate-700 space-y-1">
-                  <div><span className="text-slate-500">Shifts:</span> {fairness.shifts}</div>
-                  <div><span className="text-slate-500">Nights:</span> {fairness.nights}</div>
-                  <div><span className="text-slate-500">Weekends:</span> {fairness.weekends}</div>
-                  <div><span className="text-slate-500">PHs:</span> {fairness.publicHolidays}</div>
-                  <div><span className="text-slate-500">OT hrs:</span> {fairness.overtimeHours}</div>
-                </div>
-              );
 
               return (
                 <tr key={`${team}-${staffKey}`} className={`border-t ${idx===0 ? "border-slate-300" : "border-slate-100"}`}>
-                  {/* Team cell only on the first row per team (rowspan trick via group header rows would be nicer; keeping simple) */}
                   <td className="p-2 font-semibold">{idx===0 ? team : ""}</td>
-                  <td className="p-2 whitespace-nowrap">{staffName}</td>
+                  <td className="p-2 whitespace-nowrap">{name}</td>
 
-                  {allDays.map((d, colIdx) => {
-                    const a = byDay.get(d);
-                    const token = a?.shift ?? "R";
-                    const isRest = token === "R";
-                    const color =
-                      isRest ? "bg-slate-100 text-slate-500"
-                      : token === "N" ? "bg-indigo-50 text-indigo-700"
-                      : token === "D" ? "bg-blue-50 text-blue-700"
-                      : token === "E" ? "bg-emerald-50 text-emerald-700"
-                      : token === "L" ? "bg-amber-50 text-amber-700"
-                      : "bg-slate-50 text-slate-700";
-
-                    // Rest-risk dot between today and next assignment day (only draw after this cell if there is a subsequent duty).
-                    let dotEl: React.ReactNode = null;
-                    if (a) {
-                      const next = list.find(b => b.day > d);
-                      if (next) {
-                        const key = `${a.day}→${next.day}`;
-                        const info = dots[key];
-                        if (info) {
-                          dotEl = (
-                            <div className="mt-1 flex items-center gap-1" title={`${info.title}${info.hours!=null ? ` (${info.hours.toFixed(1)}h)` : ""}`}>
-                              <span className={`inline-block w-2 h-2 rounded-full ${info.color}`} />
-                              <span className="text-[10px] text-slate-500">{info.hours!=null ? `${info.hours.toFixed(1)}h` : ""}</span>
-                            </div>
-                          );
-                        }
-                      }
-                    }
-
+                  {allDays.map(d => {
+                    const token = chooseTokenForDay(list, d);
+                    const color = tokenClass(token);
+                    const restDot = restDotBetween(list, d);
                     return (
                       <td key={d} className="p-2 align-top min-w-[80px]">
-                        <div className={`inline-flex px-2 py-1 rounded ${color}`} title={isRest ? "Rest Day" : `Shift ${token}`}>
+                        <div className={`inline-flex px-2 py-1 rounded ${color}`} title={token==="R" ? "Rest Day" : `Shift ${token}`}>
                           {token}
                         </div>
-                        {dotEl}
+                        {restDot && (
+                          <div className="mt-1 flex items-center gap-1" title={`${restDot.label}${restDot.hrs!=null ? ` (${restDot.hrs.toFixed(1)}h)` : ""}`}>
+                            <span className={`inline-block w-2 h-2 rounded-full ${restDot.dot}`} />
+                            <span className="text-[10px] text-slate-500">{restDot.hrs!=null ? `${restDot.hrs.toFixed(1)}h` : ""}</span>
+                          </div>
+                        )}
                       </td>
                     );
                   })}
 
-                  <td className="p-2 align-top">{fairnessEl}</td>
+                  <td className="p-2 align-top">
+                    <div className="text-xs text-slate-700 space-y-1">
+                      <div><span className="text-slate-500">Shifts:</span> {fairness.shifts}</div>
+                      <div><span className="text-slate-500">Nights:</span> {fairness.nights}</div>
+                      <div><span className="text-slate-500">Weekends:</span> {fairness.weekends}</div>
+                      <div><span className="text-slate-500">PHs:</span> {fairness.publicHolidays}</div>
+                      <div><span className="text-slate-500">OT hrs:</span> {fairness.overtimeHours}</div>
+                    </div>
+                  </td>
                 </tr>
               );
             });
@@ -308,9 +285,10 @@ export default function TeamLaneRoster({ versionId }: Props) {
         <div className="flex items-center gap-1" title="Amber means 11–13h rest between adjacent duties">
           <span className="inline-block w-2 h-2 rounded-full bg-amber-500" /> <span>🟡 11–13h</span>
         </div>
-        <div className="flex items-center gap-1" title="Red means <11h rest between adjacent duties">
+        <div className="flex items-center gap-1" title="Red means &lt;11h rest between adjacent duties">
           <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> <span>🔴 &lt;11h</span>
         </div>
+        <div className="ml-auto text-slate-500">R = Rest Day • D/E/L/N = Day/Early/Late/Night</div>
       </div>
     </div>
   );
