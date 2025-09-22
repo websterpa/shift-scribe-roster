@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useRosterSummary } from "@/hooks/useRosterSummary";
 import MonthlyScheduleTab from "@/components/MonthlyScheduleTab";
-import { CoverageStrip } from "@/components/roster/CoverageStrip";
-import { TeamLaneRoster } from "@/components/roster/TeamLaneRoster";
+import CoverageStrip from "@/components/roster/CoverageStrip";
+import TeamLaneRoster from "@/components/roster/TeamLaneRoster";
 
 // Formatting helpers
 function fmtPounds(n: number | null) { return n==null ? "—" : `£${Math.round(n).toLocaleString()}`; }

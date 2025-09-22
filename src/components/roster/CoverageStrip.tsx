@@ -16,7 +16,7 @@ interface DayData {
   shifts: Record<string, ShiftData>;
 }
 
-export function CoverageStrip({ versionId }: CoverageStripProps) {
+export default function CoverageStrip({ versionId }: CoverageStripProps) {
   const [data, setData] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,46 +61,42 @@ export function CoverageStrip({ versionId }: CoverageStripProps) {
     return 'bg-red-100 text-red-800 border-red-200'; // deficit
   };
 
-  if (loading) {
-    return (
-      <div className="sticky top-0 bg-white border-b p-4">
-        <div className="animate-pulse h-16 bg-gray-100 rounded"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="sticky top-0 bg-white border-b p-4">
-        <div className="text-red-600 text-sm">Coverage error: {error}</div>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-4">Loading coverage…</div>;
+  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
 
   return (
-    <div className="sticky top-0 bg-white border-b shadow-sm z-10">
-      <div className="p-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Coverage Overview</h3>
-        <div className="overflow-x-auto">
-          <div className="flex gap-2 min-w-max">
-            {data.map((dayData) => (
-              <div key={dayData.day} className="flex-shrink-0 border rounded-lg p-2 min-w-[120px]">
-                <div className="text-xs font-medium text-center mb-2">{dayData.day}</div>
-                <div className="space-y-1">
-                  {Object.entries(dayData.shifts).map(([shiftCode, shift]) => (
-                    <div key={shiftCode} className="flex items-center justify-between text-xs">
-                      <span className="font-mono">{shiftCode}</span>
-                      <span className={`px-2 py-1 rounded border text-xs ${getVariancePill(shift)}`}>
-                        {shift.planned}/{shift.need}
+    <div className="overflow-x-auto rounded-lg border bg-white shadow">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-slate-50">
+            <th className="p-2 text-left">Day</th>
+            <th className="p-2 text-left">Shifts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((dayData, i) => (
+            <tr key={i} className="border-t">
+              <td className="p-2 font-semibold">{dayData.day}</td>
+              <td className="p-2">
+                <div className="flex gap-2 flex-wrap">
+                  {Object.entries(dayData.shifts).map(([shiftCode, shift]) => {
+                    const diff = shift.planned - shift.need;
+                    const color =
+                      diff < 0 ? "bg-red-100 text-red-700"
+                      : diff === 0 ? "bg-green-100 text-green-700"
+                      : "bg-blue-100 text-blue-700";
+                    return (
+                      <span key={shiftCode} className={`px-2 py-1 rounded ${color}`}>
+                        {shiftCode}: {shift.planned}/{shift.need}
                       </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
