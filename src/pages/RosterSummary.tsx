@@ -1,9 +1,12 @@
 import React, { useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useRosterSummary } from "@/hooks/useRosterSummary";
+import { useNightPresence } from "@/hooks/useNightPresence";
 import MonthlyScheduleTab from "@/components/MonthlyScheduleTab";
 import CoverageStrip from "@/components/roster/CoverageStrip";
 import TeamLaneRoster from "@/components/roster/TeamLaneRoster";
+import NightCallout from "@/components/NightCallout";
+import { toast } from "sonner";
 
 // Formatting helpers
 function fmtPounds(n: number | null) { return n==null ? "—" : `£${Math.round(n).toLocaleString()}`; }
@@ -12,10 +15,33 @@ function fmtHours(n: number | null)  { return n==null ? "—" : `${Math.round(n)
 
 export default function RosterSummary() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const versionId = params.get("version") || "";
   const [activeTab, setActiveTab] = useState<"summary" | "coverage" | "teams" | "month">("summary");
 
   const { loading, error, version, kpis, matrix, tours, budget, diag } = useRosterSummary(versionId);
+  
+  // Check for Night presence
+  const { 
+    loading: npLoading, 
+    error: npError, 
+    hasNight, 
+    tokenCounts 
+  } = useNightPresence(versionId, {
+    expectNights: version?.shift_type === "12h" || version?.config_name?.includes("Night"),
+    coverageRequiresNights: false // Could be enhanced based on config
+  });
+
+  function handleRegenerateWithNights() {
+    console.log("Regenerating roster with Nights enabled for version:", versionId);
+    toast.info("Night shift regeneration would be triggered here");
+    // TODO: Implement actual regeneration logic
+  }
+
+  function openWizard() {
+    console.log("Opening wizard with Night preset for version:", versionId);
+    navigate(`/wizard?version=${versionId}&preset=dn`);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -90,6 +116,18 @@ export default function RosterSummary() {
           </div>
         )}
 
+        {/* Night Presence Check */}
+        {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
+          <div className="mb-4">
+            <NightCallout
+              reason="not-generated"
+              tokenCounts={tokenCounts}
+              onRegenerateNights={handleRegenerateWithNights}
+              onOpenWizard={openWizard}
+            />
+          </div>
+        )}
+
         {/* Tab Content */}
         {activeTab === "summary" && version && (
           <div className="space-y-4">
@@ -129,18 +167,48 @@ export default function RosterSummary() {
         )}
 
         {activeTab === "coverage" && (
-          <CoverageStrip versionId={versionId} />
+          <div className="space-y-4">
+            {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
+              <NightCallout
+                reason="not-generated"
+                tokenCounts={tokenCounts}
+                onRegenerateNights={handleRegenerateWithNights}
+                onOpenWizard={openWizard}
+              />
+            )}
+            <CoverageStrip versionId={versionId} />
+          </div>
         )}
 
         {activeTab === "teams" && (
-          <TeamLaneRoster versionId={versionId} />
+          <div className="space-y-4">
+            {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
+              <NightCallout
+                reason="not-generated"
+                tokenCounts={tokenCounts}
+                onRegenerateNights={handleRegenerateWithNights}
+                onOpenWizard={openWizard}
+              />
+            )}
+            <TeamLaneRoster versionId={versionId} />
+          </div>
         )}
 
         {activeTab === "month" && (
-          <MonthlyScheduleTab
-            versionId={versionId}
-            siteTz={version?.timezone ?? "Europe/London"}
-          />
+          <div className="space-y-4">
+            {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
+              <NightCallout
+                reason="not-generated"
+                tokenCounts={tokenCounts}
+                onRegenerateNights={handleRegenerateWithNights}
+                onOpenWizard={openWizard}
+              />
+            )}
+            <MonthlyScheduleTab
+              versionId={versionId}
+              siteTz={version?.timezone ?? "Europe/London"}
+            />
+          </div>
         )}
       </div>
     </div>

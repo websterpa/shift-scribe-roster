@@ -737,6 +737,13 @@ export type Database = {
         Args: { version_id: string }
         Returns: Json[]
       }
+      rpc_version_token_counts: {
+        Args: { version_id: string }
+        Returns: {
+          cnt: number
+          token: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
