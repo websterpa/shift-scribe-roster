@@ -4,7 +4,7 @@ export type Token = "D"|"E"|"L"|"N"|"R"|"S";
 const NAME_TO_TOKEN: Record<string, Token> = {
   // exact readable names from DB
   "Day": "D",
-  "Early": "E", 
+  "Early": "E",
   "Late": "L",
   "Night": "N",
   "Rest": "R",
