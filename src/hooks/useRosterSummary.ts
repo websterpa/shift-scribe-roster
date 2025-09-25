@@ -8,7 +8,6 @@ export type SummaryDiag = {
   matrix:  { ok: boolean; msg?: string };
   tours:   { ok: boolean; msg?: string };
   budget:  { ok: boolean; msg?: string };
-  fallbackUsed: boolean;
 };
 
 export type KPIs = {
@@ -27,7 +26,7 @@ export function useRosterSummary(versionId: string) {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [diag, setDiag]         = useState<SummaryDiag>({
-    version:{ok:false}, kpis:{ok:false}, matrix:{ok:false}, tours:{ok:false}, budget:{ok:false}, fallbackUsed:false
+    version:{ok:false}, kpis:{ok:false}, matrix:{ok:false}, tours:{ok:false}, budget:{ok:false}
   });
 
   const [version, setVersion]   = useState<any>(null);
@@ -112,44 +111,12 @@ export function useRosterSummary(versionId: string) {
         if (toursData) setTours(toursData);
         if (budgetData) setBudget(budgetData);
 
-        // 3) Fallbacks if any of the above failed
-        const needFallback = !kpisData || !budgetData;
-        if (needFallback) {
-          d.fallbackUsed = true;
-
-          // 3a) Get assignment data for fallback calculations
-          const { data: assignments, error: asgError } = await supabase
-            .from("roster_assignments")
-            .select("cost, hours, shift_code, staff_id")
-            .eq("version_id", versionId);
-
-          let coveragePct: number | null = null;
-          let totalHours: number | null = null;
-          let estimated: number | null = null;
-
-          if (!asgError && assignments) {
-            // Calculate total hours and cost
-            totalHours = assignments.reduce((sum, a) => sum + (a.hours || 0), 0);
-            estimated = assignments.reduce((sum, a) => sum + (a.cost || 0), 0);
-            
-            // Simple coverage calculation based on assignments vs expected
-            const expectedAssignments = totalHours > 0 ? Math.ceil(totalHours / 8) : assignments.length;
-            coveragePct = expectedAssignments > 0 ? Math.min((assignments.length / expectedAssignments) * 100, 100) : 0;
-          }
-
-          // Mock budget for variance calculation
-          const budgetSet = 50000; // £50k baseline
-          const variance = estimated != null ? (estimated - budgetSet) : null;
-
-          setKpis(prev => ({
-            coverageFillPct: coveragePct ?? prev?.coverageFillPct ?? null,
-            totalHours: totalHours ?? prev?.totalHours ?? null,
-            otHours: prev?.otHours ?? null,
-            budgetEstimated: estimated ?? prev?.budgetEstimated ?? null,
-            budgetSet: budgetSet ?? prev?.budgetSet ?? null,
-            budgetVariance: variance ?? prev?.budgetVariance ?? null,
-          }));
-          setBudget({ estimated: estimated ?? null, budget: budgetSet ?? null, variance: variance ?? null });
+        // Throw clear error if RPCs fail - no fallbacks
+        if (!kpisData) {
+          throw new Error("Coverage RPC failed - rpc_roster_kpis returned no data");
+        }
+        if (!budgetData) {
+          throw new Error("Budget RPC failed - rpc_roster_budget returned no data");
         }
 
         if (!alive) return;

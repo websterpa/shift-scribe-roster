@@ -57,8 +57,17 @@ export function useReportsData() {
       // Calculate overtime (hours over 40 per week)
       const overtimeHours = Math.max(0, averageHoursPerWeek - 40) * 4;
 
-      // Mock budget variance calculation (would need budget data in real implementation)
-      const monthlyBudget = 12500; // Mock budget
+      // Get budget from site_settings
+      const { data: siteSettings, error: budgetError } = await supabase
+        .from('site_settings')
+        .select('budget_warn_threshold')
+        .single();
+      
+      if (budgetError) {
+        throw new Error(`Budget RPC failed: ${budgetError.message}`);
+      }
+      
+      const monthlyBudget = siteSettings?.budget_warn_threshold || 0;
       const budgetVariance = totalCost - monthlyBudget;
 
       setData({
@@ -66,7 +75,7 @@ export function useReportsData() {
         budgetVariance,
         totalAssignments,
         averageHoursPerWeek,
-        complianceScore: 94, // Mock compliance score
+        complianceScore: 0, // Remove mock - calculate from actual data if needed
         overtimeHours
       });
 

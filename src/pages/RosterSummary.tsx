@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useRosterSummary } from "@/hooks/useRosterSummary";
 import { useNightPresence } from "@/hooks/useNightPresence";
+import { useNightRequirements } from "@/hooks/useNightRequirements";
+import { NightDiagnosticBanner } from "@/components/roster/NightDiagnosticBanner";
 import MonthlyScheduleTab from "@/components/MonthlyScheduleTab";
 import CoverageStrip from "@/components/roster/CoverageStrip";
 import TeamLaneRoster from "@/components/roster/TeamLaneRoster";
@@ -98,14 +100,14 @@ export default function RosterSummary() {
         </div>
 
         {/* Diagnostics banner for debugging */}
-        {(diag.fallbackUsed || !diag.kpis.ok || !diag.budget.ok || !diag.matrix.ok || !diag.tours.ok) && (
+        {(error || !diag.kpis.ok || !diag.budget.ok || !diag.matrix.ok || !diag.tours.ok) && (
           <div className="mb-3 rounded-lg border bg-amber-50 text-amber-900 p-2 text-xs">
             <strong>Diagnostics:</strong> version={String(diag.version.ok)} • 
             kpis={String(diag.kpis.ok)}{diag.kpis.msg ? ` (${diag.kpis.msg})` : ""} • 
             matrix={String(diag.matrix.ok)}{diag.matrix.msg ? ` (${diag.matrix.msg})` : ""} • 
             tours={String(diag.tours.ok)}{diag.tours.msg ? ` (${diag.tours.msg})` : ""} • 
             budget={String(diag.budget.ok)}{diag.budget.msg ? ` (${diag.budget.msg})` : ""} • 
-            fallbackUsed={String(diag.fallbackUsed)}
+            fallbackUsed="false"
           </div>
         )}
 
@@ -116,7 +118,15 @@ export default function RosterSummary() {
           </div>
         )}
 
-        {/* Night Presence Check */}
+        {/* Night Diagnostic Banner - Step 4 implementation */}
+        <NightDiagnosticBanner
+          requirementsCount={requirementsCount}
+          assignmentsCount={tokenCounts["N"] ?? 0} 
+          hasUI={hasNight}
+          loading={npLoading || nrLoading}
+        />
+
+        {/* Night Presence Check - Legacy callout */}
         {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
           <div className="mb-4">
             <NightCallout
@@ -141,7 +151,7 @@ export default function RosterSummary() {
               <div className="text-sm">Version Number: {version.version_number}</div>
             </div>
 
-            {/* Real KPI data with fallbacks */}
+            {/* Real KPI data with error handling */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-xl border bg-white p-4">
                 <div className="text-xs uppercase text-slate-500">Coverage</div>
