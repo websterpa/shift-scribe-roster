@@ -34,6 +34,12 @@ export default function RosterSummary() {
     coverageRequiresNights: false // Could be enhanced based on config
   });
 
+  const { 
+    loading: nrLoading, 
+    error: nrError, 
+    requirementsCount 
+  } = useNightRequirements(versionId);
+
   function handleRegenerateWithNights() {
     console.log("Regenerating roster with Nights enabled for version:", versionId);
     toast.info("Night shift regeneration would be triggered here");
