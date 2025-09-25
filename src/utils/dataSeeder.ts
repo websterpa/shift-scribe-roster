@@ -5,6 +5,14 @@ export async function seedInitialData() {
   console.log('🌱 DataSeeder: Starting initial data seeding...');
   
   try {
+    // Check if user is authenticated first
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.log('👤 DataSeeder: No authenticated user, skipping data seeding');
+      return;
+    }
+    
     // Check if staff exists
     const { data: existingStaff, error: staffError } = await supabase
       .from('staff_profiles')
@@ -18,7 +26,7 @@ export async function seedInitialData() {
     
     if (!existingStaff || existingStaff.length === 0) {
       console.log('👥 DataSeeder: No staff found, creating sample staff...');
-      await createSampleStaff();
+      await createSampleStaff(user.id);
     } else {
       console.log('✅ DataSeeder: Staff already exists, skipping staff creation');
     }
@@ -26,11 +34,11 @@ export async function seedInitialData() {
     console.log('✅ DataSeeder: Initial data seeding completed');
   } catch (error) {
     console.error('❌ DataSeeder: Error seeding initial data:', error);
-    throw error;
+    // Don't throw - allow app to continue without sample data
   }
 }
 
-async function createSampleStaff() {
+async function createSampleStaff(userId: string) {
   console.log('👥 DataSeeder: Creating sample staff members...');
   
   const sampleStaff = [
@@ -52,7 +60,7 @@ async function createSampleStaff() {
       holiday_multiplier: 2,
       leave_allowance_days: 28,
       is_active: true,
-      user_id: '00000000-0000-0000-0000-000000000001' // Dummy user ID
+      user_id: userId
     },
     {
       employee_id: 'EMP002',
@@ -72,7 +80,7 @@ async function createSampleStaff() {
       holiday_multiplier: 2,
       leave_allowance_days: 28,
       is_active: true,
-      user_id: '00000000-0000-0000-0000-000000000002' // Dummy user ID
+      user_id: userId
     },
     {
       employee_id: 'EMP003',
@@ -92,7 +100,7 @@ async function createSampleStaff() {
       holiday_multiplier: 2,
       leave_allowance_days: 30,
       is_active: true,
-      user_id: '00000000-0000-0000-0000-000000000003' // Dummy user ID
+      user_id: userId
     }
   ];
   
