@@ -721,6 +721,17 @@ export type Database = {
         Args: Record<PropertyKey, never> | { user_id?: string }
         Returns: boolean
       }
+      rpc_night_gap: {
+        Args: { version_id: string }
+        Returns: Json
+      }
+      rpc_requirements_token_counts: {
+        Args: { version_id: string }
+        Returns: {
+          cnt: number
+          token: string
+        }[]
+      }
       rpc_roster_budget: {
         Args: { version_id: string }
         Returns: Json
