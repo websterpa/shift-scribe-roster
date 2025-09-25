@@ -30,12 +30,19 @@ export default function CoverageStrip({ versionId }: CoverageStripProps) {
         const { data: matrixData, error: matrixError } = await supabase
           .rpc('rpc_roster_staffing_matrix', { version_id: versionId });
 
-        if (matrixError) throw matrixError;
+        if (matrixError) {
+          console.error('Coverage strip RPC error:', matrixError);
+          throw new Error("Coverage query returned no data (no demo fallback).");
+        }
 
         const coverage: DayData[] = (matrixData || []).map((row: any) => ({
           day: row.day,
           shifts: row.shifts || {}
         }));
+
+        if (!coverage || coverage.length === 0) {
+          throw new Error("Coverage query returned no data (no demo fallback).");
+        }
 
         setData(coverage);
       } catch (err: any) {

@@ -8,6 +8,7 @@ import MonthlyScheduleTab from "@/components/MonthlyScheduleTab";
 import CoverageStrip from "@/components/roster/CoverageStrip";
 import TeamLaneRoster from "@/components/roster/TeamLaneRoster";
 import NightCallout from "@/components/NightCallout";
+import RosterDebugDrawer from "@/components/debug/RosterDebugDrawer";
 import { toast } from "sonner";
 
 // Formatting helpers
@@ -31,7 +32,7 @@ export default function RosterSummary() {
     tokenCounts 
   } = useNightPresence(versionId, {
     expectNights: version?.shift_type === "12h" || version?.config_name?.includes("Night"),
-    coverageRequiresNights: false // Could be enhanced based on config
+    coverageRequiresNights: false
   });
 
   const { 
@@ -43,7 +44,6 @@ export default function RosterSummary() {
   function handleRegenerateWithNights() {
     console.log("Regenerating roster with Nights enabled for version:", versionId);
     toast.info("Night shift regeneration would be triggered here");
-    // TODO: Implement actual regeneration logic
   }
 
   function openWizard() {
@@ -105,26 +105,10 @@ export default function RosterSummary() {
           </nav>
         </div>
 
-        {/* Diagnostics banner for debugging */}
-        {(error || !diag.kpis.ok || !diag.budget.ok || !diag.matrix.ok || !diag.tours.ok) && (
-          <div className="mb-3 rounded-lg border bg-amber-50 text-amber-900 p-2 text-xs">
-            <strong>Diagnostics:</strong> version={String(diag.version.ok)} • 
-            kpis={String(diag.kpis.ok)}{diag.kpis.msg ? ` (${diag.kpis.msg})` : ""} • 
-            matrix={String(diag.matrix.ok)}{diag.matrix.msg ? ` (${diag.matrix.msg})` : ""} • 
-            tours={String(diag.tours.ok)}{diag.tours.msg ? ` (${diag.tours.msg})` : ""} • 
-            budget={String(diag.budget.ok)}{diag.budget.msg ? ` (${diag.budget.msg})` : ""} • 
-            fallbackUsed="false"
-          </div>
-        )}
+        {/* Debug Drawer */}
+        <RosterDebugDrawer versionId={versionId} />
 
-        {loading && <div className="rounded-xl border bg-white p-4">Loading…</div>}
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
-            {error}
-          </div>
-        )}
-
-        {/* Night Diagnostic Banner - Step 4 implementation */}
+        {/* Night Diagnostic Banner */}
         <NightDiagnosticBanner
           requirementsCount={requirementsCount}
           assignmentsCount={tokenCounts["N"] ?? 0} 
@@ -132,15 +116,10 @@ export default function RosterSummary() {
           loading={npLoading || nrLoading}
         />
 
-        {/* Night Presence Check - Legacy callout */}
-        {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
-          <div className="mb-4">
-            <NightCallout
-              reason="not-generated"
-              tokenCounts={tokenCounts}
-              onRegenerateNights={handleRegenerateWithNights}
-              onOpenWizard={openWizard}
-            />
+        {loading && <div className="rounded-xl border bg-white p-4">Loading…</div>}
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+            {error}
           </div>
         )}
 
@@ -184,42 +163,18 @@ export default function RosterSummary() {
 
         {activeTab === "coverage" && (
           <div className="space-y-4">
-            {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
-              <NightCallout
-                reason="not-generated"
-                tokenCounts={tokenCounts}
-                onRegenerateNights={handleRegenerateWithNights}
-                onOpenWizard={openWizard}
-              />
-            )}
             <CoverageStrip versionId={versionId} />
           </div>
         )}
 
         {activeTab === "teams" && (
           <div className="space-y-4">
-            {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
-              <NightCallout
-                reason="not-generated"
-                tokenCounts={tokenCounts}
-                onRegenerateNights={handleRegenerateWithNights}
-                onOpenWizard={openWizard}
-              />
-            )}
             <TeamLaneRoster versionId={versionId} />
           </div>
         )}
 
         {activeTab === "month" && (
           <div className="space-y-4">
-            {(!npLoading && !npError && !hasNight && Object.keys(tokenCounts).length > 0) && (
-              <NightCallout
-                reason="not-generated"
-                tokenCounts={tokenCounts}
-                onRegenerateNights={handleRegenerateWithNights}
-                onOpenWizard={openWizard}
-              />
-            )}
             <MonthlyScheduleTab
               versionId={versionId}
               siteTz={version?.timezone ?? "Europe/London"}

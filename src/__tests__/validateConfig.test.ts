@@ -1,28 +1,29 @@
-import { assertNightExpectations, validateRosterResults } from "@/utils/roster/validateConfig";
+import { nightExpectations, validateRosterResults } from "@/utils/roster/validateConfig";
 
-describe("assertNightExpectations", () => {
+describe("nightExpectations", () => {
   test("expects nights when shift system is 12h", () => {
-    const result = assertNightExpectations({ shiftSystem: "12h" });
+    const result = nightExpectations({ system: "12h" });
     expect(result.expectsNights).toBe(true);
   });
 
   test("expects nights when includeNights is true", () => {
-    const result = assertNightExpectations({ 
-      shiftSystem: "8h", 
+    const result = nightExpectations({ 
+      system: "8h", 
       includeNights: true 
     });
     expect(result.expectsNights).toBe(true);
   });
 
   test("expects nights when N requirement exists", () => {
-    const result = assertNightExpectations({ 
-      requiredByShift: { D: 2, N: 1 }
+    const result = nightExpectations({ 
+      system: "8h",
+      requiredByDay: { 0: { D: 2, N: 1 } }
     });
     expect(result.expectsNights).toBe(true);
   });
 
   test("does not expect nights for 8h system without flags", () => {
-    const result = assertNightExpectations({ shiftSystem: "8h" });
+    const result = nightExpectations({ system: "8h" });
     expect(result.expectsNights).toBe(false);
   });
 });

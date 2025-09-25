@@ -19,9 +19,9 @@ export function useRosterDebug(versionId: string | null) {
         console.log("useRosterDebug: fetching debug data for version", versionId);
         
         const [r, a, g] = await Promise.all([
-          supabase.rpc("rpc_requirements_token_counts", { version_id: versionId }),
-          supabase.rpc("rpc_version_token_counts", { version_id: versionId }),
-          supabase.rpc("rpc_night_gap", { version_id: versionId }),
+          (supabase as any).rpc("rpc_requirements_token_counts", { version_id: versionId }),
+          (supabase as any).rpc("rpc_version_token_counts", { version_id: versionId }),
+          (supabase as any).rpc("rpc_night_gap", { version_id: versionId }),
         ]);
         
         if (r.error) throw r.error; 
@@ -29,15 +29,15 @@ export function useRosterDebug(versionId: string | null) {
         if (g.error) throw g.error;
         
         const toObj = (rows: any[]) => 
-          rows.reduce((m, r) => ((m[r.token] = +r.cnt || 0), m), {} as Record<string, number>);
+          Array.isArray(rows) ? rows.reduce((m, r) => ((m[r.token] = +r.cnt || 0), m), {} as Record<string, number>) : {};
         
         if (!alive) return;
         
         set({ 
           loading: false, 
           error: null, 
-          req: toObj(r.data || []), 
-          asg: toObj(a.data || []), 
+          req: toObj(r.data), 
+          asg: toObj(a.data), 
           night: g.data as any 
         });
       } catch (e: any) { 
