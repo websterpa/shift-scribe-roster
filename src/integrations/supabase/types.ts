@@ -458,6 +458,7 @@ export type Database = {
       }
       site_settings: {
         Row: {
+          allow_supervisor_nights: boolean
           avg_staff_rate: number
           avg_supervisor_rate: number
           budget_warn_threshold: number | null
@@ -467,6 +468,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_supervisor_nights?: boolean
           avg_staff_rate?: number
           avg_supervisor_rate?: number
           budget_warn_threshold?: number | null
@@ -476,6 +478,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_supervisor_nights?: boolean
           avg_staff_rate?: number
           avg_supervisor_rate?: number
           budget_warn_threshold?: number | null
@@ -702,7 +705,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      patterns_legacy: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          site_id: string | null
+          tokens: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: never
+          id?: string | null
+          name?: string | null
+          site_id?: string | null
+          tokens?: never
+        }
+        Update: {
+          created_at?: string | null
+          description?: never
+          id?: string | null
+          name?: string | null
+          site_id?: string | null
+          tokens?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _hours_for_shift: {
