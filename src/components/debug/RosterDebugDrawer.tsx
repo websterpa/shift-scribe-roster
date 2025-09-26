@@ -1,8 +1,11 @@
 import React from "react";
 import { useRosterDebug } from "@/hooks/useRosterDebug";
 
-export default function RosterDebugDrawer({ versionId }: { versionId: string }) {
+export default function RosterDebugDrawer({ versionId }: { versionId?: string | null }) {
   const { loading, error, req, asg, night } = useRosterDebug(versionId);
+  
+  if (import.meta.env.PROD) return null;
+  if (!versionId) return null;
   
   const row = (t: string, o: Record<string, number>) => (
     <div className="text-xs">

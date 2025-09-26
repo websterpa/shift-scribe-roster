@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useRosterDebug(versionId: string | null) {
+export function useRosterDebug(versionId?: string | null) {
   const [state, set] = useState({
     loading: !!versionId, 
     error: null as string | null,
@@ -19,9 +19,9 @@ export function useRosterDebug(versionId: string | null) {
         console.log("useRosterDebug: fetching debug data for version", versionId);
         
         const [r, a, g] = await Promise.all([
-          (supabase as any).rpc("rpc_requirements_token_counts", { version_id: versionId }),
-          (supabase as any).rpc("rpc_version_token_counts", { version_id: versionId }),
-          (supabase as any).rpc("rpc_night_gap", { version_id: versionId }),
+          supabase.rpc("rpc_requirements_token_counts", { version_id: versionId }),
+          supabase.rpc("rpc_version_token_counts", { version_id: versionId }),
+          supabase.rpc("rpc_night_gap", { version_id: versionId }),
         ]);
         
         if (r.error) throw r.error; 
