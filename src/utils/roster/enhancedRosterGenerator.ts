@@ -35,8 +35,19 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
     includeNights: input.includeNights 
   });
   
+  // Night eligibility pool (site-configured supervisor rule)
+  const nightPool = input.staff.filter(s => 
+    s.is_active && 
+    (!s.role?.includes('supervisor') || input.allowSupervisorNights)
+  );
+  
   if (expects.expectsNights) {
     console.log("[G1] Nights expected, checking readiness");
+    
+    if (nightPool.length === 0) {
+      throw new Error("No eligible staff for Night shifts: all staff are supervisors and 'Allow supervisor nights' is disabled.");
+    }
+    
     const readiness = checkNightReadiness({
       system: input.system,
       staff: input.staff,
@@ -69,15 +80,14 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   }
 
   function assignShift(d: { dayIdx: number; token: string; need: number }) {
-    const dayDate = indexToDate(d.dayIdx);
+    const dayDate = indexToDate(d.dayIdx); // anchor to start day
     const { start, end, overnight } = resolveShiftWindow(d.token as any, input.siteStartHH || 6);
     
     for (let i = 0; i < d.need; i++) {
-      // Simple assignment logic - in real implementation would respect constraints
-      const availableStaff = input.staff.filter(s => 
+      // For Nights, use night-eligible pool; for others, use all active staff
+      const availableStaff = d.token === "N" ? nightPool : input.staff.filter(s => 
         s.is_active && 
-        (!s.eligible_shifts || s.eligible_shifts.length === 0 || s.eligible_shifts.includes(d.token)) &&
-        (d.token !== "N" || !s.role?.includes('supervisor') || input.allowSupervisorNights)
+        (!s.eligible_shifts || s.eligible_shifts.length === 0 || s.eligible_shifts.includes(d.token))
       );
 
       if (availableStaff.length === 0) {
@@ -90,7 +100,7 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
       result.push({
         version_id: input.versionId,
         staff_id: staff.id,
-        date: dayDate,
+        date: dayDate, // anchor to start day
         shift_code: d.token === "N" ? "Night" : d.token === "D" ? "Day" : d.token === "E" ? "Early" : "Late",
         shift_start: new Date(`${dayDate}T${start}`).toISOString(),
         shift_end: new Date(`${overnight ? indexToDate(d.dayIdx + 1) : dayDate}T${end}`).toISOString(),
@@ -111,20 +121,21 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   // 6) Hard assertion for night expectations
   if (expects.expectsNights && nightsGenerated === 0) {
     throw new Error(
-      "Night-enabled configuration produced 0 Night assignments. " +
-      "Likely causes: supervisor-night restriction, impossible rest windows, or pattern without 'N'."
+      "Night-enabled configuration produced 0 Night assignments — likely token drift or eligibility/shift-set bug."
     );
   }
+
+  const tokenCounts = result.reduce((acc, a) => {
+    const token = a.shift_code === "Night" ? "N" : a.shift_code === "Day" ? "D" : 
+                 a.shift_code === "Early" ? "E" : a.shift_code === "Late" ? "L" : "R";
+    acc[token] = (acc[token] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   console.log("[G2] Enhanced generator completed:", {
     totalAssignments: result.length,
     nightsGenerated,
-    tokenCounts: result.reduce((acc, a) => {
-      const token = a.shift_code === "Night" ? "N" : a.shift_code === "Day" ? "D" : 
-                   a.shift_code === "Early" ? "E" : "L";
-      acc[token] = (acc[token] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
+    tokenCounts
   });
 
   return { assignments: result, nightsGenerated };

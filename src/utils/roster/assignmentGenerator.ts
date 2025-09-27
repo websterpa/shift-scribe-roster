@@ -203,7 +203,10 @@ export function generateAssignments(
       const assignment: Assignment = {
         staff_id: staff.id,
         date: dateString,
-        shift_code: finalShiftCode === 'N' ? 'Night' : finalShiftCode,
+        shift_code: finalShiftCode === 'N' ? 'Night' : 
+                   finalShiftCode === 'D' ? 'Day' :
+                   finalShiftCode === 'E' ? 'Early' :
+                   finalShiftCode === 'L' ? 'Late' : finalShiftCode,
         shift_start: shiftDetails.shiftStart ? shiftDetails.shiftStart.toISOString() : null,
         shift_end: shiftDetails.shiftEnd ? shiftDetails.shiftEnd.toISOString() : null,
         hours: shiftDetails.hours,

@@ -4,15 +4,16 @@ export function buildDemand(
 ) {
   console.log("buildDemand: building demand for system", system, "with requirements", reqByDay);
   
-  // Fixed shift sets based on system
+  // Fixed shift sets based on system - ensure 12h includes D and N (no collapse)
   const shiftSet = system === "8h" ? (["E", "L", "N"] as const) : (["D", "N"] as const);
   
-  const list: { dayIdx: number; token: string; need: number }[] = [];
+  const list: { dayIdx: number; token: "D"|"N"|"E"|"L"; need: number }[] = [];
   
   Object.entries(reqByDay).forEach(([d, row]) => {
     shiftSet.forEach(t => { 
-      if ((row[t] ?? 0) > 0) {
-        list.push({ dayIdx: +d, token: t, need: row[t]! });
+      const v = Number(row[t] ?? 0);
+      if (v > 0) {
+        list.push({ dayIdx: Number(d), token: t, need: v });
       }
     });
   });

@@ -7,9 +7,18 @@ describe("buildDemand", () => {
     expect(out.map(x => x.token)).toEqual(expect.arrayContaining(["E", "L"]));
   });
 
-  test("12h includes Day and Night", () => {
+test("12h includes Day and Night", () => {
     const out = buildDemand("12h", { 0: { D: 2, N: 1 } });
     expect(out.map(x => x.token)).toEqual(expect.arrayContaining(["D", "N"]));
+    expect(out.some(x => x.token === "N")).toBe(true);
+    expect(out.some(x => x.token === "D")).toBe(true);
+  });
+
+  test("12h with zero D still includes N", () => {
+    const out = buildDemand("12h", { 0: { D: 0, N: 2 } });
+    expect(out.map(x => x.token)).toEqual(["N"]);
+    expect(out.filter(x => x.token === "N")).toHaveLength(1);
+    expect(out[0].need).toBe(2);
   });
 
   test("filters out zero demand", () => {

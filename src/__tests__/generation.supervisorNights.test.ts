@@ -78,4 +78,22 @@ describe("validateRosterResults", () => {
     
     expect(result.validated).toBe(true);
   });
+
+  test("12h system always expects nights", () => {
+    const result = nightExpectations({ 
+      system: "12h", 
+      requiredByDay: {}, 
+      includeNights: false 
+    });
+    expect(result.expectsNights).toBe(true);
+  });
+
+  test("8h system with N demand expects nights", () => {
+    const result = nightExpectations({ 
+      system: "8h", 
+      requiredByDay: { 0: { N: 1 }, 1: { N: 2 } }, 
+      includeNights: false 
+    });
+    expect(result.expectsNights).toBe(true);
+  });
 });
