@@ -1,9 +1,11 @@
 import { StaffMember, Assignment } from "@/types/roster";
 import { nightExpectations } from "./validateConfig";
 import { buildDemand } from "./buildDemand";
-import { resolveShiftWindow } from "./shiftWindows";
 import { checkNightReadiness } from "./nightReadinessCheck";
 import { assertShiftToken, ShiftToken } from "@/domain/shifts";
+import { respectsRestRules, ShiftWindowResolver } from "../restValidation";
+import { makeShiftWindowResolver } from "../shiftWindowResolver";
+import { ShiftCode, isWorkCode } from "../constraints";
 
 export interface GeneratorInput {
   system: "8h" | "12h";
@@ -72,6 +74,18 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   console.log("[G1] Processing nights first:", nights.length, "then others:", others.length);
 
   const result: Assignment[] = [];
+  
+  // Setup shift window resolver for rest validation
+  const resolveShiftWindow = makeShiftWindowResolver({
+    shiftSystem: input.system,
+    siteStartLocalTime: input.siteStartHH ? `${String(input.siteStartHH).padStart(2, '0')}:00` : '07:00',
+    timezone: 'Europe/London'
+  });
+
+  // Track last worked info for rest validation
+  const lastWorkedEndByStaff: Record<string, Date | null> = {};
+  const prevWorkedDateByStaff: Record<string, string | null> = {};
+  const prevWorkedCodeByStaff: Record<string, ShiftCode | null> = {};
 
   function indexToDate(dayIdx: number): string {
     const startDate = new Date(input.startDate);
@@ -80,16 +94,55 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
     return targetDate.toISOString().split('T')[0];
   }
 
+  function isEligibleForToken(staffId: string, token: string, dayISO: string): boolean {
+    const staff = input.staff.find(s => s.id === staffId);
+    if (!staff || !staff.is_active) return false;
+
+    // Check basic shift eligibility
+    if (staff.eligible_shifts && staff.eligible_shifts.length > 0) {
+      const shiftName = token === 'D' ? 'Day' : token === 'E' ? 'Early' : token === 'L' ? 'Late' : token === 'N' ? 'Night' : '';
+      if (shiftName && !staff.eligible_shifts.includes(shiftName)) return false;
+    }
+
+    // C) Special-case day 0 in rest checks - if no previous assignment, allow (subject to availability)
+    const prevEnd = lastWorkedEndByStaff[staffId];
+    const prevDateISO = prevWorkedDateByStaff[staffId];
+    const prevCode = prevWorkedCodeByStaff[staffId];
+    
+    if (!prevEnd || !prevDateISO || !prevCode) {
+      // ✅ First day of horizon: no previous assignment → allow (subject to availability)
+      return true;
+    }
+
+    // Use rest validation for subsequent days
+    return respectsRestRules(
+      prevEnd,
+      prevDateISO,
+      prevCode,
+      dayISO,
+      token as ShiftCode,
+      resolveShiftWindow
+    );
+  }
+
   function assignShift(d: { dayIdx: number; token: string; need: number }) {
     const dayDate = indexToDate(d.dayIdx); // anchor to start day
-    const { start, end, overnight } = resolveShiftWindow(d.token as any, input.siteStartHH || 6);
     
     for (let i = 0; i < d.need; i++) {
-      // For Nights, use night-eligible pool; for others, use all active staff
-      const availableStaff = d.token === "N" ? nightPool : input.staff.filter(s => 
+      // B) Confirm the function used for Day builds the full pool
+      // ✅ Day uses everyone; Night uses night-eligible pool
+      const dayPool = d.token === "N" ? nightPool : input.staff.filter(s => 
         s.is_active && 
         (!s.eligible_shifts || s.eligible_shifts.length === 0 || s.eligible_shifts.includes(d.token))
       );
+      
+      // A) Log the pool sizes right before picking on day 0
+      if (import.meta.env.DEV && d.dayIdx === 0) {
+        console.info(`[ELIG] day0 ${d.token} pool size`, dayPool.length, { dayISO: dayDate, token: d.token });
+      }
+
+      // Filter by rest eligibility
+      const availableStaff = dayPool.filter(s => isEligibleForToken(s.id, d.token, dayDate));
 
       if (availableStaff.length === 0) {
         throw new Error(`No available staff for ${d.token} shift on day ${d.dayIdx}. Check eligibility, constraints, or supervisor night rules.`);
@@ -102,13 +155,26 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
       const shiftToken = d.token as ShiftToken;
       assertShiftToken(shiftToken);
       
+      // Get shift window for timing
+      const shiftWindow = resolveShiftWindow(dayDate, shiftToken);
+      if (!shiftWindow) {
+        throw new Error(`Could not resolve shift window for ${shiftToken} on ${dayDate}`);
+      }
+      
+      // Update tracking for rest validation
+      if (isWorkCode(shiftToken)) {
+        lastWorkedEndByStaff[staff.id] = shiftWindow.end;
+        prevWorkedDateByStaff[staff.id] = dayDate;
+        prevWorkedCodeByStaff[staff.id] = shiftToken;
+      }
+      
       result.push({
         version_id: input.versionId,
         staff_id: staff.id,
         date: dayDate, // anchor to start day
         shift_code: shiftToken, // Write token directly
-        shift_start: new Date(`${dayDate}T${start}`).toISOString(),
-        shift_end: new Date(`${overnight ? indexToDate(d.dayIdx + 1) : dayDate}T${end}`).toISOString(),
+        shift_start: shiftWindow.start.toISOString(),
+        shift_end: shiftWindow.end.toISOString(),
         hours: d.token === "N" || d.token === "D" ? 12 : 8,
         cost: (d.token === "N" || d.token === "D" ? 12 : 8) * 18 // Simplified costing
       });
