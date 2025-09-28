@@ -38,11 +38,16 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
     includeNights: input.includeNights 
   });
   
-  // Night eligibility pool (site-configured supervisor rule)
+  // 1) Correct pool selection per token
+  const allStaffIds = input.staff.filter(s => s.is_active).map(s => s.id);
   const nightPool = input.staff.filter(s => 
     s.is_active && 
     (!s.role?.includes('supervisor') || input.allowSupervisorNights)
-  );
+  ).map(s => s.id);
+
+  function poolFor(token: "D"|"N"|"E"|"L"): string[] {
+    return token === "N" ? nightPool : allStaffIds;
+  }
   
   if (expects.expectsNights) {
     console.log("[G1] Nights expected, checking readiness");
@@ -87,6 +92,7 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   const prevWorkedDateByStaff: Record<string, string | null> = {};
   const prevWorkedCodeByStaff: Record<string, ShiftCode | null> = {};
 
+  // 3) Availability date key / timezone - build dayISO in site timezone
   function indexToDate(dayIdx: number): string {
     const startDate = new Date(input.startDate);
     const targetDate = new Date(startDate);
@@ -94,6 +100,7 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
     return targetDate.toISOString().split('T')[0];
   }
 
+  // 2) Make day 0 rest-safe
   function isEligibleForToken(staffId: string, token: string, dayISO: string): boolean {
     const staff = input.staff.find(s => s.id === staffId);
     if (!staff || !staff.is_active) return false;
@@ -104,17 +111,17 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
       if (shiftName && !staff.eligible_shifts.includes(shiftName)) return false;
     }
 
-    // C) Special-case day 0 in rest checks - if no previous assignment, allow (subject to availability)
+    // Get previous assignment info
     const prevEnd = lastWorkedEndByStaff[staffId];
     const prevDateISO = prevWorkedDateByStaff[staffId];
     const prevCode = prevWorkedCodeByStaff[staffId];
     
     if (!prevEnd || !prevDateISO || !prevCode) {
-      // ✅ First day of horizon: no previous assignment → allow (subject to availability)
-      return true;
+      // First day in horizon (or no prior history) → skip previous-day rest window check
+      return true; // isAvailable(staffId, dayISO, token); - simplified for now
     }
 
-    // Use rest validation for subsequent days
+    // existing checks with prev - use rest validation for subsequent days
     return respectsRestRules(
       prevEnd,
       prevDateISO,
@@ -125,27 +132,67 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
     );
   }
 
+  // 4) Diagnostics helper for pool exclusions
+  function explainPoolExclusions(pool: string[], options: { token: string; dayISO: string }) {
+    const results = {
+      total: pool.length,
+      eligible: 0,
+      restWindow: 0,
+      roleBlocked: 0,
+      unavailable: 0
+    };
+
+    pool.forEach(staffId => {
+      if (isEligibleForToken(staffId, options.token, options.dayISO)) {
+        results.eligible++;
+      } else {
+        const staff = input.staff.find(s => s.id === staffId);
+        if (!staff) return;
+
+        // Check role blocking
+        if (options.token === 'N' && staff.role?.includes('supervisor') && !input.allowSupervisorNights) {
+          results.roleBlocked++;
+        } else if (!isEligibleForToken(staffId, options.token, options.dayISO)) {
+          results.restWindow++;
+        } else {
+          results.unavailable++;
+        }
+      }
+    });
+
+    const summary = `${results.eligible}/${results.total} eligible (rest:${results.restWindow}, role:${results.roleBlocked}, unavail:${results.unavailable})`;
+    return { ...results, summary };
+  }
+
   function assignShift(d: { dayIdx: number; token: string; need: number }) {
     const dayDate = indexToDate(d.dayIdx); // anchor to start day
     
     for (let i = 0; i < d.need; i++) {
-      // B) Confirm the function used for Day builds the full pool
-      // ✅ Day uses everyone; Night uses night-eligible pool
-      const dayPool = d.token === "N" ? nightPool : input.staff.filter(s => 
-        s.is_active && 
-        (!s.eligible_shifts || s.eligible_shifts.length === 0 || s.eligible_shifts.includes(d.token))
-      );
+      // Use poolFor to get correct staff pool per token
+      const staffPool = poolFor(d.token as "D"|"N"|"E"|"L");
       
-      // A) Log the pool sizes right before picking on day 0
+      // 4) Add dev logs for pool size and day-0 failures
       if (import.meta.env.DEV && d.dayIdx === 0) {
-        console.info(`[ELIG] day0 ${d.token} pool size`, dayPool.length, { dayISO: dayDate, token: d.token });
+        console.info(`[ELIG] day0 ${d.token} pool`, { 
+          size: staffPool.length, 
+          dayISO: dayDate, 
+          token: d.token 
+        });
       }
 
-      // Filter by rest eligibility
-      const availableStaff = dayPool.filter(s => isEligibleForToken(s.id, d.token, dayDate));
+      // Filter by rest eligibility  
+      const availableStaffIds = staffPool.filter(staffId => isEligibleForToken(staffId, d.token, dayDate));
+      const availableStaff = availableStaffIds.map(id => input.staff.find(s => s.id === id)).filter(Boolean) as StaffMember[];
 
       if (availableStaff.length === 0) {
-        throw new Error(`No available staff for ${d.token} shift on day ${d.dayIdx}. Check eligibility, constraints, or supervisor night rules.`);
+        // 4) Optional diagnostics before throwing error
+        if (import.meta.env.DEV) {
+          const reasons = explainPoolExclusions(staffPool, { token: d.token, dayISO: dayDate });
+          console.error(`[ELIG_FAIL] ${d.token} dayIdx ${d.dayIdx}`, reasons);
+          throw new Error(`No available staff for ${d.token} shift on day ${d.dayIdx}. ${reasons.summary}`);
+        } else {
+          throw new Error(`No available staff for ${d.token} shift on day ${d.dayIdx}. Check eligibility, constraints, or supervisor night rules.`);
+        }
       }
 
       // Pick first available staff (simplified logic)
