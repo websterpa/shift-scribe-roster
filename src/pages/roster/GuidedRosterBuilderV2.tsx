@@ -15,7 +15,7 @@ import {
   validateRestRulesPreview,
   validateNightEligibility 
 } from '@/domain/invariants';
-import { assertShiftToken, LABEL_FROM_TOKEN } from '@/domain/shifts';
+import { assertShiftToken, LABEL_FROM_TOKEN, allowedTokens, LABEL } from '@/domain/shifts';
 import type { StaffMember } from '@/types/roster';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -421,50 +421,67 @@ export default function GuidedRosterBuilderV2() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent>
-                    {form.watch('system') === "8h" ? (
-                      <div className="grid grid-cols-4 gap-2 text-sm">
-                        <div className="font-medium">Day</div>
-                        <div className="font-medium text-center">Early</div>
-                        <div className="font-medium text-center">Late</div>
-                        <div className="font-medium text-center">Night</div>
-                        
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-                          <React.Fragment key={day}>
-                            <div className="font-medium">{day}</div>
-                            {['E', 'L', 'N'].map(token => (
-                              <Input
-                                key={`${idx}-${token}`}
-                                type="number"
-                                min="0"
-                                className="w-16"
-                                {...form.register(`staffing.${idx}.need.${token}` as any, { valueAsNumber: true })}
-                              />
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <div className="font-medium">Day</div>
-                        <div className="font-medium text-center">Day</div>
-                        <div className="font-medium text-center">Night</div>
-                        
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-                          <React.Fragment key={day}>
-                            <div className="font-medium">{day}</div>
-                            {['D', 'N'].map(token => (
-                              <Input
-                                key={`${idx}-${token}`}
-                                type="number"
-                                min="0"
-                                className="w-16"
-                                {...form.register(`staffing.${idx}.need.${token}` as any, { valueAsNumber: true })}
-                              />
-                            ))}
-                          </React.Fragment>
-                        ))}
+                    {/* Warning for supervisor nights */}
+                    {!form.watch('allowSupervisorNights') && (
+                      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                        <strong>Note:</strong> Supervisor nights are disabled at site level. You can still enter Night requirements; the generator will warn if no eligible staff are available.
                       </div>
                     )}
+                    
+                    {(() => {
+                      const system = form.watch('system');
+                      const tokens = allowedTokens(system);
+                      const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                      
+                      // Calculate debug totals
+                      const debugTotals = React.useMemo(() => {
+                        const totals: Record<string, number> = { D: 0, E: 0, L: 0, N: 0, R: 0, S: 0 };
+                        const staffingData = form.getValues('staffing');
+                        staffingData.forEach((d: any) => {
+                          tokens.forEach(t => {
+                            totals[t] += Number(d?.need?.[t] || 0);
+                          });
+                        });
+                        return totals;
+                      }, [form.watch('staffing'), tokens]);
+
+                      return (
+                        <div className="space-y-4">
+                          {/* Grid layout */}
+                          <div className={`grid gap-2 text-sm ${tokens.length === 2 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                            {/* Headers */}
+                            <div className="font-medium">Day</div>
+                            {tokens.map(token => (
+                              <div key={token} className="font-medium text-center">{LABEL[token]}</div>
+                            ))}
+                            
+                            {/* Rows for each day */}
+                            {DAYS.map((day, idx) => (
+                              <React.Fragment key={day}>
+                                <div className="font-medium">{day}</div>
+                                {tokens.map(token => (
+                                  <Input
+                                    key={`${idx}-${token}`}
+                                    type="number"
+                                    min="0"
+                                    className="w-16"
+                                    data-testid={`need-${idx}-${token}`}
+                                    {...form.register(`staffing.${idx}.need.${token}` as any, { valueAsNumber: true })}
+                                  />
+                                ))}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                          
+                          {/* Debug totals in development */}
+                          {import.meta.env.DEV && (
+                            <div className="text-xs text-slate-600 font-mono">
+                              Debug totals: {tokens.map(t => `${t}:${debugTotals[t]}`).join(' • ')}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </CollapsibleContent>
               </Collapsible>

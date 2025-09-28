@@ -14,6 +14,21 @@ export const LABEL_FROM_TOKEN: Record<ShiftToken, string> = {
   S: 'Sickness',
 };
 
+// Shorter label mapping for UI
+export const LABEL: Record<ShiftToken, string> = {
+  D: 'Day',
+  E: 'Early', 
+  L: 'Late',
+  N: 'Night',
+  R: 'Rest',
+  S: 'Sickness',
+};
+
+// Helper to get allowed tokens per system
+export function allowedTokens(system: '8h' | '12h'): ShiftToken[] {
+  return system === '12h' ? ['D', 'N'] : ['E', 'L', 'N'];
+}
+
 // Optional: normalize from various UI strings to tokens
 export function normalizeToToken(input: string): ShiftToken {
   const s = input.trim().toUpperCase();
