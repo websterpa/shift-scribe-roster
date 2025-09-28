@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { validateShiftSetConsistency, validateRestRulesPreview, validateNightEligibility } from '@/domain/invariants';
 import { DEFAULT_STAFFING_8H, DEFAULT_STAFFING_12H } from '@/domain/rosterSchema';
 
-describe('validateShiftSetConsistency', () => {
-  it('allows 8h system with E/L/N shifts', () => {
+describe("validateShiftSetConsistency", () => {
+  test("passes for 8h system with E/L/N shifts", () => {
     const input = {
       system: "8h" as const,
       staffing: DEFAULT_STAFFING_8H,
@@ -15,25 +15,11 @@ describe('validateShiftSetConsistency', () => {
       allowSupervisorNights: false
     };
 
-    expect(() => validateShiftSetConsistency(input)).not.toThrow();
+    const issues = validateShiftSetConsistency(input);
+    expect(issues).toHaveLength(0);
   });
 
-  it('allows 12h system with D/N shifts', () => {
-    const input = {
-      system: "12h" as const,
-      staffing: DEFAULT_STAFFING_12H,
-      pattern: "DDNN",
-      tz: "Europe/London",
-      siteStartHour: 6,
-      horizonWeeks: 17,
-      rates: { staff: 18, supervisor: 24, roleMixByShift: {}, budgetWarn: null },
-      allowSupervisorNights: false
-    };
-
-    expect(() => validateShiftSetConsistency(input)).not.toThrow();
-  });
-
-  it('rejects 8h system with D shifts', () => {
+  test("fails for 8h system with D shifts", () => {
     const input = {
       system: "8h" as const,
       staffing: [
@@ -48,10 +34,29 @@ describe('validateShiftSetConsistency', () => {
       allowSupervisorNights: false
     };
 
-    expect(() => validateShiftSetConsistency(input)).toThrow(/Inconsistent shift-set.*D.*not allowed for 8h/);
+    const issues = validateShiftSetConsistency(input);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("fatal");
+    expect(issues[0].message).toContain("D not allowed for 8h");
   });
 
-  it('rejects 12h system with E/L shifts', () => {
+  test("passes for 12h system with D/N shifts", () => {
+    const input = {
+      system: "12h" as const,
+      staffing: DEFAULT_STAFFING_12H,
+      pattern: "DDNN",
+      tz: "Europe/London",
+      siteStartHour: 6,
+      horizonWeeks: 17,
+      rates: { staff: 18, supervisor: 24, roleMixByShift: {}, budgetWarn: null },
+      allowSupervisorNights: false
+    };
+
+    const issues = validateShiftSetConsistency(input);
+    expect(issues).toHaveLength(0);
+  });
+
+  test("fails for 12h system with E/L shifts", () => {
     const input = {
       system: "12h" as const,
       staffing: [
@@ -66,28 +71,15 @@ describe('validateShiftSetConsistency', () => {
       allowSupervisorNights: false
     };
 
-    expect(() => validateShiftSetConsistency(input)).toThrow(/Inconsistent shift-set.*E,L.*not allowed for 12h/);
+    const issues = validateShiftSetConsistency(input);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("fatal");
+    expect(issues[0].message).toContain("E,L not allowed for 12h");
   });
 });
 
-describe('validateRestRulesPreview', () => {
-  it('detects potential day-to-night violations', () => {
-    const input = {
-      system: "12h" as const,
-      pattern: "DN", // Day immediately followed by Night
-      staffing: DEFAULT_STAFFING_12H,
-      tz: "Europe/London",
-      siteStartHour: 6,
-      horizonWeeks: 17,
-      rates: { staff: 18, supervisor: 24, roleMixByShift: {}, budgetWarn: null },
-      allowSupervisorNights: false
-    };
-
-    const result = validateRestRulesPreview(input);
-    expect(result.warnings).toContain(expect.stringContaining("D→N may violate 11h rest"));
-  });
-
-  it('allows patterns with rest days', () => {
+describe("validateRestRulesPreview", () => {
+  test("returns no issues for safe pattern", () => {
     const input = {
       system: "12h" as const,
       pattern: "DRNR", // Rest days between work
@@ -99,15 +91,15 @@ describe('validateRestRulesPreview', () => {
       allowSupervisorNights: false
     };
 
-    const result = validateRestRulesPreview(input);
-    expect(result.warnings).toHaveLength(0);
+    const issues = validateRestRulesPreview(input);
+    expect(issues).toHaveLength(0);
   });
 
-  it('detects 8h early-to-night violations', () => {
+  test("returns warning for D→N pattern", () => {
     const input = {
-      system: "8h" as const,
-      pattern: "EN", // Early followed by Night
-      staffing: DEFAULT_STAFFING_8H,
+      system: "12h" as const,
+      pattern: "DN", // Day immediately followed by Night
+      staffing: DEFAULT_STAFFING_12H,
       tz: "Europe/London",
       siteStartHour: 6,
       horizonWeeks: 17,
@@ -115,13 +107,33 @@ describe('validateRestRulesPreview', () => {
       allowSupervisorNights: false
     };
 
-    const result = validateRestRulesPreview(input);
-    expect(result.warnings).toContain(expect.stringContaining("E→N may violate 11h rest"));
+    const issues = validateRestRulesPreview(input);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("warning");
+    expect(issues[0].message).toContain("D→N may violate 11h rest");
+  });
+
+  test("returns warning for E→N pattern", () => {
+    const input = {
+      system: "8h" as const,
+      pattern: "EN", // Early followed by Night
+      staffing: DEFAULT_STAFFING_8H,
+      tz: "Europe/London",
+      siteStartHour: 6,
+      horizonWeeks: 17,  
+      rates: { staff: 18, supervisor: 24, roleMixByShift: {}, budgetWarn: null },
+      allowSupervisorNights: false
+    };
+
+    const issues = validateRestRulesPreview(input);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("warning");
+    expect(issues[0].message).toContain("E→N may violate 11h rest");
   });
 });
 
-describe('validateNightEligibility', () => {
-  it('returns eligible when no nights required', () => {
+describe("validateNightEligibility", () => {
+  test("returns no issues when no nights required", () => {
     const input = {
       system: "8h" as const,
       pattern: "ELR", // No nights
@@ -134,12 +146,11 @@ describe('validateNightEligibility', () => {
     };
 
     const staffList = [{ role: "Supervisor" }];
-    const result = validateNightEligibility(input, staffList);
-    expect(result.eligible).toBe(true);
-    expect(result.warnings).toHaveLength(0);
+    const issues = validateNightEligibility(input, staffList);
+    expect(issues).toHaveLength(0);
   });
 
-  it('detects when nights required but no eligible staff', () => {
+  test("returns fatal error when nights required but no eligible staff", () => {
     const input = {
       system: "12h" as const,
       pattern: "DN",
@@ -152,12 +163,30 @@ describe('validateNightEligibility', () => {
     };
 
     const staffList = [{ role: "Supervisor" }, { role: "Supervisor" }]; // All supervisors
-    const result = validateNightEligibility(input, staffList);
-    expect(result.eligible).toBe(false);
-    expect(result.warnings).toContain(expect.stringContaining("No staff eligible for Night shifts"));
+    const issues = validateNightEligibility(input, staffList);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("fatal");
+    expect(issues[0].message).toContain("No staff eligible for Night shifts");
   });
 
-  it('allows supervisors when setting enabled', () => {
+  test("returns no issues when nights required and eligible staff available", () => {
+    const input = {
+      system: "12h" as const,
+      pattern: "DN",
+      staffing: DEFAULT_STAFFING_12H,
+      tz: "Europe/London",
+      siteStartHour: 6,
+      horizonWeeks: 17,
+      rates: { staff: 18, supervisor: 24, roleMixByShift: {}, budgetWarn: null },
+      allowSupervisorNights: false
+    };
+
+    const staffList = [{ role: "Supervisor" }, { role: "Staff" }];
+    const issues = validateNightEligibility(input, staffList);
+    expect(issues).toHaveLength(0);
+  });
+
+  test("returns no issues when supervisor nights allowed", () => {
     const input = {
       system: "12h" as const,
       pattern: "DN",
@@ -170,12 +199,11 @@ describe('validateNightEligibility', () => {
     };
 
     const staffList = [{ role: "Supervisor" }, { role: "Supervisor" }];
-    const result = validateNightEligibility(input, staffList);
-    expect(result.eligible).toBe(true);
-    expect(result.warnings).toHaveLength(0);
+    const issues = validateNightEligibility(input, staffList);
+    expect(issues).toHaveLength(0);
   });
 
-  it('detects nights from pattern', () => {
+  test("detects nights from pattern", () => {
     const input = {
       system: "8h" as const,
       pattern: "EELNRR", // Contains N
@@ -188,7 +216,9 @@ describe('validateNightEligibility', () => {
     };
 
     const staffList = [{ role: "Supervisor" }];
-    const result = validateNightEligibility(input, staffList);
-    expect(result.eligible).toBe(false); // Pattern has N but no eligible staff
+    const issues = validateNightEligibility(input, staffList);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].level).toBe("fatal");
+    expect(issues[0].message).toContain("No staff eligible for Night shifts");
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
@@ -13,7 +13,8 @@ import {
 import { 
   validateShiftSetConsistency, 
   validateRestRulesPreview,
-  validateNightEligibility 
+  validateNightEligibility,
+  type ValidationIssue
 } from '@/domain/invariants';
 import { assertShiftToken, LABEL_FROM_TOKEN, allowedTokens, LABEL } from '@/domain/shifts';
 import type { StaffMember } from '@/types/roster';
@@ -42,7 +43,8 @@ export default function GuidedRosterBuilderV2() {
   const [previewData, setPreviewData] = useState<PreviewData>({});
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
+  const [ackWarnings, setAckWarnings] = useState(false);
   const [openSections, setOpenSections] = useState({
     basics: true,
     pattern: true,
@@ -162,22 +164,24 @@ export default function GuidedRosterBuilderV2() {
 
   const validateInputs = () => {
     const values = form.getValues();
-    const newWarnings: string[] = [];
+    const allIssues: ValidationIssue[] = [];
 
-    try {
-      validateShiftSetConsistency(values);
-    } catch (error) {
-      newWarnings.push(error instanceof Error ? error.message : "Shift set validation failed");
-    }
+    // Collect all validation issues
+    allIssues.push(...validateShiftSetConsistency(values));
+    allIssues.push(...validateRestRulesPreview(values));
+    allIssues.push(...validateNightEligibility(values, staffList));
 
-    const restValidation = validateRestRulesPreview(values);
-    newWarnings.push(...restValidation.warnings);
-
-    const nightValidation = validateNightEligibility(values, staffList);
-    newWarnings.push(...nightValidation.warnings);
-
-    setWarnings(newWarnings);
+    setValidationIssues(allIssues);
   };
+
+  // Split issues into warnings and fatal errors
+  const warnings = validationIssues.filter(issue => issue.level === "warning");
+  const fatalErrors = validationIssues.filter(issue => issue.level === "fatal");
+
+  // Reset acknowledgment when warnings change
+  useEffect(() => {
+    setAckWarnings(false);
+  }, [JSON.stringify(warnings)]);
 
   const handleGenerate = async () => {
     const values = form.getValues();
@@ -185,11 +189,13 @@ export default function GuidedRosterBuilderV2() {
     try {
       setIsGenerating(true);
       
-      // Final validation
-      validateShiftSetConsistency(values);
-      const nightValidation = validateNightEligibility(values, staffList);
-      if (!nightValidation.eligible) {
-        throw new Error(nightValidation.warnings[0]);
+      // Final validation - check for fatal errors only
+      const shiftSetIssues = validateShiftSetConsistency(values);
+      const nightIssues = validateNightEligibility(values, staffList);
+      const allFatalErrors = [...shiftSetIssues, ...nightIssues].filter(issue => issue.level === "fatal");
+      
+      if (allFatalErrors.length > 0) {
+        throw new Error(allFatalErrors[0].message);
       }
 
       // Create roster configuration
@@ -280,7 +286,12 @@ export default function GuidedRosterBuilderV2() {
     }
   };
 
-  const canGenerate = warnings.length === 0 && !isLoadingPreview;
+  const canGenerate = useMemo(() => {
+    if (fatalErrors.length > 0) return false;
+    if (warnings.length > 0 && !ackWarnings) return false;
+    if (isLoadingPreview || isGenerating) return false;
+    return true;
+  }, [fatalErrors.length, warnings.length, ackWarnings, isLoadingPreview, isGenerating]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
@@ -588,14 +599,41 @@ export default function GuidedRosterBuilderV2() {
               </CardContent>
             </Card>
 
-            {/* Warnings */}
+            {/* Validation Issues */}
             {warnings.length > 0 && (
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="space-y-3">
+                    {warnings.map((warning, idx) => (
+                      <div key={idx} className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">
+                        {warning.message}
+                      </div>
+                    ))}
+                    <label className="flex items-start gap-2 text-sm mt-1">
+                      <Checkbox
+                        checked={ackWarnings}
+                        onCheckedChange={(checked) => setAckWarnings(checked === true)}
+                        data-testid="ack-warnings"
+                      />
+                      <span>
+                        I acknowledge this warning and wish to continue.
+                      </span>
+                    </label>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Fatal Errors */}
+            {fatalErrors.length > 0 && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <div className="space-y-1">
-                    {warnings.map((warning, idx) => (
-                      <div key={idx}>{warning}</div>
+                  <div className="space-y-2">
+                    {fatalErrors.map((error, idx) => (
+                      <div key={idx} className="text-sm text-red-800 bg-red-100 border border-red-300 rounded px-2 py-1">
+                        {error.message}
+                      </div>
                     ))}
                   </div>
                 </AlertDescription>
@@ -623,9 +661,9 @@ export default function GuidedRosterBuilderV2() {
                     </>
                   )}
                 </Button>
-                {canGenerate && (
-                  <p className="text-sm text-center text-slate-600 mt-2">
-                    Ready to generate with {staffList.length} staff members
+                {!canGenerate && warnings.length > 0 && !ackWarnings && fatalErrors.length === 0 && (
+                  <p className="text-xs text-slate-500 mt-1 text-center">
+                    Tick the checkbox above to proceed despite warnings.
                   </p>
                 )}
               </CardContent>
