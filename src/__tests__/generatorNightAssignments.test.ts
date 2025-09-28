@@ -53,7 +53,7 @@ describe('Generator Night Assignments', () => {
     );
 
     expect(assignments).toHaveLength(1);
-    expect(assignments[0].shift_code).toBe('Night');
+    expect(assignments[0].shift_code).toBe('N'); // Now using token
     expect(assignments[0].staff_id).toBe('staff1');
   });
 
@@ -77,7 +77,7 @@ describe('Generator Night Assignments', () => {
     
     // Both should be Night shifts
     assignments.forEach(assignment => {
-      expect(assignment.shift_code).toBe('Night');
+      expect(assignment.shift_code).toBe('N'); // Now using token
     });
   });
 
@@ -95,7 +95,7 @@ describe('Generator Night Assignments', () => {
     );
 
     const nightAssignment = assignments[0];
-    expect(nightAssignment.shift_code).toBe('Night');
+    expect(nightAssignment.shift_code).toBe('N'); // Now using token
     
     // Check that shift_start and shift_end are present for night shifts
     expect(nightAssignment.shift_start).toBeTruthy();

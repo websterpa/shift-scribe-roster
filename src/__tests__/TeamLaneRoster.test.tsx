@@ -87,7 +87,7 @@ test("normalizes readable shift names to tokens", async () => {
                   },
                   {
                     date: "2025-09-21", 
-                    shift_code: "Night", // readable name from DB
+                    shift_code: "N", // token from DB
                     staff_id: "s1",
                     shift_start: "2025-09-21T19:00:00Z",
                     shift_end: "2025-09-22T07:00:00Z",

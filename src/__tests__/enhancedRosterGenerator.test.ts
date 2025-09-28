@@ -42,8 +42,8 @@ describe("generateRosterEnhanced", () => {
     expect(result.assignments).toHaveLength(4); // 2 days * 2 shifts
     expect(result.nightsGenerated).toBe(2);
     
-    // Check that nights were generated
-    const nightShifts = result.assignments.filter(a => a.shift_code === "Night");
+    // Check that nights were generated (using token 'N')
+    const nightShifts = result.assignments.filter(a => a.shift_code === "N");
     expect(nightShifts).toHaveLength(2);
   });
 
@@ -66,7 +66,7 @@ describe("generateRosterEnhanced", () => {
     expect(result.nightsGenerated).toBe(1);
     
     const shiftCodes = result.assignments.map(a => a.shift_code).sort();
-    expect(shiftCodes).toEqual(["Early", "Late", "Night"]);
+    expect(shiftCodes).toEqual(["E", "L", "N"]); // Now using tokens
   });
 
   test("throws error when no eligible staff for nights", () => {

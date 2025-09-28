@@ -91,14 +91,14 @@ describe("generateRosterEnhanced - 12h Nights", () => {
     expect(result.assignments.length).toBeGreaterThan(0);
     expect(result.nightsGenerated).toBeGreaterThan(0);
     
-    // Verify we have Night assignments
-    const nightAssignments = result.assignments.filter(a => a.shift_code === "Night");
+    // Verify we have Night assignments (now using token 'N')
+    const nightAssignments = result.assignments.filter(a => a.shift_code === "N");
     expect(nightAssignments.length).toBe(5); // 2+1+2 = 5 total Night assignments expected
 
     // Verify Night assignments are anchored to start day
     nightAssignments.forEach(assignment => {
       expect(assignment.date).toMatch(/^2025-09-1[0-2]$/); // Should be within our date range
-      expect(assignment.shift_code).toBe("Night");
+      expect(assignment.shift_code).toBe("N"); // Now using token
     });
   });
 
@@ -146,7 +146,7 @@ describe("generateRosterEnhanced - 12h Nights", () => {
     const result = generateRosterEnhanced(input);
 
     expect(result.nightsGenerated).toBe(1);
-    expect(result.assignments.some(a => a.shift_code === "Night")).toBe(true);
+    expect(result.assignments.some(a => a.shift_code === "N")).toBe(true);
   });
 
   test("12h: mixed D/N demand preserves both tokens", () => {
@@ -169,8 +169,8 @@ describe("generateRosterEnhanced - 12h Nights", () => {
 
     const result = generateRosterEnhanced(input);
 
-    const dayAssignments = result.assignments.filter(a => a.shift_code === "Day");
-    const nightAssignments = result.assignments.filter(a => a.shift_code === "Night");
+    const dayAssignments = result.assignments.filter(a => a.shift_code === "D");
+    const nightAssignments = result.assignments.filter(a => a.shift_code === "N");
 
     expect(dayAssignments.length).toBe(3); // 1+2+0 = 3
     expect(nightAssignments.length).toBe(3); // 1+0+2 = 3

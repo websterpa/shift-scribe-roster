@@ -7,6 +7,7 @@ import { ShiftCode } from "../constraints";
 import { makeShiftWindowResolver, OTOptions } from "@/utils/shiftWindowResolver";
 import { shiftCost, durationHours } from "@/utils/costing";
 import { respectsRestRules } from "../restValidation";
+import { assertShiftToken } from "@/domain/shifts";
 
 const logger = createLogger('AssignmentGenerator');
 
@@ -200,13 +201,13 @@ export function generateAssignments(
         return;
       }
 
+      // Ensure token is valid before insert
+      assertShiftToken(finalShiftCode);
+      
       const assignment: Assignment = {
         staff_id: staff.id,
         date: dateString,
-        shift_code: finalShiftCode === 'N' ? 'Night' : 
-                   finalShiftCode === 'D' ? 'Day' :
-                   finalShiftCode === 'E' ? 'Early' :
-                   finalShiftCode === 'L' ? 'Late' : finalShiftCode,
+        shift_code: finalShiftCode, // Use token directly
         shift_start: shiftDetails.shiftStart ? shiftDetails.shiftStart.toISOString() : null,
         shift_end: shiftDetails.shiftEnd ? shiftDetails.shiftEnd.toISOString() : null,
         hours: shiftDetails.hours,

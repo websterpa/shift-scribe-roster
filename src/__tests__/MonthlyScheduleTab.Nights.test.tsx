@@ -11,8 +11,8 @@ jest.mock("@/integrations/supabase/client", () => ({
           gte: () => ({
             lte: () => Promise.resolve({
               data: [
-                // DB returns readable names that should normalize to tokens
-                { date: "2025-09-20", shift_code: "Night", staff_id: "s1", shift_start: "2025-09-20T19:00:00Z", shift_end: "2025-09-21T07:00:00Z" },
+                // DB now stores tokens directly
+                { date: "2025-09-20", shift_code: "N", staff_id: "s1", shift_start: "2025-09-20T19:00:00Z", shift_end: "2025-09-21T07:00:00Z" },
               ],
               error: null
             })

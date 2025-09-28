@@ -3,6 +3,7 @@ import { nightExpectations } from "./validateConfig";
 import { buildDemand } from "./buildDemand";
 import { resolveShiftWindow } from "./shiftWindows";
 import { checkNightReadiness } from "./nightReadinessCheck";
+import { assertShiftToken, ShiftToken } from "@/domain/shifts";
 
 export interface GeneratorInput {
   system: "8h" | "12h";
@@ -97,11 +98,15 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
       // Pick first available staff (simplified logic)
       const staff = availableStaff[i % availableStaff.length];
       
+      // Use token directly as shift_code to satisfy DB CHECK constraint
+      const shiftToken = d.token as ShiftToken;
+      assertShiftToken(shiftToken);
+      
       result.push({
         version_id: input.versionId,
         staff_id: staff.id,
         date: dayDate, // anchor to start day
-        shift_code: d.token === "N" ? "Night" : d.token === "D" ? "Day" : d.token === "E" ? "Early" : "Late",
+        shift_code: shiftToken, // Write token directly
         shift_start: new Date(`${dayDate}T${start}`).toISOString(),
         shift_end: new Date(`${overnight ? indexToDate(d.dayIdx + 1) : dayDate}T${end}`).toISOString(),
         hours: d.token === "N" || d.token === "D" ? 12 : 8,
@@ -116,7 +121,7 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   // 5) Then assign others  
   others.forEach(assignShift);
 
-  const nightsGenerated = result.filter(a => a.shift_code === "Night").length;
+  const nightsGenerated = result.filter(a => a.shift_code === "N").length;
 
   // 6) Hard assertion for night expectations
   if (expects.expectsNights && nightsGenerated === 0) {
@@ -126,8 +131,8 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   }
 
   const tokenCounts = result.reduce((acc, a) => {
-    const token = a.shift_code === "Night" ? "N" : a.shift_code === "Day" ? "D" : 
-                 a.shift_code === "Early" ? "E" : a.shift_code === "Late" ? "L" : "R";
+    // shift_code is now already a token
+    const token = a.shift_code;
     acc[token] = (acc[token] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);

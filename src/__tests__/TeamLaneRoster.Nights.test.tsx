@@ -10,8 +10,8 @@ jest.mock("@/integrations/supabase/client", () => ({
         eq: () => Promise.resolve({
           data: [
             // DB returns readable names
-            { date: "2025-09-20", shift_code: "Day", staff_id: "s1", shift_start: "2025-09-20T07:00:00Z", shift_end: "2025-09-20T19:00:00Z", hours: 12 },
-            { date: "2025-09-20", shift_code: "Night", staff_id: "s1", shift_start: "2025-09-20T19:00:00Z", shift_end: "2025-09-21T07:00:00Z", hours: 12 },
+            { date: "2025-09-20", shift_code: "D", staff_id: "s1", shift_start: "2025-09-20T07:00:00Z", shift_end: "2025-09-20T19:00:00Z", hours: 12 },
+            { date: "2025-09-20", shift_code: "N", staff_id: "s1", shift_start: "2025-09-20T19:00:00Z", shift_end: "2025-09-21T07:00:00Z", hours: 12 },
           ],
           error: null
         })

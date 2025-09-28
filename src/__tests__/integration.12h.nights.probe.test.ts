@@ -52,10 +52,10 @@ describe("12h Nights Database Integration Probes", () => {
 });
 
 describe("Token Mapping Logic Tests", () => {
-  test("shift_code Night maps to token N", () => {
+  test("shift_code N maps to token N", () => {
     const mockAssignments = [
-      { shift_code: "Night", token: undefined },
-      { shift_code: "Day", token: undefined },
+      { shift_code: "N", token: undefined },
+      { shift_code: "D", token: undefined },
       { shift_code: "Early", token: undefined },
       { shift_code: "Late", token: undefined },
       { shift_code: "Rest", token: undefined }
@@ -63,14 +63,14 @@ describe("Token Mapping Logic Tests", () => {
 
     const tokenized = mockAssignments.map(a => ({
       ...a,
-      token: a.shift_code === "Night" ? "N" :
-             a.shift_code === "Day" ? "D" :
+      token: a.shift_code === "N" ? "N" :
+             a.shift_code === "D" ? "D" :
              a.shift_code === "Early" ? "E" :
              a.shift_code === "Late" ? "L" : "R"
     }));
 
-    expect(tokenized.find(a => a.shift_code === "Night")?.token).toBe("N");
-    expect(tokenized.find(a => a.shift_code === "Day")?.token).toBe("D");
+    expect(tokenized.find(a => a.shift_code === "N")?.token).toBe("N");
+    expect(tokenized.find(a => a.shift_code === "D")?.token).toBe("D");
     expect(tokenized.filter(a => a.token === "N")).toHaveLength(1);
   });
 
