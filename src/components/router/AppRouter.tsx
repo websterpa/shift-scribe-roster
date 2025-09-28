@@ -28,8 +28,10 @@ import PrivacyPage from '@/pages/PrivacyPage';
 import PatternManagement from '@/pages/PatternManagement';
 import HelpSupport from '@/pages/HelpSupport';
 import Wizard from '@/pages/Wizard';
+import LegacyWizardDeprecated from '@/pages/LegacyWizardDeprecated';
 import RosterSummary from '@/pages/RosterSummary';
 import LegacyCreateRoster from '@/pages/LegacyCreateRoster';
+import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient({
@@ -75,8 +77,9 @@ export function AppRouter() {
               <Route path="help" element={<HelpSupport />} />
               <Route path="patterns" element={<PatternManagement />} />
               <Route path="roster/create" element={<LegacyCreateRoster />} />
+              <Route path="roster/builder" element={<GuidedRosterBuilderV2 />} />
             <Route path="roster/summary" element={<RosterSummary />} />
-            <Route path="wizard" element={<Wizard />} />
+            <Route path="wizard" element={<LegacyWizardDeprecated />} />
             </Route>
             
             {/* 404 route */}
