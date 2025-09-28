@@ -421,22 +421,17 @@ export default function GuidedRosterBuilderV2() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent>
-                    <div className="grid grid-cols-7 gap-2 text-sm">
-                      <div className="font-medium">Day</div>
-                      {form.watch('system') === "8h" ? 
-                        ['Early', 'Late', 'Night'].map(label => (
-                          <div key={label} className="font-medium text-center">{label}</div>
-                        )) :
-                        ['Day', 'Night'].map(label => (
-                          <div key={label} className="font-medium text-center">{label}</div>
-                        ))
-                      }
-                      
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-                        <React.Fragment key={day}>
-                          <div className="font-medium">{day}</div>
-                          {form.watch('system') === "8h" ? 
-                            ['E', 'L', 'N'].map(token => (
+                    {form.watch('system') === "8h" ? (
+                      <div className="grid grid-cols-4 gap-2 text-sm">
+                        <div className="font-medium">Day</div>
+                        <div className="font-medium text-center">Early</div>
+                        <div className="font-medium text-center">Late</div>
+                        <div className="font-medium text-center">Night</div>
+                        
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+                          <React.Fragment key={day}>
+                            <div className="font-medium">{day}</div>
+                            {['E', 'L', 'N'].map(token => (
                               <Input
                                 key={`${idx}-${token}`}
                                 type="number"
@@ -444,8 +439,20 @@ export default function GuidedRosterBuilderV2() {
                                 className="w-16"
                                 {...form.register(`staffing.${idx}.need.${token}` as any, { valueAsNumber: true })}
                               />
-                            )) :
-                            ['D', 'N'].map(token => (
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="font-medium">Day</div>
+                        <div className="font-medium text-center">Day</div>
+                        <div className="font-medium text-center">Night</div>
+                        
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+                          <React.Fragment key={day}>
+                            <div className="font-medium">{day}</div>
+                            {['D', 'N'].map(token => (
                               <Input
                                 key={`${idx}-${token}`}
                                 type="number"
@@ -453,11 +460,11 @@ export default function GuidedRosterBuilderV2() {
                                 className="w-16"
                                 {...form.register(`staffing.${idx}.need.${token}` as any, { valueAsNumber: true })}
                               />
-                            ))
-                          }
-                        </React.Fragment>
-                      ))}
-                    </div>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </CollapsibleContent>
               </Collapsible>
