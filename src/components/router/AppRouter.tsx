@@ -10,6 +10,7 @@ import PricingPage from '@/pages/PricingPage';
 import AuthPage from '@/pages/AuthPage';
 import Dashboard from '@/pages/Dashboard';
 import Staff from '@/pages/Staff';
+import { MonthlyPage } from '@/features/roster/monthly/MonthlyPage';
 import RosterConfig from '@/pages/RosterConfig';
 import GenerateRoster from '@/pages/GenerateRoster';
 import GenerateRosterPanel from '@/components/GenerateRosterPanel';
@@ -78,8 +79,9 @@ export function AppRouter() {
               <Route path="patterns" element={<PatternManagement />} />
               <Route path="roster/create" element={<LegacyCreateRoster />} />
               <Route path="roster/builder" element={<GuidedRosterBuilderV2 />} />
-            <Route path="roster/summary" element={<RosterSummary />} />
-            <Route path="wizard" element={<LegacyWizardDeprecated />} />
+              <Route path="roster/summary" element={<RosterSummary />} />
+              <Route path="roster/monthly" element={<MonthlyPage />} />
+              <Route path="wizard" element={<LegacyWizardDeprecated />} />
             </Route>
             
             {/* 404 route */}
