@@ -94,23 +94,55 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
 
   if (cfgErr) throw new Error(`Failed to load roster_config for version ${rosterVersionId}: ${cfgErr.message}`);
 
-  const reqJson = (cfg?.staffing_requirements ?? null) as { days?: RequirementsByDate } | null;
-  if (!reqJson || !reqJson.days) {
+  const reqJson = cfg?.staffing_requirements;
+  if (!reqJson) {
     throw new Error(`No staffing_requirements JSON found for version ${rosterVersionId}`);
   }
 
-  // Flatten & filter by month
+  // Handle both formats: new "days" format and legacy day-of-week format
   const requirements: Requirement[] = [];
-  for (const [dateISO, list] of Object.entries(reqJson.days)) {
-    if (!dateISO.startsWith(monthISO)) continue;
-    for (const r of list) {
-      requirements.push({
-        role_id: r.role_id,
-        site_id: r.site_id,
-        start: r.start,
-        end: r.end,
-        needed: Math.max(1, Number(r.needed ?? 1)),
-      });
+  
+  if ((reqJson as any).days) {
+    // New format: {"days": {"2025-09-01": [requirements]}}
+    const days = (reqJson as any).days;
+    for (const [dateISO, list] of Object.entries(days)) {
+      if (!dateISO.startsWith(monthISO)) continue;
+      if (Array.isArray(list)) {
+        for (const r of list) {
+          requirements.push({
+            role_id: (r as any).role_id,
+            site_id: (r as any).site_id || "SITE1",
+            start: (r as any).start,
+            end: (r as any).end,
+            needed: Math.max(1, Number((r as any).needed ?? 1)),
+          });
+        }
+      }
+    }
+  } else {
+    // Legacy format: {"0": {"D": 2, "N": 1}, ...} where keys are day-of-week
+    const startDate = new Date(`${monthISO}-01`);
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    
+    for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+      const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
+      const dayKey = String(dayOfWeek);
+      const dayReqs = (reqJson as any)[dayKey];
+      
+      if (dayReqs && typeof dayReqs === 'object') {
+        for (const [shiftCode, count] of Object.entries(dayReqs)) {
+          if (typeof count === 'number' && count > 0) {
+            const { start, end } = getShiftTimes(date, shiftCode);
+            requirements.push({
+              role_id: shiftCode,
+              site_id: "SITE1",
+              start: start.toISOString(),
+              end: end.toISOString(),
+              needed: count,
+            });
+          }
+        }
+      }
     }
   }
   if (requirements.length === 0) {
@@ -263,6 +295,41 @@ function getShiftCodeFromTimes(start: Date, end: Date): string {
   if (hour >= 6 && hour < 10) return 'E'; // Early shift
   
   return 'D'; // Default fallback
+}
+
+/**
+ * Helper to convert shift codes to actual times for legacy format
+ * TODO: Make this configurable based on site settings
+ */
+function getShiftTimes(date: Date, shiftCode: string): { start: Date; end: Date } {
+  const start = new Date(date);
+  const end = new Date(date);
+  
+  switch (shiftCode) {
+    case 'D': // Day shift
+      start.setHours(8, 0, 0, 0);
+      end.setHours(16, 0, 0, 0);
+      break;
+    case 'E': // Early shift  
+      start.setHours(6, 0, 0, 0);
+      end.setHours(14, 0, 0, 0);
+      break;
+    case 'L': // Late shift
+      start.setHours(14, 0, 0, 0);
+      end.setHours(22, 0, 0, 0);
+      break;
+    case 'N': // Night shift
+      start.setHours(22, 0, 0, 0);
+      end.setDate(end.getDate() + 1); // Next day
+      end.setHours(6, 0, 0, 0);
+      break;
+    default:
+      // Default to day shift
+      start.setHours(8, 0, 0, 0);
+      end.setHours(16, 0, 0, 0);
+  }
+  
+  return { start, end };
 }
 
 /**
