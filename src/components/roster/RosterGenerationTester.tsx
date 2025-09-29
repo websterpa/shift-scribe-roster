@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { generateRoster, getDefaultRatePolicy, getDefaultRestRules } from "@/utils/roster/rosterGeneration";
+import { generateRoster, getDefaultRatePolicy, getDefaultRestRules, getDefaultGeneratorConfig } from "@/utils/roster/rosterGeneration";
 import { toast } from "sonner";
 
 export function RosterGenerationTester() {
@@ -31,6 +31,7 @@ export function RosterGenerationTester() {
         ratePolicy: getDefaultRatePolicy(),
         restRules: getDefaultRestRules(),
         holidays: [],
+        config: getDefaultGeneratorConfig(),
       });
 
       console.log("✅ Generation completed:", summary);

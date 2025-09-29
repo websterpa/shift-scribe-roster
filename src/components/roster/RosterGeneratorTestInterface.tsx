@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { generateRoster, getDefaultRatePolicy, getDefaultRestRules } from '@/utils/roster/rosterGeneration';
+import { generateRoster, getDefaultRatePolicy, getDefaultRestRules, getDefaultGeneratorConfig } from '@/utils/roster/rosterGeneration';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -119,7 +119,7 @@ export function RosterGeneratorTestInterface() {
         holidays: [
           { dateISO: '2025-09-15', isPublicHoliday: true }
         ],
-        // Let it use synthetic staff if no real staff available
+        config: getDefaultGeneratorConfig(),
       });
       
       setResult(summary);

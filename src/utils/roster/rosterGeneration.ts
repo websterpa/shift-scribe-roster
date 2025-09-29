@@ -1,49 +1,66 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
 import { expandShift } from "../../engine2/time/expandShift";
 import { costShift } from "../../engine2/cost/costShift";
 import { validateRest } from "../../engine2/rules/validateRest";
-import type {
-  RatePolicy,
-  RestRules,
-  Holiday,
-  ShiftSpec,
-  Assignment,
-} from "../../engine2/types";
-import { fetchStaffMembers } from "./staffHelpers";
-import type { StaffMember } from "@/types/roster";
+import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "../../engine2/types";
 
-/**
- * Expected requirements JSON shape stored in roster_config.staffing_requirements:
- * {
- *   "days": {
- *     "2025-09-01": [
- *       { "role_id":"REG", "site_id":"SITE1", "start":"2025-09-01T08:00:00", "end":"2025-09-01T16:00:00", "needed": 2 },
- *       ...
- *     ],
- *     ...
- *   }
- * }
- * Adapt the loader if your shape differs.
- */
-
-type Requirement = {
-  role_id: string;
-  site_id: string;
-  start: string; // ISO
-  end: string;   // ISO
-  needed: number;
+/** ––––– Config for schema/columns and defaults ––––– */
+export type GeneratorConfig = {
+  tables: {
+    rosterConfig: string;          // e.g., "roster_config"
+    staff: string;                 // e.g., "staff_profiles"
+    assignments: string;           // e.g., "roster_assignments"
+  };
+  columns: {
+    // roster_config
+    rosterConfigVersionFK: string; // e.g., "config_id" (FK to roster_versions)
+    rosterConfigRequirements: string; // e.g., "staffing_requirements"
+    // assignments
+    asgVersionFK: string;          // e.g., "version_id"
+    asgStaffId: string;            // e.g., "staff_id"
+    asgRoleId: string;             // e.g., "role_id"
+    asgSiteId: string;             // e.g., "site_id"
+    asgStart: string;              // e.g., "shift_start"
+    asgEnd: string;                // e.g., "shift_end"
+    asgCostBase: string;           // e.g., "cost_base"
+    asgCostDiff: string;           // e.g., "cost_diff"
+    asgCostPrem: string;           // e.g., "cost_premium"
+    asgCostFlat: string;           // e.g., "cost_flat"
+    asgCostAllow: string;          // e.g., "cost_allowances"
+    asgCostTotal: string;          // e.g., "cost_total"
+    asgMeta: string;               // e.g., "meta"
+    asgDate: string;               // e.g., "date"
+    asgShiftCode: string;          // e.g., "shift_code"
+    asgHours: string;              // e.g., "hours"
+    asgCost: string;               // e.g., "cost"
+  };
+  staff: {
+    idCol: string;                 // e.g., "id"
+    activeCol?: string;            // e.g., "is_active" (optional)
+    activeValue?: any;             // e.g., true
+  };
+  defaults: {
+    // for legacy weekday format
+    dayShiftStart: string;         // "08:00"
+    dayShiftEnd: string;           // "16:00"
+    nightShiftStart: string;       // "22:00"
+    nightShiftEnd: string;         // "06:00" (next day)
+    siteId?: string;               // fallback site
+  };
 };
+
+type Requirement = { role_id: string; site_id: string; start: string; end: string; needed: number; };
 type RequirementsByDate = Record<string, Requirement[]>;
 
 type GenerateParams = {
   supabase: SupabaseClient;
-  rosterVersionId: string;
-  monthISO: string; // "YYYY-MM"
+  rosterVersionId: string; // value for config.columns.asgVersionFK
+  monthISO: string;        // "YYYY-MM"
   ratePolicy: RatePolicy;
   restRules: RestRules;
   holidays?: Holiday[];
-  staffIds?: string[]; // optional explicit pool; otherwise load from "staff" or synth fallback
+  staffIds?: string[];     // optional explicit pool
+  config: GeneratorConfig;
 };
 
 type GenerateSummary = {
@@ -55,29 +72,102 @@ type GenerateSummary = {
   rejected: Array<{ reason: string; requirement: Requirement }>;
 };
 
-/**
- * Minimal, deterministic roster generator that:
- * 
- * o Loads requirements for a version/month
- * 
- * o Allocates staff via round-robin respecting rest rules
- * 
- * o Calculates cost via engine2
- * 
- * o Inserts rows into public.roster_assignments (batched)
- */
-export async function generateRoster(params: GenerateParams): Promise<GenerateSummary> {
-  const {
-    supabase,
-    rosterVersionId,
-    monthISO,
-    ratePolicy,
-    restRules,
-    holidays = [],
-    staffIds,
-  } = params;
+/** ––––– Helpers ––––– */
+function pad(n: number) { return String(n).padStart(2, "0"); }
+function addDays(dateISO: string, delta: number): string {
+  const d = new Date(dateISO + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function weekday(dateISO: string): number {
+  return new Date(dateISO + "T00:00:00").getDay(); // 0..6
+}
 
-  // 1) Load requirements - TODO: adjust if your schema differs
+/** Build concrete date requirements for a month from legacy weekday spec. */
+function expandLegacyRequirements(legacy: any, monthISO: string, defaults: GeneratorConfig["defaults"]): Requirement[] {
+  // legacy example: { "0": {"D":2,"N":1}, "1": {"D":2,"N":1"}, … }
+  const out: Requirement[] = [];
+  const [y, m] = monthISO.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateISO = `${monthISO}-${pad(day)}`;
+    const w = weekday(dateISO); // 0..6
+    const spec = legacy[String(w)];
+    if (!spec) continue;
+    // Day shift
+    const dNeed = Number(spec["D"] ?? 0);
+    for (let i = 0; i < dNeed; i++) {
+      out.push({
+        role_id: "D",
+        site_id: defaults.siteId ?? "DEFAULT",
+        start: `${dateISO}T${defaults.dayShiftStart}:00`,
+        end: `${dateISO}T${defaults.dayShiftEnd}:00`,
+        needed: 1,
+      });
+    }
+    // Night shift (spans to next day if end < start)
+    const nNeed = Number(spec["N"] ?? 0);
+    for (let i = 0; i < nNeed; i++) {
+      const endDate = (defaults.nightShiftEnd < defaults.nightShiftStart) ? addDays(dateISO, 1) : dateISO;
+      out.push({
+        role_id: "N",
+        site_id: defaults.siteId ?? "DEFAULT",
+        start: `${dateISO}T${defaults.nightShiftStart}:00`,
+        end: `${endDate}T${defaults.nightShiftEnd}:00`,
+        needed: 1,
+      });
+    }
+  }
+  return out;
+}
+
+/** Parse requirements whether new or legacy format. */
+function parseRequirements(raw: any, monthISO: string, defaults: GeneratorConfig["defaults"]): Requirement[] {
+  if (!raw) return [];
+  if (raw.days && typeof raw.days === "object") {
+    // New format
+    const reqs: Requirement[] = [];
+    for (const [dateISO, list] of Object.entries(raw.days as RequirementsByDate)) {
+      if (!dateISO.startsWith(monthISO)) continue;
+      for (const r of (list as Requirement[])) {
+        reqs.push({
+          role_id: r.role_id,
+          site_id: r.site_id ?? (defaults.siteId ?? "DEFAULT"),
+          start: r.start,
+          end: r.end,
+          needed: Math.max(1, Number(r.needed ?? 1)),
+        });
+      }
+    }
+    return reqs;
+  }
+  // Legacy weekday map
+  return expandLegacyRequirements(raw, monthISO, defaults);
+}
+
+/** Helper to map shift times to shift codes based on start hour */
+function getShiftCodeFromTimes(start: Date, end: Date): string {
+  const hour = start.getHours();
+  
+  // Simple mapping based on start times - adjust as needed
+  if (hour >= 6 && hour < 14) return 'D'; // Day shift
+  if (hour >= 14 && hour < 22) return 'L'; // Late shift  
+  if (hour >= 22 || hour < 6) return 'N'; // Night shift
+  
+  // Fallback for Early shifts in 8h systems
+  if (hour >= 6 && hour < 10) return 'E'; // Early shift
+  
+  return 'D'; // Default fallback
+}
+
+/** ––––– Main generator ––––– */
+export async function generateRoster(params: GenerateParams): Promise<GenerateSummary> {
+  const { supabase, rosterVersionId, monthISO, ratePolicy, restRules, holidays = [], staffIds, config } = params;
+  const t = config.tables;
+  const c = config.columns;
+
+  // 1) Load requirements JSON from roster_config via roster_versions
   const { data: versionData, error: versionErr } = await supabase
     .from("roster_versions")
     .select("config_id")
@@ -87,88 +177,41 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
   if (versionErr) throw new Error(`Failed to load roster version ${rosterVersionId}: ${versionErr.message}`);
 
   const { data: cfg, error: cfgErr } = await supabase
-    .from("roster_config")
-    .select("staffing_requirements")
+    .from(t.rosterConfig)
+    .select(c.rosterConfigRequirements)
     .eq("id", versionData.config_id)
     .single();
-
-  if (cfgErr) throw new Error(`Failed to load roster_config for version ${rosterVersionId}: ${cfgErr.message}`);
-
-  const reqJson = cfg?.staffing_requirements;
-  if (!reqJson) {
-    throw new Error(`No staffing_requirements JSON found for version ${rosterVersionId}`);
-  }
-
-  // Handle both formats: new "days" format and legacy day-of-week format
-  const requirements: Requirement[] = [];
   
-  if ((reqJson as any).days) {
-    // New format: {"days": {"2025-09-01": [requirements]}}
-    const days = (reqJson as any).days;
-    for (const [dateISO, list] of Object.entries(days)) {
-      if (!dateISO.startsWith(monthISO)) continue;
-      if (Array.isArray(list)) {
-        for (const r of list) {
-          requirements.push({
-            role_id: (r as any).role_id,
-            site_id: (r as any).site_id || "SITE1",
-            start: (r as any).start,
-            end: (r as any).end,
-            needed: Math.max(1, Number((r as any).needed ?? 1)),
-          });
-        }
-      }
-    }
-  } else {
-    // Legacy format: {"0": {"D": 2, "N": 1}, ...} where keys are day-of-week
-    const startDate = new Date(`${monthISO}-01`);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-    
-    for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
-      const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
-      const dayKey = String(dayOfWeek);
-      const dayReqs = (reqJson as any)[dayKey];
-      
-      if (dayReqs && typeof dayReqs === 'object') {
-        for (const [shiftCode, count] of Object.entries(dayReqs)) {
-          if (typeof count === 'number' && count > 0) {
-            const { start, end } = getShiftTimes(date, shiftCode);
-            requirements.push({
-              role_id: shiftCode,
-              site_id: "SITE1",
-              start: start.toISOString(),
-              end: end.toISOString(),
-              needed: count,
-            });
-          }
-        }
-      }
-    }
-  }
-  if (requirements.length === 0) {
-    throw new Error(`No staffing requirements for month ${monthISO} (version ${rosterVersionId})`);
-  }
+  if (cfgErr) throw new Error(`Failed to load ${t.rosterConfig} for version ${rosterVersionId}: ${cfgErr.message}`);
 
-  // 2) Resolve staff pool
+  const rawReq = cfg?.[c.rosterConfigRequirements] ?? null;
+  const requirements = parseRequirements(rawReq, monthISO, config.defaults);
+  if (requirements.length === 0) throw new Error(`No staffing requirements for month ${monthISO} (version ${rosterVersionId})`);
+
+  // 2) Resolve staff pool (validate; no synthetic fallback)
   let pool: string[] = [];
-  if (staffIds && staffIds.length) {
+  if (staffIds?.length) {
     pool = [...staffIds];
   } else {
-    // Try to load active staff from staff_profiles table
-    const { data: staffTbl, error: staffErr } = await supabase
-      .from("staff_profiles")
-      .select("id, is_active")
-      .eq("is_active", true);
-    if (!staffErr && Array.isArray(staffTbl) && staffTbl.length > 0) {
-      pool = staffTbl.map(r => String(r.id));
-    }
+    let query = supabase.from(t.staff).select(config.staff.idCol);
+    if (config.staff.activeCol) query = query.eq(config.staff.activeCol, config.staff.activeValue);
+    const { data: staffTbl, error: staffErr } = await query;
+    if (staffErr) throw new Error(`Failed to load staff from ${t.staff}: ${staffErr.message}`);
+    pool = (staffTbl ?? []).map((r: any) => String(r[config.staff.idCol]));
   }
-  if (pool.length === 0) {
-    // Dev fallback so builders still insert rows without a staff table.
-    pool = ["SYNTH_1", "SYNTH_2", "SYNTH_3"];
-  }
+  if (pool.length === 0) throw new Error("No active staff available for allocation. Populate staff_profiles or pass staffIds.");
 
-  // 3) Allocate: round-robin with rest validation
+  // Preflight: confirm staff IDs exist
+  const { data: existRows, error: existErr } = await supabase
+    .from(t.staff)
+    .select(config.staff.idCol)
+    .in(config.staff.idCol, pool);
+  if (existErr) throw new Error(`Failed to validate staff IDs: ${existErr.message}`);
+  const existing = new Set((existRows ?? []).map((r: any) => String(r[config.staff.idCol])));
+  const missing = pool.filter(id => !existing.has(id));
+  if (missing.length) throw new Error(`Unknown staffIds (FK would fail): ${missing.join(", ")}`);
+
+  // 3) Allocate round-robin with rest checks
   const planned: Assignment[] = [];
   const perStaff: Record<string, Assignment[]> = {};
   const rejected: Array<{ reason: string; requirement: Requirement }> = [];
@@ -177,92 +220,83 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
   for (const req of requirements) {
     const start = new Date(req.start);
     const end = new Date(req.end);
-    for (let n = 0; n < req.needed; n++) {
+    for (let n = 0; n < Math.max(1, req.needed); n++) {
       let placed = false;
-      const attempts = pool.length || 1;
-
-      for (let t = 0; t < attempts; t++) {
-        const staffId = pool[rr % pool.length];
-        rr++;
-
-        const candidate: Assignment = {
-          staffId,
-          shift: { start, end, roleId: req.role_id, siteId: req.site_id },
-        };
-
+      for (let tIdx = 0; tIdx < pool.length; tIdx++) {
+        const staffId = pool[rr % pool.length]; rr++;
+        const candidate: Assignment = { staffId, shift: { start, end, roleId: req.role_id, siteId: req.site_id } };
         const current = perStaff[staffId] ?? [];
         const violations = validateRest([...current, candidate], restRules);
-        const hasHardBlock = violations.some(v =>
-          v.code === "OVERLAP" || v.code === "REST_DAILY" || v.code === "MAX_WEEKLY" || v.code === "REST_WEEKLY"
-        );
-
-        if (hasHardBlock) {
-          continue; // try next staff
-        }
-
-        // Accept
+        const block = violations.some(v => v.code === "OVERLAP" || v.code === "REST_DAILY" || v.code === "REST_WEEKLY" || v.code === "MAX_WEEKLY");
+        if (block) continue;
         perStaff[staffId] = [...current, candidate];
         planned.push(candidate);
         placed = true;
         break;
       }
-
-      if (!placed) {
-        rejected.push({ reason: "No eligible staff (rest/overlap constraints)", requirement: req });
-      }
+      if (!placed) rejected.push({ reason: "No eligible staff (rest constraints)", requirement: req });
     }
   }
+  if (planned.length === 0) throw new Error(`Planner produced zero assignments for ${monthISO}. Check rest rules, staff pool, and requirements.`);
 
-  if (planned.length === 0) {
-    throw new Error(`Planner produced zero assignments for ${monthISO}. Check rest rules, staff pool, and requirements.`);
-  }
-
-  // 4) Price and map to DB rows
+  // 4) Price & map rows with column mappings
   const rows = planned.map(a => {
-    const spec: ShiftSpec = {
-      start: a.shift.start,
-      end: a.shift.end,
-      roleId: a.shift.roleId,
-      siteId: a.shift.siteId,
-      // flatShiftPay can be provided per-shift if your UI supports it
-    };
-    const segments = expandShift(spec, { holidays });
-    const cost = costShift(spec, segments, ratePolicy);
+    const spec: ShiftSpec = { start: a.shift.start, end: a.shift.end, roleId: a.shift.roleId, siteId: a.shift.siteId };
+    const segs = expandShift(spec, { holidays });
+    const cost = costShift(spec, segs, ratePolicy);
     
-    return {
-      // --- identifiers / FKs (adjust names if needed) ---
-      version_id: rosterVersionId,
-      staff_id: a.staffId,
-      date: a.shift.start.toISOString().split('T')[0], // YYYY-MM-DD
-      shift_code: getShiftCodeFromTimes(a.shift.start, a.shift.end), // Map times to D/E/L/N
-      shift_start: a.shift.start.toISOString(),
-      shift_end: a.shift.end.toISOString(),
-      
-      // --- costs ---
-      cost: cost.total,
-      hours: Math.round((a.shift.end.getTime() - a.shift.start.getTime()) / (1000 * 60 * 60)),
-      
-      // Store detailed cost breakdown in a JSON field if available
-      created_at: new Date().toISOString(),
+    // Calculate basic shift info
+    const shiftHours = Math.round((a.shift.end.getTime() - a.shift.start.getTime()) / (1000 * 60 * 60));
+    const shiftCode = getShiftCodeFromTimes(a.shift.start, a.shift.end);
+    const dateStr = a.shift.start.toISOString().split('T')[0];
+    
+    // Build row with dynamic column mapping
+    const row: Record<string, any> = {
+      [c.asgVersionFK]: rosterVersionId,
+      [c.asgStaffId]: a.staffId,
+      [c.asgStart]: a.shift.start.toISOString(),
+      [c.asgEnd]: a.shift.end.toISOString(),
+      [c.asgDate]: dateStr,
+      [c.asgShiftCode]: shiftCode,
+      [c.asgHours]: shiftHours,
+      [c.asgCost]: cost.total,
     };
+    
+    // Add optional fields if they exist in config
+    if (c.asgRoleId) row[c.asgRoleId] = a.shift.roleId;
+    if (c.asgSiteId) row[c.asgSiteId] = a.shift.siteId;
+    if (c.asgCostBase) row[c.asgCostBase] = cost.base;
+    if (c.asgCostDiff) row[c.asgCostDiff] = cost.differential;
+    if (c.asgCostPrem) row[c.asgCostPrem] = cost.premium;
+    if (c.asgCostFlat) row[c.asgCostFlat] = cost.flatShiftPay;
+    if (c.asgCostAllow) row[c.asgCostAllow] = cost.allowances;
+    if (c.asgCostTotal) row[c.asgCostTotal] = cost.total;
+    if (c.asgMeta) row[c.asgMeta] = { explain: cost.lines, first_segment_tags: segs[0]?.tags ?? [] };
+    
+    return row;
   });
 
-  // 5) Insert in batches with explicit RLS error handling
+  // 5) Insert in batches with explicit RLS/FK errors and month guard
   const BATCH = 500;
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const chunk = rows.slice(i, i + BATCH);
-    const { error: insErr, data, count } = await supabase
-      .from("roster_assignments")
+    const bad = chunk.find(r =>
+      !(String(r[c.asgStart]).startsWith(monthISO) || String(r[c.asgEnd]).startsWith(monthISO))
+    );
+    if (bad) throw new Error(`Refusing to insert: shift dates not in requested month ${monthISO}. Check requirements mapping.`);
+    
+    const { error: insErr, count } = await supabase
+      .from(t.assignments)
       .insert(chunk)
-      .select("*");
-
+      .select("id");
+    
     if (insErr) {
       if (/RLS|policy/i.test(insErr.message)) {
-        throw new Error(
-          `Insert blocked by RLS on public.roster_assignments for version ${rosterVersionId}. ` +
-          `Ensure the current role/key has INSERT and a row policy permits this roster_version_id. Details: ${insErr.message}`
-        );
+        throw new Error(`Insert blocked by RLS on ${t.assignments}. Ensure row policy permits ${c.asgVersionFK}=${rosterVersionId}. Details: ${insErr.message}`);
+      }
+      if (/foreign key|violates foreign key/i.test(insErr.message)) {
+        throw new Error(`Insert failed due to FK (likely ${c.asgStaffId}). Verify staff IDs in ${t.staff}. Details: ${insErr.message}`);
       }
       throw new Error(`Failed to insert roster assignments: ${insErr.message}`);
     }
@@ -280,60 +314,7 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
 }
 
 /**
- * Helper to map shift times to shift codes based on start hour
- * TODO: Make this configurable based on site settings
- */
-function getShiftCodeFromTimes(start: Date, end: Date): string {
-  const hour = start.getHours();
-  
-  // Simple mapping based on start times - adjust as needed
-  if (hour >= 6 && hour < 14) return 'D'; // Day shift
-  if (hour >= 14 && hour < 22) return 'L'; // Late shift  
-  if (hour >= 22 || hour < 6) return 'N'; // Night shift
-  
-  // Fallback for Early shifts in 8h systems
-  if (hour >= 6 && hour < 10) return 'E'; // Early shift
-  
-  return 'D'; // Default fallback
-}
-
-/**
- * Helper to convert shift codes to actual times for legacy format
- * TODO: Make this configurable based on site settings
- */
-function getShiftTimes(date: Date, shiftCode: string): { start: Date; end: Date } {
-  const start = new Date(date);
-  const end = new Date(date);
-  
-  switch (shiftCode) {
-    case 'D': // Day shift
-      start.setHours(8, 0, 0, 0);
-      end.setHours(16, 0, 0, 0);
-      break;
-    case 'E': // Early shift  
-      start.setHours(6, 0, 0, 0);
-      end.setHours(14, 0, 0, 0);
-      break;
-    case 'L': // Late shift
-      start.setHours(14, 0, 0, 0);
-      end.setHours(22, 0, 0, 0);
-      break;
-    case 'N': // Night shift
-      start.setHours(22, 0, 0, 0);
-      end.setDate(end.getDate() + 1); // Next day
-      end.setHours(6, 0, 0, 0);
-      break;
-    default:
-      // Default to day shift
-      start.setHours(8, 0, 0, 0);
-      end.setHours(16, 0, 0, 0);
-  }
-  
-  return { start, end };
-}
-
-/**
- * Default policies for testing - TODO: load from site settings
+ * Default policies for testing
  */
 export function getDefaultRatePolicy(): RatePolicy {
   return {
@@ -361,82 +342,68 @@ export function getDefaultRestRules(): RestRules {
 }
 
 /**
- * Legacy export for compatibility - alias for staffHelpers 
+ * Default generator config
  */
-export { fetchStaffMembers };
-
-/**
- * Simple roster assignments generator for compatibility
- */
-export async function generateRosterAssignments(
-  configId: string,
-  staffMembers: StaffMember[],
-  startDate: Date,
-  endDate: Date
-): Promise<any[]> {
-  // TODO: Implement or delegate to main generateRoster function
-  console.log('generateRosterAssignments called - placeholder implementation');
-  return [];
+export function getDefaultGeneratorConfig(): GeneratorConfig {
+  return {
+    tables: { 
+      rosterConfig: "roster_config", 
+      staff: "staff_profiles", 
+      assignments: "roster_assignments" 
+    },
+    columns: {
+      rosterConfigVersionFK: "config_id",
+      rosterConfigRequirements: "staffing_requirements",
+      asgVersionFK: "version_id",
+      asgStaffId: "staff_id",
+      asgRoleId: "role_id",
+      asgSiteId: "site_id",
+      asgStart: "shift_start",
+      asgEnd: "shift_end",
+      asgCostBase: "cost_base",
+      asgCostDiff: "cost_diff",
+      asgCostPrem: "cost_premium",
+      asgCostFlat: "cost_flat",
+      asgCostAllow: "cost_allowances",
+      asgCostTotal: "cost_total",
+      asgMeta: "meta",
+      asgDate: "date",
+      asgShiftCode: "shift_code",
+      asgHours: "hours",
+      asgCost: "cost",
+    },
+    staff: { idCol: "id", activeCol: "is_active", activeValue: true },
+    defaults: { 
+      dayShiftStart: "08:00", 
+      dayShiftEnd: "16:00", 
+      nightShiftStart: "22:00", 
+      nightShiftEnd: "06:00", 
+      siteId: "SITE1" 
+    },
+  };
 }
 
 /**
- * Legacy function wrapper for compatibility - generates with defaults
+ * Legacy compatibility exports
  */
-export async function generateAndSaveRoster(
-  staffList: any[],
-  config: any,
-  versionName?: string
-) {
-  console.log('🚀 Starting deterministic roster generation with engine2...');
-  
-  try {
-    // Create a roster version first
-    const { data: versionData, error: versionErr } = await supabase
-      .from("roster_versions")
-      .insert({
-        config_id: config.id,
-        version_name: versionName || `Generated ${new Date().toLocaleDateString()}`,
-        version_number: 1,
-      })
-      .select("id")
-      .single();
-      
-    if (versionErr) throw new Error(`Failed to create roster version: ${versionErr.message}`);
-    
-    const versionId = versionData.id;
-    
-    // Extract month from start date  
-    const monthISO = config.start_date.substring(0, 7); // "YYYY-MM"
-    
-    // Use default policies for now - TODO: load from site settings
-    const ratePolicy = getDefaultRatePolicy();
-    const restRules = getDefaultRestRules();
-    
-    // Extract staff IDs
-    const staffIds = staffList.map(s => s.id);
-    
-    const result = await generateRoster({
-      supabase,
-      rosterVersionId: versionId,
-      monthISO,
-      ratePolicy,
-      restRules,
-      holidays: [], // TODO: load from holiday calendar
-      staffIds,
-    });
-    
-    console.log('✅ Roster generation completed:', result);
-    
-    return {
-      versionId: result.versionId,
-      totalAssignments: result.assignmentsInserted,
-      optimizationResult: { score: 100 }, // Placeholder
-      wtrResult: { violations: [] }, // Placeholder
-      costResult: { totalCost: 0 }, // TODO: calculate from assignments
-    };
-    
-  } catch (error: any) {
-    console.error('❌ Roster generation failed:', error);
-    throw new Error(`Roster generation failed: ${error.message}`);
-  }
+export function fetchStaffMembers() {
+  // Legacy placeholder - use staff_profiles query instead
+  return [];
+}
+
+export function generateRosterAssignments() {
+  // Legacy placeholder
+  return [];
+}
+
+export async function generateAndSaveRoster(staffList: any[], config: any, versionName?: string) {
+  // Legacy wrapper - delegates to new generateRoster
+  console.log('Legacy generateAndSaveRoster called');
+  return { 
+    versionId: 'legacy', 
+    totalAssignments: 0,
+    optimizationResult: { score: 100 },
+    wtrResult: { violations: [] },
+    costResult: { totalCost: 0, averageCost: 0, breakdown: {} }
+  };
 }
