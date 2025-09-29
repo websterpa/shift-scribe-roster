@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMonthlyAssignments } from "./useMonthlyAssignments";
-import { VersionPicker } from "./VersionPicker";
 import { MonthlyHeader } from "./MonthlyHeader";
-import { normalizeShiftCode } from "@/utils/roster/normalizeShift";
+import { MonthlyGrid } from "./MonthlyGrid";
+import { StaffingOverview } from "./StaffingOverview";
+import { resolveActiveRosterVersion } from "./useActiveRoster";
 
 type Assignment = {
   id: string;
@@ -24,43 +25,58 @@ type Assignment = {
 
 const SHIFT_LABEL: Record<string,string> = { E:"Early (E)", L:"Late (L)", N:"Night (N)", D:"Day (D)" };
 
-export function MonthlyPage() {
+export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
   const [sp, setSp] = useSearchParams();
   const navigate = useNavigate();
-
+  
   const monthISO = sp.get("month") ?? new Date().toISOString().slice(0,7);
-  const versionParam = sp.get("version") ?? "";
-  const [versionId, setVersionId] = useState(versionParam);
-
-  const [shiftCodeFilter, setShiftCodeFilter] = useState("ALL");
+  const [versionId, setVersionId] = useState(sp.get("version") ?? "");
+  const [humanLabel, setHumanLabel] = useState("");
+  
   const [rows, setRows] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-resolve active roster if version not supplied
   useEffect(() => {
-    if (!versionId) { 
-      setRows([]);
+    let mounted = true;
+    (async () => {
+      if (versionId) return;
+      const active = await resolveActiveRosterVersion(supabase, monthISO, siteName);
+      if (!mounted || !active) return;
+      setVersionId(active.versionId);
+      setHumanLabel(active.label);
+      sp.set("version", active.versionId);
+      sp.set("month", monthISO);
+      navigate({ search: sp.toString() }, { replace: true });
+    })();
+    return () => { mounted = false; };
+  }, [versionId, monthISO, siteName, navigate, sp]);
+
+  useEffect(() => {
+    if (!versionId) return;
+    (async () => {
+      setLoading(true);
       setError(null);
-      return; 
-    }
-    setLoading(true);
-    setError(null);
-    fetchMonthlyAssignments({ sb: supabase, versionId, monthISO, shiftCodeFilter })
-      .then(setRows)
-      .catch((err) => {
+      
+      // Set label if missing (e.g., direct link)
+      if (!humanLabel) {
+        const active = await resolveActiveRosterVersion(supabase, monthISO, siteName);
+        if (active && active.versionId === versionId) setHumanLabel(active.label);
+      }
+      
+      try {
+        const data = await fetchMonthlyAssignments({ sb: supabase, versionId, monthISO, shiftCodeFilter: "ALL" });
+        setRows(data);
+      } catch (err: any) {
         console.error("Error fetching monthly assignments:", err);
         setError(err.message || "Failed to load assignments");
         setRows([]);
-      })
-      .finally(() => setLoading(false));
-  }, [versionId, monthISO, shiftCodeFilter]);
-
-  function applyVersion(v: string) {
-    setVersionId(v);
-    sp.set("version", v);
-    sp.set("month", monthISO);
-    navigate({ search: sp.toString() }, { replace: true });
-  }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [versionId, monthISO, humanLabel, siteName]);
 
   function handleMonthChange(direction: 'prev' | 'next' | 'current') {
     const currentDate = new Date(monthISO + "-01");
@@ -79,163 +95,73 @@ export function MonthlyPage() {
     }
     
     const newMonthISO = newDate.toISOString().slice(0, 7);
+    // Reset version when changing months to trigger auto-selection
+    setVersionId("");
+    setHumanLabel("");
     sp.set("month", newMonthISO);
-    if (versionId) sp.set("version", versionId);
+    sp.delete("version");
     navigate({ search: sp.toString() }, { replace: true });
   }
 
-  // Group assignments by date for calendar display
-  const assignmentsByDate = rows.reduce((acc, assignment) => {
-    const date = new Date(assignment.shift_start).toISOString().slice(0, 10);
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(assignment);
-    return acc;
-  }, {} as Record<string, Assignment[]>);
-
   const monthStart = new Date(monthISO + "-01");
-  const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
+    <div className="flex flex-col h-screen">
+      <div className="flex-shrink-0 p-6 border-b">
         <h1 className="text-2xl font-bold mb-4">Monthly Schedule</h1>
         
-        <div className="flex flex-wrap items-center gap-4 mb-4">
-          <VersionPicker 
-            sb={supabase}
-            monthISO={monthISO}
-            value={versionId}
-            onChange={applyVersion}
-          />
-          
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Month</label>
-            <div className="flex items-center gap-1">
-              <button 
-                className="px-2 py-1 text-sm border rounded hover:bg-muted"
-                onClick={() => handleMonthChange('prev')}
-              >
-                ←
-              </button>
-              <span className="px-3 py-1 text-sm font-medium min-w-[120px] text-center">
-                {monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </span>
-              <button 
-                className="px-2 py-1 text-sm border rounded hover:bg-muted"
-                onClick={() => handleMonthChange('next')}
-              >
-                →
-              </button>
-              <button 
-                className="px-2 py-1 text-sm border rounded hover:bg-muted"
-                onClick={() => handleMonthChange('current')}
-              >
-                Today
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground">Shift</label>
-            <select 
-              className="border rounded px-2 py-1 text-sm" 
-              value={shiftCodeFilter} 
-              onChange={(e)=> setShiftCodeFilter(e.target.value)}
+        <div className="flex items-center gap-2 mb-4">
+          <label className="text-xs text-muted-foreground">Month</label>
+          <div className="flex items-center gap-1">
+            <button 
+              className="px-2 py-1 text-sm border rounded hover:bg-muted"
+              onClick={() => handleMonthChange('prev')}
             >
-              <option value="ALL">All shifts</option>
-              <option value="D">D (Day)</option>
-              <option value="N">N (Night)</option>
-              <option value="E">E (Early)</option>
-              <option value="L">L (Late)</option>
-            </select>
+              ←
+            </button>
+            <span className="px-3 py-1 text-sm font-medium min-w-[120px] text-center">
+              {monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </span>
+            <button 
+              className="px-2 py-1 text-sm border rounded hover:bg-muted"
+              onClick={() => handleMonthChange('next')}
+            >
+              →
+            </button>
+            <button 
+              className="px-2 py-1 text-sm border rounded hover:bg-muted"
+              onClick={() => handleMonthChange('current')}
+            >
+              Today
+            </button>
           </div>
         </div>
 
-        {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} />}
+        {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} />}
+        {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
       </div>
 
-      {loading && (
-        <div className="text-sm text-muted-foreground">Loading…</div>
-      )}
+      <div className="flex-1 p-6 overflow-hidden">
+        {loading && (
+          <div className="text-sm text-muted-foreground">Loading…</div>
+        )}
 
-      {error && (
-        <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200 mb-4">
-          Error: {error}
-        </div>
-      )}
-
-      {!loading && !error && !versionId && (
-        <div className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-          Please select a roster version to view assignments.
-        </div>
-      )}
-
-      {!loading && !error && versionId && (
-        <div className="space-y-4">
-          <div className="text-xs text-muted-foreground">
-            Loaded rows: {rows.length}
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 p-3 rounded border border-red-200 mb-4">
+            Error: {error}
           </div>
-          
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="p-2 text-sm font-medium text-center border-b">
-                {day}
-              </div>
-            ))}
-            
-            {/* Empty cells for days before month starts */}
-            {Array.from({ length: monthStart.getDay() }).map((_, i) => (
-              <div key={`empty-${i}`} className="p-2 h-24"></div>
-            ))}
-            
-            {/* Days of the month */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const date = `${monthISO}-${day.toString().padStart(2, '0')}`;
-              const assignments = assignmentsByDate[date] || [];
-              const isToday = new Date().toISOString().slice(0, 10) === date;
-              
-              return (
-                <div 
-                  key={day} 
-                  className={`p-2 h-24 border rounded text-sm ${
-                    isToday ? 'border-primary bg-primary/5' : 'border-border'
-                  }`}
-                >
-                  <div className="font-medium mb-1">{day}</div>
-                  <div className="space-y-1 overflow-y-auto max-h-16">
-                    {assignments.length === 0 && (
-                      <div className="text-xs text-muted-foreground">—</div>
-                    )}
-                    {assignments.map((assignment, idx) => {
-                      const staff = assignment.staff_profiles;
-                      const staffName = staff?.name || 
-                        (staff?.first_name && staff?.last_name ? `${staff.first_name} ${staff.last_name}` : 'Unknown');
-                      const shiftCode = normalizeShiftCode(assignment.shift_code);
-                      const startTime = new Date(assignment.shift_start).toLocaleTimeString('en-GB', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      });
-                      
-                      return (
-                        <div 
-                          key={idx}
-                          className="text-xs bg-muted/50 rounded px-1 py-0.5 truncate"
-                          title={`${staffName} - ${SHIFT_LABEL[shiftCode] || shiftCode} (${startTime})`}
-                        >
-                          <div className="font-medium truncate">{staffName}</div>
-                          <div className="text-muted-foreground">{shiftCode} {startTime}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+        )}
+
+        {!loading && !error && !versionId && (
+          <div className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+            Finding active roster for this month…
           </div>
-        </div>
-      )}
+        )}
+
+        {!loading && !error && versionId && (
+          <MonthlyGrid monthISO={monthISO} rows={rows} />
+        )}
+      </div>
     </div>
   );
 }

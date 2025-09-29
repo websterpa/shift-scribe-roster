@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { countMonthlyAssignments } from "./useMonthlyAssignments";
 
-export function MonthlyHeader({ sb, versionId, monthISO }: { sb: SupabaseClient; versionId: string; monthISO: string }) {
+export function MonthlyHeader({ sb, versionId, monthISO, humanLabel }: { sb: SupabaseClient; versionId: string; monthISO: string; humanLabel: string }) {
   const [count, setCount] = useState<number | null>(null);
   
   useEffect(() => {
@@ -21,11 +21,13 @@ export function MonthlyHeader({ sb, versionId, monthISO }: { sb: SupabaseClient;
   return (
     <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted/50 rounded-lg">
       <div className="flex items-center gap-2">
-        <span>Version: {versionId ? `${versionId.slice(0,8)}…` : "—"}</span>
+        <span title={versionId ? `Full UUID: ${versionId}` : "No version selected"}>
+          Active Roster: {humanLabel}
+        </span>
         <span>•</span>
         <span>Month: {monthISO}</span>
         <span>•</span>
-        <span>Rows: {count ?? "…"}</span>
+        <span>Assignments: {count ?? "…"}</span>
       </div>
     </div>
   );
