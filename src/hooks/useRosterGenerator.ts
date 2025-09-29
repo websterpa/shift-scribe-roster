@@ -108,8 +108,8 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
     const summary = {
       coverageAchievedPct: calculateCoveragePercentage(result, coverage),
       totalCost: (result.costResult && 'totalCost' in result.costResult) ? result.costResult.totalCost : 0,
-      budget: form.budget ?? null,
-      budgetVariance: (result.costResult && 'budgetVariance' in result.costResult) ? result.costResult.budgetVariance : null,
+      budget: form.budget ?? 50000,
+      budgetVariance: Number((result.costResult && 'budgetVariance' in result.costResult) ? result.costResult.budgetVariance : 0),
       fairness: {
         nights: calculateFairnessStats(result, 'nights'),
         weekends: calculateFairnessStats(result, 'weekends'),
@@ -119,16 +119,13 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
         }
       },
       violations: [
-        ...(result.wtrResult?.violationDetails || []),
-        ...(result.optimizationResult?.error ? [`Optimization: ${result.optimizationResult.error}`] : []),
-        ...(result.costResult && 'error' in result.costResult ? [`Cost calculation: ${result.costResult.error}`] : [])
+        ...(result.wtrResult?.violations || []),
+        ...(result.optimizationResult?.score < 50 ? [`Low optimization score: ${result.optimizationResult.score}`] : [])
       ],
       notes: [
         `Roster generated with ${result.totalAssignments} assignments`,
-        ...(result.optimizationResult?.improvementPercent > 0 ? 
-          [`Optimization improved score by ${result.optimizationResult.improvementPercent}%`] : []),
-        ...(result.optimizationResult?.optimizationTimeMs ? 
-          [`Generation completed in ${result.optimizationResult.optimizationTimeMs}ms`] : [])
+        `Optimization score: ${result.optimizationResult?.score || 0}`,
+        'Generated using engine2 deterministic algorithms'
       ]
     };
 
