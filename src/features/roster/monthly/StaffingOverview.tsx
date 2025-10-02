@@ -88,22 +88,29 @@ export function StaffingOverview({ sb, versionId, monthISO }: { sb: SupabaseClie
     loadStaffingOverview(sb, { versionId, monthISO }).then(setItems).catch(()=>setItems([]));
   }, [sb, versionId, monthISO]);
 
+  const monthDate = new Date(`${monthISO}-01`);
+  const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
   return (
     <div className="bg-muted/30 p-4 rounded-lg mb-4">
-      <div className="text-sm font-medium mb-3">Staffing Overview</div>
+      <div className="text-sm font-medium mb-2">Staffing Overview</div>
+      <div className="text-xs text-muted-foreground mb-3">Coverage for {monthLabel}</div>
       <div className="flex gap-4 flex-wrap">
         {items.map(it => {
           const pct = it.required > 0 ? Math.min(100, Math.round((it.assigned / it.required) * 100)) : 0;
+          const shiftLabel = { E: "Early", L: "Late", N: "Night", D: "Day" }[it.shift_code] || it.shift_code;
+          
           return (
-            <div key={it.shift_code} className="flex items-center gap-2">
-              <div className="text-sm font-medium">{it.shift_code}</div>
-              <div className="text-xs text-muted-foreground">{it.assigned}/{it.required}</div>
-              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+            <div key={it.shift_code} className="flex items-center gap-2 bg-card p-2 rounded border">
+              <div className="text-sm font-medium min-w-[60px]">{shiftLabel} ({it.shift_code})</div>
+              <div className="text-xs text-muted-foreground min-w-[40px]">{it.assigned}/{it.required}</div>
+              <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
                   className={"h-2 rounded transition-all " + (it.shift_code === "N" ? "bg-purple-500" : "bg-blue-500")} 
                   style={{ width: `${pct}%` }} 
                 />
               </div>
+              <div className="text-xs font-medium">{pct}%</div>
             </div>
           );
         })}
