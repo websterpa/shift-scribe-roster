@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchMonthlyAssignments } from "./useMonthlyAssignments";
 import { MonthlyHeader } from "./MonthlyHeader";
 import { MonthlyGrid } from "./MonthlyGrid";
-import { StaffingOverview } from "./StaffingOverview";
+import { StaffingOverview, loadStaffingOverview } from "./StaffingOverview";
 import { resolveActiveRosterVersion } from "./useActiveRoster";
 
 type Assignment = {
@@ -27,9 +27,10 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
   const [versionId, setVersionId] = useState(sp.get("version") ?? "");
   const [humanLabel, setHumanLabel] = useState("");
   
-  const [rows, setRows] = useState<Assignment[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   // Auto-resolve active roster if version not supplied
   useEffect(() => {
@@ -52,6 +53,7 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
     (async () => {
       setLoading(true);
       setError(null);
+      setWarnings([]);
       
       // Set label if missing (e.g., direct link)
       if (!humanLabel) {
@@ -60,12 +62,29 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
       }
       
       try {
-        const data = await fetchMonthlyAssignments({ sb: supabase, versionId, monthISO, shiftCodeFilter: "ALL" });
+        const [data, staffingItems] = await Promise.all([
+          fetchMonthlyAssignments({ sb: supabase, versionId, monthISO, shiftCodeFilter: "ALL" }),
+          loadStaffingOverview(supabase, { versionId, monthISO })
+        ]);
+        
         setRows(data);
+        
+        // Calculate warnings based on staffing overview
+        const newWarnings: string[] = [];
+        const missingCodes = staffingItems
+          .filter(item => item.required > 0 && item.assigned === 0)
+          .map(item => item.shift_code);
+        
+        if (missingCodes.length > 0) {
+          newWarnings.push(`No assignments for required shift(s): ${missingCodes.join(", ")}`);
+        }
+        
+        setWarnings(newWarnings);
       } catch (err: any) {
         console.error("Error fetching monthly assignments:", err);
         setError(err.message || "Failed to load assignments");
         setRows([]);
+        setWarnings([]);
       } finally {
         setLoading(false);
       }
@@ -131,7 +150,7 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
           </div>
         </div>
 
-        {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} />}
+        {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
         {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
       </div>
 

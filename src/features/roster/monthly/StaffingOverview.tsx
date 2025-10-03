@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { toCode } from "./shiftMapping";
 
 type Item = { shift_code: string; required: number; assigned: number };
 
@@ -17,8 +18,9 @@ function expandLegacyRequirements(legacy: any, monthISO: string): Record<string,
     const w = String(weekday(dateISO));
     const spec = legacy[w];
     if (!spec) continue;
-    for (const code of Object.keys(spec)) {
-      counts[code] = (counts[code] ?? 0) + Number(spec[code] ?? 0);
+    for (const keyLogicalOrCode of Object.keys(spec)) {
+      const code = toCode(keyLogicalOrCode); // Map to codes
+      counts[code] = (counts[code] ?? 0) + Number(spec[keyLogicalOrCode] ?? 0);
     }
   }
   return counts;
@@ -29,7 +31,8 @@ function expandNewRequirements(daysObj: any, monthISO: string): Record<string, n
   for (const [dateISO, list] of Object.entries(daysObj as Record<string, any[]>)) {
     if (!dateISO.startsWith(monthISO)) continue;
     for (const it of (list ?? [])) {
-      const code = (it.role_id ?? it.shift_code ?? "UNK");
+      const logicalOrCode = (it.role_id ?? it.shift_code ?? "UNK");
+      const code = toCode(logicalOrCode); // Map logical names to codes
       const needed = Math.max(1, Number(it.needed ?? 1));
       counts[code] = (counts[code] ?? 0) + needed;
     }

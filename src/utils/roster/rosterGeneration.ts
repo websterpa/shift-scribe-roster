@@ -3,6 +3,7 @@ import { expandShift } from "../../engine2/time/expandShift";
 import { costShift } from "../../engine2/cost/costShift";
 import { validateRest } from "../../engine2/rules/validateRest";
 import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "../../engine2/types";
+import { toCode } from "../../features/roster/monthly/shiftMapping";
 
 /** ––––– Config for schema/columns and defaults ––––– */
 export type GeneratorConfig = {
@@ -247,7 +248,15 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
     
     // Calculate basic shift info
     const shiftHours = Math.round((a.shift.end.getTime() - a.shift.start.getTime()) / (1000 * 60 * 60));
-    const shiftCode = getShiftCodeFromTimes(a.shift.start, a.shift.end);
+    
+    // Map roleId (may be logical like "Night") to shift_code (like "N")
+    const logicalOrCode = a.shift.roleId ?? getShiftCodeFromTimes(a.shift.start, a.shift.end);
+    const shiftCode = toCode(logicalOrCode);
+    
+    if (!shiftCode || shiftCode.trim() === "") {
+      throw new Error(`Refusing to insert: empty shift_code derived from roleId "${a.shift.roleId}"`);
+    }
+    
     const dateStr = a.shift.start.toISOString().split('T')[0];
     
     // Build row with dynamic column mapping
@@ -275,6 +284,26 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
     
     return row;
   });
+  
+  // Post-plan validation: ensure required logical shifts have assignments
+  const requiredLogicalShifts = new Set<string>();
+  for (const req of requirements) {
+    if (req.role_id) requiredLogicalShifts.add(req.role_id);
+  }
+  
+  const plannedCodes = new Set(rows.map(r => r[c.asgShiftCode]));
+  const missingShifts: string[] = [];
+  
+  for (const logical of requiredLogicalShifts) {
+    const code = toCode(logical);
+    if (!plannedCodes.has(code)) {
+      missingShifts.push(`${logical} (${code})`);
+    }
+  }
+  
+  if (missingShifts.length > 0) {
+    throw new Error(`Night-enabled configuration produced 0 assignments for required shift(s): ${missingShifts.join(", ")}. Check staff eligibility and rest constraints.`);
+  }
 
   // 5) Insert in batches with explicit RLS/FK errors and month guard
   const BATCH = 500;
