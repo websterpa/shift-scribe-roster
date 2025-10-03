@@ -2,7 +2,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
 import Index from '@/pages/Index';
 import LandingPage from '@/pages/LandingPage';
@@ -35,19 +34,9 @@ import LegacyCreateRoster from '@/pages/LegacyCreateRoster';
 import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';
 import NotFound from '@/pages/NotFound';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
-
 export function AppRouter() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+    <BrowserRouter>
         <AuthProvider>
           <Routes>
             {/* Public routes */}
@@ -89,6 +78,5 @@ export function AppRouter() {
           </Routes>
         </AuthProvider>
       </BrowserRouter>
-    </QueryClientProvider>
   );
 }

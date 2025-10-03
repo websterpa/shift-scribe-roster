@@ -21,8 +21,7 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
         id,
         first_name,
         last_name,
-        name,
-        role
+        name
       )
     `)
     .eq("version_id", versionId)
@@ -35,7 +34,18 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
 
   const { data, error } = await q;
   if (error) throw error;
-  return data ?? [];
+  
+  // Enrich with staff_name
+  const enriched = (data ?? []).map(row => {
+    const profile = row.staff_profiles;
+    const staff_name = profile?.name || 
+                       (profile?.first_name && profile?.last_name 
+                         ? `${profile.first_name} ${profile.last_name}` 
+                         : 'Unknown');
+    return { ...row, staff_name };
+  });
+  
+  return enriched;
 }
 
 export async function countMonthlyAssignments({ sb, versionId, monthISO }: { sb: SupabaseClient; versionId: string; monthISO: string }) {

@@ -14,13 +14,7 @@ type Assignment = {
   shift_start: string;
   shift_end: string;
   staff_id: string;
-  staff_profiles: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    name?: string;
-    role?: string;
-  };
+  staff_name: string;
 };
 
 const SHIFT_LABEL: Record<string,string> = { E:"Early (E)", L:"Late (L)", N:"Night (N)", D:"Day (D)" };

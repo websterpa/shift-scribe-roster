@@ -6,11 +6,7 @@ type Row = {
   shift_end?: string; 
   shift_code: string; 
   staff_id: string;
-  staff_profiles?: {
-    first_name?: string;
-    last_name?: string;
-    name?: string;
-  };
+  staff_name: string;
 };
 type Props = { monthISO: string; rows: Row[] };
 
@@ -61,20 +57,15 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
               </div>
               
               <div className="flex-1 space-y-1 overflow-hidden">
-                {assigns.slice(0,10).map((a, idx) => {
-                  const staffName = a.staff_profiles?.first_name 
-                    ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name || ""}`.trim()
-                    : a.staff_profiles?.name || "Staff";
-                  
-                  return (
-                    <span 
-                      key={idx} 
-                      className={"inline-block rounded px-1 py-0.5 text-[11px] " + (a.shift_code === "N" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800")}
-                    >
-                      {a.shift_code}: {staffName}
-                    </span>
-                  );
-                })}
+                {assigns.slice(0,10).map((a, idx) => (
+                  <span 
+                    key={idx} 
+                    title={`Staff ID: ${a.staff_id}`}
+                    className={"inline-block rounded px-1 py-0.5 text-[11px] " + (a.shift_code === "N" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800")}
+                  >
+                    {a.shift_code}: {a.staff_name}
+                  </span>
+                ))}
                 {assigns.length > 10 && (
                   <div className="text-[10px] text-muted-foreground">+{assigns.length - 10} more…</div>
                 )}
@@ -97,27 +88,21 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
             </button>
           </div>
           <div className="space-y-2">
-            {(byDate[openDay] ?? []).map((a, i) => {
-              const staffName = a.staff_profiles?.first_name 
-                ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name || ""}`.trim()
-                : a.staff_profiles?.name || "Unknown Staff";
-              
-              return (
-                <div key={i} className="border rounded p-2 text-sm flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">
-                      <span className={"mr-2 px-1 py-0.5 rounded text-[11px] " + (a.shift_code === "N" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800")}>
-                        {a.shift_code}
-                      </span>
-                      {staffName}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {a.shift_start?.slice(11,16)} → {a.shift_end?.slice(11,16) ?? "?"}
-                    </div>
+            {(byDate[openDay] ?? []).map((a, i) => (
+              <div key={i} className="border rounded p-2 text-sm flex items-center justify-between">
+                <div>
+                  <div className="font-medium">
+                    <span className={"mr-2 px-1 py-0.5 rounded text-[11px] " + (a.shift_code === "N" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800")}>
+                      {a.shift_code}
+                    </span>
+                    {a.staff_name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {a.shift_start?.slice(11,16)} → {a.shift_end?.slice(11,16) ?? "?"}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
             {((byDate[openDay] ?? []).length === 0) && (
               <div className="text-sm text-muted-foreground">No assignments.</div>
             )}

@@ -4,7 +4,7 @@ import { useRosterSummary } from "@/hooks/useRosterSummary";
 import { useNightPresence } from "@/hooks/useNightPresence";
 import { useNightRequirements } from "@/hooks/useNightRequirements";
 import { NightDiagnosticBanner } from "@/components/roster/NightDiagnosticBanner";
-import MonthlyScheduleTab from "@/components/MonthlyScheduleTab";
+import { MonthlyPage } from "@/features/roster/monthly/MonthlyPage";
 import CoverageStrip from "@/components/roster/CoverageStrip";
 import TeamLaneRoster from "@/components/roster/TeamLaneRoster";
 import NightCallout from "@/components/NightCallout";
@@ -175,24 +175,7 @@ export default function RosterSummary() {
 
         {activeTab === "month" && (
           <div className="space-y-4">
-            <div className="rounded-xl border bg-blue-50 p-3 mb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-blue-900">New Monthly View Available</div>
-                  <div className="text-xs text-blue-700">Try the improved monthly schedule with version picker and better filtering</div>
-                </div>
-                <Link 
-                  to={`/roster/monthly?version=${versionId}&month=${new Date().toISOString().slice(0,7)}`}
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                >
-                  Open New View
-                </Link>
-              </div>
-            </div>
-            <MonthlyScheduleTab
-              versionId={versionId}
-              siteTz={version?.timezone ?? "Europe/London"}
-            />
+            <MonthlyPage siteName={version?.config_name} />
           </div>
         )}
       </div>
