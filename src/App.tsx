@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AppRouter } from "@/components/router/AppRouter";
+import { AppErrorBoundary } from "@/components/layout/AppErrorBoundary";
 import { useEffect } from "react";
 import { seedInitialData } from "@/utils/dataSeeder";
 import "./App.css";
@@ -12,10 +13,15 @@ function App() {
   useEffect(() => {
     console.log('🚀 App: Initializing application...');
     
-    // Seed initial data on app startup
+    // Seed initial data on app startup (development only)
     const initializeApp = async () => {
+      if (!import.meta.env.DEV) {
+        console.log('⚠️ App: Skipping data seeding in production');
+        return;
+      }
+      
       try {
-        console.log('🌱 App: Starting data seeding...');
+        console.log('🌱 App: Starting data seeding (dev only)...');
         await seedInitialData();
         console.log('✅ App: Data seeding completed');
       } catch (error) {
@@ -28,10 +34,12 @@ function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppRouter />
-      <Toaster />
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AppRouter />
+        <Toaster />
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }
 
