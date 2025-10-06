@@ -166,8 +166,12 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
         )}
 
         {!loading && !error && !versionId && (
-          <div className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-            Finding active roster for this month…
+          <div className="text-sm text-amber-700 bg-amber-50 p-4 rounded border border-amber-200">
+            <div className="font-medium mb-2">No Active Roster Found</div>
+            <div>No assignments found for {monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' })}.</div>
+            <div className="mt-2">
+              <a href="/wizard" className="text-blue-600 hover:underline">Create a new roster using the wizard →</a>
+            </div>
           </div>
         )}
 

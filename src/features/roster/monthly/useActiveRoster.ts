@@ -6,6 +6,8 @@ export async function resolveActiveRosterVersion(sb: SupabaseClient, monthISO: s
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toISOString().slice(0,10);
 
+  console.log(`🔍 Resolving active roster for month: ${monthISO}, date range: ${start} to ${end}`);
+
   // Get counts per version for this month
   const { data, error } = await sb
     .from("roster_assignments")
@@ -13,14 +15,32 @@ export async function resolveActiveRosterVersion(sb: SupabaseClient, monthISO: s
     .gte("shift_start", start)
     .lt("shift_start", end);
 
-  if (error || !data) return null;
+  if (error) {
+    console.error("❌ Error fetching assignments:", error);
+    return null;
+  }
+
+  if (!data || data.length === 0) {
+    console.warn("⚠️ No assignments found for this month");
+    return null;
+  }
 
   const counts = new Map<string, number>();
   for (const r of data) {
     counts.set(r.version_id, (counts.get(r.version_id) ?? 0) + 1);
   }
+  
+  console.log(`📊 Found ${counts.size} versions with assignments:`, 
+    [...counts.entries()].map(([id, count]) => `${id.slice(0,8)}... (${count} assignments)`).join(", ")
+  );
+
   const best = [...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
-  if (!best) return null;
+  if (!best || best[1] === 0) {
+    console.warn("⚠️ No version with assignments found");
+    return null;
+  }
+
+  console.log(`✅ Selected version ${best[0].slice(0,8)}... with ${best[1]} assignments`);
 
   // Fetch version details to get the actual version number
   const { data: versionData } = await sb

@@ -39,18 +39,24 @@ export function MonthlyHeader({
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="ml-2">
-            <strong>Missing Required Shifts:</strong> {warnings[0]}
-            <br />
-            <span className="text-xs mt-1 block">
-              Check that your shift code mapping is correct and staff are assigned to required shifts. 
-              <a 
-                href="/help" 
-                target="_blank" 
-                className="underline ml-1 hover:text-red-900"
-              >
-                View mapping documentation
+            <div className="font-medium">⚠️ Missing Required Shifts: {warnings[0]}</div>
+            <div className="text-xs mt-2">
+              This roster version has requirements defined but no staff assignments. 
+              The roster may have failed to generate properly, or you're viewing an incomplete version.
+            </div>
+            <div className="text-xs mt-2">
+              <strong>Solutions:</strong>
+              <ul className="list-disc ml-4 mt-1">
+                <li>Try generating a new roster with staff assigned to all required shifts</li>
+                <li>Check that staff profiles have eligible_shifts configured correctly</li>
+                <li>Verify that the roster generation completed successfully</li>
+              </ul>
+            </div>
+            <div className="mt-2">
+              <a href="/wizard" className="text-blue-900 hover:underline font-medium">
+                Create new roster →
               </a>
-            </span>
+            </div>
           </AlertDescription>
         </Alert>
       )}
