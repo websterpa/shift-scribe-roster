@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Users, FileText, BarChart3, HelpCircle, Wand2 } from 'lucide-react';
+import { Calendar, Users, FileText, BarChart3, HelpCircle, Wand2, Shield } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
@@ -14,7 +14,8 @@ const Navigation = () => {
     { path: '/roster/builder', label: 'Roster Builder', icon: Wand2, gradient: 'from-indigo-500 to-blue-600' },
     { path: '/leave-requests', label: 'Leave Requests', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
     { path: '/reports', label: 'Reports', icon: BarChart3, gradient: 'from-emerald-500 to-green-600' },
-    { path: '/help', label: 'Help & Support', icon: HelpCircle, gradient: 'from-teal-500 to-cyan-600' }
+    { path: '/help', label: 'Help & Support', icon: HelpCircle, gradient: 'from-teal-500 to-cyan-600' },
+    { path: '/admin/rls-setup', label: 'Admin: RLS Setup', icon: Shield, gradient: 'from-red-500 to-rose-600' }
   ];
 
   return (

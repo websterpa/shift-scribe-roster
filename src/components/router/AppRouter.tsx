@@ -30,6 +30,7 @@ import HelpSupport from '@/pages/HelpSupport';
 import Wizard from '@/pages/Wizard';
 import RosterSummary from '@/pages/RosterSummary';
 import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';
+import RLSHelp from '@/pages/Admin/RLSHelp';
 import NotFound from '@/pages/NotFound';
 
 export function AppRouter() {
@@ -68,6 +69,7 @@ export function AppRouter() {
               <Route path="roster/summary" element={<RosterSummary />} />
               <Route path="roster/monthly" element={<MonthlyPage />} />
               <Route path="wizard" element={<Wizard />} />
+              <Route path="admin/rls-setup" element={<RLSHelp />} />
             </Route>
             
             {/* 404 route */}
