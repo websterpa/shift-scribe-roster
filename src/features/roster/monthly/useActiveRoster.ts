@@ -22,9 +22,17 @@ export async function resolveActiveRosterVersion(sb: SupabaseClient, monthISO: s
   const best = [...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
   if (!best) return null;
 
-  // Build a human label (siteName optional)
+  // Fetch version details to get the actual version number
+  const { data: versionData } = await sb
+    .from("roster_versions")
+    .select("version_number, version_name")
+    .eq("id", best[0])
+    .single();
+
+  // Build a human label
   const monthName = new Date(start).toLocaleString(undefined, { month: "short", year: "numeric" });
-  const label = `${siteName ? siteName + " – " : ""}${monthName} (v${counts.size})`;
+  const versionLabel = versionData?.version_name || `v${versionData?.version_number ?? "?"}`;
+  const label = `${siteName ? siteName + " – " : ""}${monthName} (${versionLabel})`;
 
   return { versionId: best[0], rows: best[1], label };
 }
