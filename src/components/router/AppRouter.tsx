@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from '@/components/auth/AuthProvider';
+import { AuthProvider, ProtectedRoute } from '@/components/auth/AuthProvider';
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
 import Index from '@/pages/Index';
 import LandingPage from '@/pages/LandingPage';
@@ -46,7 +46,7 @@ export function AppRouter() {
             <Route path="/privacy" element={<PrivacyPage />} />
             
             {/* Authenticated routes with layout */}
-            <Route path="/" element={<AuthenticatedLayout />}>
+            <Route path="/" element={<ProtectedRoute><AuthenticatedLayout /></ProtectedRoute>}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="staff" element={<Staff />} />
               <Route path="roster-config" element={<RosterConfig />} />
