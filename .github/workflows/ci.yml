@@ -37,3 +37,11 @@ jobs:
       env:
         VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+      
+    - name: Run E2E tests
+      run: npm run e2e
+      env:
+        E2E_BASE_URL: http://localhost:5173
