@@ -85,13 +85,7 @@ describe('Variable OT Assignments', () => {
       };
 
       const window = resolveShiftWindow('2024-01-15', 'OT', otOpts); // Monday
-      const cost = shiftCost(
-        20, // £20/hour
-        'OT',
-        '2024-01-15',
-        [], // No public holidays
-        { start: window!.start, end: window!.end }
-      );
+      const cost = shiftCost(window!.start, window!.end, 20);
 
       // 4 hours * £20 * 1.5 (OT multiplier) = £120
       expect(cost).toBe(120);
@@ -104,13 +98,7 @@ describe('Variable OT Assignments', () => {
       };
 
       const window = resolveShiftWindow('2024-01-14', 'OT', otOpts); // Sunday
-      const cost = shiftCost(
-        15, // £15/hour
-        'OT',
-        '2024-01-14',
-        [],
-        { start: window!.start, end: window!.end }
-      );
+      const cost = shiftCost(window!.start, window!.end, 15);
 
       // 6 hours * £15 * 2.0 (Sunday multiplier) = £180
       expect(cost).toBe(180);

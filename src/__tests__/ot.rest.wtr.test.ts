@@ -163,13 +163,8 @@ describe("Variable OT Rest & WTR Compliance", () => {
         expect(actualHours).toBeCloseTo(testCase.hours, 2);
         
         // Verify cost calculation uses actual hours
-        const cost = shiftCost(
-          20, // £20/hour
-          "OT",
-          "2025-06-03", // Tuesday (weekday)
-          [],
-          { start: otWindow.start, end: otWindow.end }
-        );
+        const hours = durationHours(otWindow.start, otWindow.end);
+        const cost = shiftCost(otWindow.start, otWindow.end, 20);
         
         // Expected: hours * rate * 1.5 (weekday OT multiplier)
         const expectedCost = testCase.hours * 20 * 1.5;
@@ -325,13 +320,8 @@ describe("Acceptance Criteria Validation", () => {
       otStartLocalTime: "10:00"
     })!;
     
-    const cost = shiftCost(
-      15, // £15/hour
-      "OT",
-      "2025-06-08",
-      [],
-      { start: otWindow.start, end: otWindow.end }
-    );
+    const hours = durationHours(otWindow.start, otWindow.end);
+    const cost = shiftCost(otWindow.start, otWindow.end, 15);
     
     // Expected: 3.5h * £15 * 2.0 (Sunday multiplier) = £105
     expect(cost).toBeCloseTo(105);

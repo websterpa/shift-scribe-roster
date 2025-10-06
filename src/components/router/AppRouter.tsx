@@ -1,7 +1,6 @@
-
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider, ProtectedRoute } from '@/components/auth/AuthProvider';
+import { Routes, Route } from 'react-router-dom';
+import { ProtectedRoute } from '@/components/auth/AuthProvider';
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout';
 import Index from '@/pages/Index';
 import LandingPage from '@/pages/LandingPage';
@@ -35,9 +34,7 @@ import NotFound from '@/pages/NotFound';
 
 export function AppRouter() {
   return (
-    <BrowserRouter>
-        <AuthProvider>
-          <Routes>
+    <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/landing" element={<LandingPage />} />
@@ -72,10 +69,8 @@ export function AppRouter() {
               <Route path="admin/rls-setup" element={<RLSHelp />} />
             </Route>
             
-            {/* 404 route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      {/* 404 route */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }

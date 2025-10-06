@@ -20,7 +20,7 @@ export default function RosterSummary() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const versionId = params.get("version") || "";
-  const [activeTab, setActiveTab] = useState<"summary" | "coverage" | "teams" | "month">("month");
+  const [activeTab, setActiveTab] = useState<"summary" | "coverage" | "teams" | "month">("month"); // Default to month view
 
   const { loading, error, version, kpis, matrix, tours, budget, diag } = useRosterSummary(versionId);
   
