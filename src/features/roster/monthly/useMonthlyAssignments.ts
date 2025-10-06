@@ -7,6 +7,14 @@ type FetchArgs = {
   shiftCodeFilter?: string;      // "ALL" | concrete shift_code
 };
 
+function fullName(p: { name?: string | null; first_name?: string | null; last_name?: string | null }) {
+  if (p.name?.trim()) return p.name.trim();
+  const first = p.first_name?.trim() ?? "";
+  const last = p.last_name?.trim() ?? "";
+  const combo = [first, last].filter(Boolean).join(" ");
+  return combo || "Unnamed";
+}
+
 export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCodeFilter = "ALL" }: FetchArgs) {
   const start = `${monthISO}-01`;
   const endDate = new Date(start);
@@ -36,8 +44,8 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   
   const ids = Array.from(new Set(valid.map(r => r.staff_id)));
   
-  // Build staff name map
-  const map = new Map<string, string>();
+  // Build staff name map - only if we have valid IDs
+  const nameMap = new Map<string, string>();
   if (ids.length > 0) {
     const { data: staff, error: staffErr } = await sb
       .from("staff_profiles")
@@ -46,19 +54,21 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
     
     if (staffErr) throw staffErr;
     
-    for (const s of (staff ?? [])) {
+    (staff ?? []).forEach(s => {
       const id = String((s as any).id);
-      const displayName = (s as any).name?.trim();
-      const fn = (s as any).first_name?.trim();
-      const ln = (s as any).last_name?.trim();
-      const name = displayName || [fn, ln].filter(Boolean).join(" ").trim();
-      if (id) map.set(id, name || id);
-    }
+      if (id) nameMap.set(id, fullName(s as any));
+    });
   }
   
-  // Enrich with staff_name
-  const enrichedValid = valid.map(r => ({ ...r, staff_name: map.get(r.staff_id) ?? r.staff_id }));
-  const enrichedInvalid = invalid.map(r => ({ ...r, staff_name: "Unassigned" }));
+  // Enrich with staff_name; blanks become "Unassigned"
+  const enrichedValid = valid.map(r => ({ 
+    ...r, 
+    staff_name: nameMap.get(r.staff_id) ?? r.staff_id 
+  }));
+  const enrichedInvalid = invalid.map(r => ({ 
+    ...r, 
+    staff_name: "Unassigned" 
+  }));
   
   return [...enrichedValid, ...enrichedInvalid];
 }
