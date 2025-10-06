@@ -61,13 +61,22 @@ export async function loadStaffingOverview(sb: SupabaseClient, { versionId, mont
     assignedCounts[code] = (assignedCounts[code] ?? 0) + 1;
   }
 
-  // 2) Required counts (try reading requirements JSON from roster_config)
-  // We attempt both shapes: new {days:{…}} and legacy {"0":{…}}
-  const { data: cfg } = await sb
-    .from("roster_config")
-    .select("staffing_requirements")
+  // 2) Required counts: Get config_id from roster_versions, then fetch requirements
+  const { data: version } = await sb
+    .from("roster_versions")
+    .select("config_id")
     .eq("id", versionId)
-    .single();
+    .maybeSingle();
+
+  let cfg: any = null;
+  if (version?.config_id) {
+    const { data } = await sb
+      .from("roster_config")
+      .select("staffing_requirements")
+      .eq("id", version.config_id)
+      .maybeSingle();
+    cfg = data;
+  }
 
   const req = cfg?.staffing_requirements ?? null;
   let requiredCounts: Record<string, number> = {};
