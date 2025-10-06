@@ -15,6 +15,15 @@ type Props = { monthISO: string; rows: Row[] };
 export function MonthlyGrid({ monthISO, rows }: Props) {
   const first = new Date(`${monthISO}-01T00:00:00`);
   const days = eachDayOfInterval({ start: startOfMonth(first), end: endOfMonth(first) });
+  
+  // Calculate the day of week for the first day (0 = Sunday, 6 = Saturday)
+  const firstDayOfWeek = startOfMonth(first).getDay();
+  
+  // Create padding cells for days before the month starts
+  const paddingCells = Array.from({ length: firstDayOfWeek }, (_, i) => ({
+    type: 'padding' as const,
+    key: `padding-${i}`
+  }));
 
   const byDate = useMemo(() => {
     const m: Record<string, Row[]> = {};
@@ -39,6 +48,15 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
         ))}
         
         {/* Calendar Days */}
+        {/* Padding cells for days before month starts */}
+        {paddingCells.map(cell => (
+          <div 
+            key={cell.key} 
+            className="p-1 min-h-[120px] bg-muted/30 border-r border-b"
+          />
+        ))}
+        
+        {/* Actual month days */}
         {days.map(d => {
           const iso = format(d, "yyyy-MM-dd");
           const dayNum = format(d, "d");
