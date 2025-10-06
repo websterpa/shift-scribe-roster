@@ -31,7 +31,7 @@ function expandNewRequirements(daysObj: any, monthISO: string): Record<string, n
   for (const [dateISO, list] of Object.entries(daysObj as Record<string, any[]>)) {
     if (!dateISO.startsWith(monthISO)) continue;
     for (const it of (list ?? [])) {
-      const logicalOrCode = (it.role_id ?? it.shift_code ?? "UNK");
+      const logicalOrCode = (it.shift_code ?? "UNK");
       const code = toCode(logicalOrCode); // Map logical names to codes
       const needed = Math.max(1, Number(it.needed ?? 1));
       counts[code] = (counts[code] ?? 0) + needed;
