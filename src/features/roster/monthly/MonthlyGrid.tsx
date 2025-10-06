@@ -63,7 +63,7 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
                     title={`Staff ID: ${a.staff_id}`}
                     className={"inline-block rounded px-1 py-0.5 text-[11px] " + (a.shift_code === "N" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800")}
                   >
-                    {a.shift_code}: {a.staff_name}
+                    {a.shift_code} – {a.staff_name}
                   </span>
                 ))}
                 {assigns.length > 10 && (
