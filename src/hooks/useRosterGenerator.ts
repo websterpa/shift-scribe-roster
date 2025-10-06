@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { on } from "@/utils/events";
 import type { ManagerRosterForm, GenerateRosterResult } from "@/types/managerUI";
-import { generateAndSaveRoster, fetchStaffMembers } from "@/utils/roster/rosterGeneration";
+import { generateAndSaveRoster } from "@/utils/roster/generateAndSaveRoster";
+import { fetchStaffMembers } from "@/utils/roster/staffHelpers";
 import type { StaffMember } from "@/types/roster";
 import { createLogger } from "@/utils/errorLogger";
 import { createRosterConfig } from "@/services/roster";
@@ -118,10 +119,11 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
           cap: form.capPublicHolidaysPerPerson 
         }
       },
-      violations: [
-        ...(result.wtrResult?.violations || []),
-        ...(result.optimizationResult?.score < 50 ? [`Low optimization score: ${result.optimizationResult.score}`] : [])
-      ],
+      violations: (result.wtrResult?.violations || []).map(v => 
+        typeof v === 'string' ? v : JSON.stringify(v)
+      ).concat(
+        result.optimizationResult?.score < 50 ? [`Low optimization score: ${result.optimizationResult.score}`] : []
+      ),
       notes: [
         `Roster generated with ${result.totalAssignments} assignments`,
         `Optimization score: ${result.optimizationResult?.score || 0}`,

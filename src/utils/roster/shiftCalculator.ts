@@ -103,17 +103,21 @@ export function calculateShiftCost(
     publicHolidays?: string[];
   }
 ): number {
-  return shiftCost(
-    hourlyRate,
-    code,
-    dateISO,
-    options?.publicHolidays || [],
-    {
-      start: options?.start,
-      end: options?.end,
-      hoursOverride: options?.hoursOverride
-    }
-  );
+  const hours = options?.hoursOverride || (code === 'D' || code === 'N' ? 12 : 8);
+  const isHoliday = isPublicHoliday(new Date(dateISO));
+  
+  // Simple cost calculation
+  let cost = hours * hourlyRate;
+  
+  if (code === 'N') {
+    cost *= 1.3; // 30% night differential
+  }
+  
+  if (isHoliday) {
+    cost *= 2; // Holiday multiplier
+  }
+  
+  return cost;
 }
 
 // Legacy function for backward compatibility

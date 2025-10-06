@@ -11,13 +11,7 @@ const logger = createLogger('GenerateAndSaveRoster');
  */
 export async function generateAndSaveRoster(
   staffList: StaffMember[],
-  config: {
-    configId?: string;
-    monthISO?: string;
-    versionName?: string;
-    staffIds?: string[];
-    siteId?: string;
-  },
+  config: any, // Accept any config format for backward compatibility
   versionName?: string
 ): Promise<{
   versionId: string;
@@ -26,21 +20,38 @@ export async function generateAndSaveRoster(
   wtrResult?: { violations: unknown[] };
   costResult?: { totalCost: number; averageCost: number; breakdown: Record<string, unknown> };
 }> {
-  logger.info('generateAndSaveRoster called', { configId: config.configId, monthISO: config.monthISO });
+  // Extract config properties - handle both new and legacy formats
+  const configId = config.configId || config.id;
+  const monthISO = config.monthISO || config.start_date?.substring(0, 7);
+  const versionNameToUse = versionName || config.versionName || config.config_name;
   
-  if (!config.configId || !config.monthISO) {
+  logger.info('generateAndSaveRoster called', { configId, monthISO });
+  
+  if (!configId || !monthISO) {
     throw new Error("configId and monthISO are required");
   }
 
   // Extract staff IDs
   const staffIds = staffList.map(s => s.id);
 
-  // Create roster version
+  // Create roster version with version_number
+  const { data: existingVersions } = await supabase
+    .from('roster_versions')
+    .select('version_number')
+    .eq('config_id', configId)
+    .order('version_number', { ascending: false })
+    .limit(1);
+  
+  const nextVersionNumber = (existingVersions && existingVersions[0]) 
+    ? existingVersions[0].version_number + 1 
+    : 1;
+
   const { data: versionData, error: versionError } = await supabase
     .from('roster_versions')
     .insert({
-      config_id: config.configId,
-      version_name: versionName || config.versionName || `Version ${Date.now()}`,
+      config_id: configId,
+      version_name: versionNameToUse || `Version ${Date.now()}`,
+      version_number: nextVersionNumber,
     })
     .select()
     .single();
@@ -56,7 +67,7 @@ export async function generateAndSaveRoster(
   const result = await generateRoster({
     supabase,
     rosterVersionId: versionData.id,
-    monthISO: config.monthISO,
+    monthISO,
     ratePolicy: getDefaultRatePolicy(),
     restRules: getDefaultRestRules(),
     holidays: [],

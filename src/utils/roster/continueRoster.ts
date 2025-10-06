@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { generateAndSaveRoster } from "./rosterGeneration";
+import { generateAndSaveRoster } from "./generateAndSaveRoster";
 import { fetchStaffMembers } from "./staffHelpers";
 import { createLogger } from "../errorLogger";
 

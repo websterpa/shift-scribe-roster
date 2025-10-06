@@ -148,23 +148,21 @@ export function generateAssignments(
 
         shiftWindow = resolveShiftWindow(dateString, "OT", otOpts);
         if (shiftWindow) {
-          const hours = durationHours(shiftWindow.start, shiftWindow.end);
+          const otHours = durationHours(shiftWindow.start, shiftWindow.end);
           shiftDetails = {
             shiftStart: shiftWindow.start,
             shiftEnd: shiftWindow.end,
-            hours
+            hours: otHours
           };
 
-          // Cost calculation using actual window timing
-          cost = shiftCost(
-            staff.hourly_rate || 15.50,
-            "OT",
-            dateString,
-            [], // TODO: Pass actual public holidays from config
-            { start: shiftWindow.start, end: shiftWindow.end }
-          );
+          // Cost calculation using actual window timing  
+          cost = otHours * (staff.hourly_rate || 15.50);
+          // Night differential if it's a night shift
+          if (shiftWindow.start.getHours() >= 22 || shiftWindow.start.getHours() < 6) {
+            cost *= 1.3;
+          }
 
-          console.log(`💰 AUDIT: OT cost for ${hours}h shift: £${cost.toFixed(2)}`);
+          console.log(`💰 AUDIT: OT cost for ${otHours}h shift: £${cost.toFixed(2)}`);
         }
       } else {
         // Standard shift handling with legacy calculator

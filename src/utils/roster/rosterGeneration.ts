@@ -407,68 +407,6 @@ export function getDefaultGeneratorConfig(): GeneratorConfig {
       dayShiftEnd: "16:00", 
       nightShiftStart: "22:00", 
       nightShiftEnd: "06:00", 
-      siteId: "SITE1" 
     },
-  };
-}
-
-/**
- * Wrapper for backward compatibility - wraps generateRoster with simpler interface
- */
-export async function generateAndSaveRoster(
-  _staffList: unknown[],
-  config: {
-    configId?: string;
-    monthISO?: string;
-    versionName?: string;
-    staffIds?: string[];
-    siteId?: string;
-  },
-  versionName?: string
-): Promise<{
-  versionId: string;
-  totalAssignments: number;
-  optimizationResult?: { score: number };
-  wtrResult?: { violations: unknown[] };
-  costResult?: { totalCost: number; averageCost: number; breakdown: Record<string, unknown> };
-}> {
-  const { supabase } = await import("@/integrations/supabase/client");
-  
-  if (!config.configId || !config.monthISO) {
-    throw new Error("configId and monthISO are required");
-  }
-
-  // Create roster version
-  const { data: versionData, error: versionError } = await supabase
-    .from('roster_versions')
-    .insert({
-      config_id: config.configId,
-      version_name: versionName || config.versionName || `Version ${Date.now()}`,
-    })
-    .select()
-    .single();
-
-  if (versionError || !versionData) {
-    throw new Error(`Failed to create roster version: ${versionError?.message || 'Unknown error'}`);
-  }
-
-  // Generate roster using new engine
-  const result = await generateRoster({
-    supabase,
-    rosterVersionId: versionData.id,
-    monthISO: config.monthISO,
-    ratePolicy: getDefaultRatePolicy(),
-    restRules: getDefaultRestRules(),
-    holidays: [],
-    staffIds: config.staffIds,
-    config: getDefaultGeneratorConfig(),
-  });
-
-  return {
-    versionId: result.versionId,
-    totalAssignments: result.assignmentsInserted,
-    optimizationResult: { score: 100 },
-    wtrResult: { violations: [] },
-    costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
   };
 }
