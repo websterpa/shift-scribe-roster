@@ -413,26 +413,62 @@ export function getDefaultGeneratorConfig(): GeneratorConfig {
 }
 
 /**
- * Legacy compatibility exports
+ * Wrapper for backward compatibility - wraps generateRoster with simpler interface
  */
-export function fetchStaffMembers() {
-  // Legacy placeholder - use staff_profiles query instead
-  return [];
-}
+export async function generateAndSaveRoster(
+  _staffList: unknown[],
+  config: {
+    configId?: string;
+    monthISO?: string;
+    versionName?: string;
+    staffIds?: string[];
+    siteId?: string;
+  },
+  versionName?: string
+): Promise<{
+  versionId: string;
+  totalAssignments: number;
+  optimizationResult?: { score: number };
+  wtrResult?: { violations: unknown[] };
+  costResult?: { totalCost: number; averageCost: number; breakdown: Record<string, unknown> };
+}> {
+  const { supabase } = await import("@/integrations/supabase/client");
+  
+  if (!config.configId || !config.monthISO) {
+    throw new Error("configId and monthISO are required");
+  }
 
-export function generateRosterAssignments() {
-  // Legacy placeholder
-  return [];
-}
+  // Create roster version
+  const { data: versionData, error: versionError } = await supabase
+    .from('roster_versions')
+    .insert({
+      config_id: config.configId,
+      version_name: versionName || config.versionName || `Version ${Date.now()}`,
+    })
+    .select()
+    .single();
 
-export async function generateAndSaveRoster(staffList: any[], config: any, versionName?: string) {
-  // Legacy wrapper - delegates to new generateRoster
-  console.log('Legacy generateAndSaveRoster called');
-  return { 
-    versionId: 'legacy', 
-    totalAssignments: 0,
+  if (versionError || !versionData) {
+    throw new Error(`Failed to create roster version: ${versionError?.message || 'Unknown error'}`);
+  }
+
+  // Generate roster using new engine
+  const result = await generateRoster({
+    supabase,
+    rosterVersionId: versionData.id,
+    monthISO: config.monthISO,
+    ratePolicy: getDefaultRatePolicy(),
+    restRules: getDefaultRestRules(),
+    holidays: [],
+    staffIds: config.staffIds,
+    config: getDefaultGeneratorConfig(),
+  });
+
+  return {
+    versionId: result.versionId,
+    totalAssignments: result.assignmentsInserted,
     optimizationResult: { score: 100 },
     wtrResult: { violations: [] },
-    costResult: { totalCost: 0, averageCost: 0, breakdown: {} }
+    costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
   };
 }
