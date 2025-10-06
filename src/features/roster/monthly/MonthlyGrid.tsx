@@ -52,7 +52,7 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
         {paddingCells.map(cell => (
           <div 
             key={cell.key} 
-            className="p-1 min-h-[120px] bg-muted/30 border-r border-b"
+            className="p-2 min-h-[120px] bg-muted/30 border-r border-b"
           />
         ))}
         
@@ -66,28 +66,33 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
           return (
             <button
               key={iso}
-              className={`p-1 min-h-[120px] flex flex-col text-left hover:bg-muted/50 border-r border-b last:border-r-0 ${
+              className={`p-2 min-h-[120px] flex flex-col text-left hover:bg-muted/50 transition-colors border-r border-b last:border-r-0 ${
                 isTodayDate ? "bg-primary/5 ring-2 ring-primary/20 ring-inset" : "bg-card"
               }`}
               onClick={() => setOpenDay(iso)}
             >
-              <div className={`font-medium text-sm mb-1 ${isTodayDate ? "text-primary font-bold" : ""}`}>
+              <div className={`font-medium text-sm mb-2 ${isTodayDate ? "text-primary font-bold" : ""}`}>
                 {dayNum}
                 {isTodayDate && <span className="ml-1 text-[10px] text-primary">Today</span>}
               </div>
               
-              <div className="flex-1 space-y-1 overflow-hidden">
+              <div className="flex-1 space-y-1 overflow-auto">
                 {assigns.slice(0,10).map((a, idx) => (
-                  <span 
+                  <div 
                     key={idx} 
-                    title={`Staff ID: ${a.staff_id}`}
-                    className={"inline-block rounded px-1 py-0.5 text-[11px] " + (a.shift_code === "N" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800")}
+                    title={`Staff: ${a.staff_name} (ID: ${a.staff_id})`}
+                    className={"block rounded px-2 py-1 text-[11px] font-medium truncate " + (
+                      a.shift_code === "N" ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" : 
+                      a.shift_code === "E" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" :
+                      a.shift_code === "L" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" :
+                      "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                    )}
                   >
                     {a.shift_code} – {a.staff_name}
-                  </span>
+                  </div>
                 ))}
                 {assigns.length > 10 && (
-                  <div className="text-[10px] text-muted-foreground">+{assigns.length - 10} more…</div>
+                  <div className="text-[10px] text-muted-foreground font-medium">+{assigns.length - 10} more…</div>
                 )}
               </div>
             </button>
