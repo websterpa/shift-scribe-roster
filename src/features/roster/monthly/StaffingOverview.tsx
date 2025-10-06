@@ -9,7 +9,20 @@ function pad(n: number) { return String(n).padStart(2, "0"); }
 function weekday(dateISO: string) { return new Date(dateISO + "T00:00:00").getDay(); } // 0..6
 
 function expandLegacyRequirements(legacy: any, monthISO: string): Record<string, number> {
-  // legacy: {"0":{"D":2,"N":1}, …}
+  // Check if this is the "simple" legacy format (day_shift_staff, early_shift_staff, etc.)
+  if (legacy.day_shift_staff !== undefined || legacy.early_shift_staff !== undefined || 
+      legacy.late_shift_staff !== undefined || legacy.night_shift_staff !== undefined) {
+    console.log("📋 Using simple legacy requirements format");
+    return {
+      D: Number(legacy.day_shift_staff ?? 0),
+      E: Number(legacy.early_shift_staff ?? 0),
+      L: Number(legacy.late_shift_staff ?? 0),
+      N: Number(legacy.night_shift_staff ?? 0),
+    };
+  }
+  
+  // Otherwise, weekday-based legacy format: {"0":{"D":2,"N":1}, …}
+  console.log("📋 Using weekday-based legacy requirements format");
   const counts: Record<string, number> = {};
   const [y, m] = monthISO.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
