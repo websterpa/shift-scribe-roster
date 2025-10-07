@@ -3,7 +3,7 @@ import { expandShift } from "../../engine2/time/expandShift";
 import { costShift } from "../../engine2/cost/costShift";
 import { validateRest } from "../../engine2/rules/validateRest";
 import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "../../engine2/types";
-import { toCode } from "../../features/roster/monthly/shiftMapping";
+import { toCode, isValidCode, detectFramework } from "../../features/roster/monthly/shiftMapping";
 
 /** ––––– Config for schema/columns and defaults ––––– */
 export type GeneratorConfig = {
@@ -86,57 +86,106 @@ function weekday(dateISO: string): number {
 
 /** Build concrete date requirements for a month from legacy weekday spec. */
 function expandLegacyRequirements(legacy: any, monthISO: string, defaults: GeneratorConfig["defaults"]): Requirement[] {
-  // legacy example: { "0": {"D":2,"N":1}, "1": {"D":2,"N":1"}, … }
+  // legacy example: { "0": {"D":2,"N":1}, "1": {"D":2,"N":1}, … }
+  // Also supports both Sunday=0 and Monday=0 weekday systems
   const out: Requirement[] = [];
   const [y, m] = monthISO.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
 
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateISO = `${monthISO}-${pad(day)}`;
-    const w = weekday(dateISO); // 0..6
-    const spec = legacy[String(w)];
-    if (!spec) continue;
-    // Day shift
-    const dNeed = Number(spec["D"] ?? 0);
-    for (let i = 0; i < dNeed; i++) {
-      out.push({
-        role_id: "D",
-        site_id: defaults.siteId ?? "DEFAULT",
-        start: `${dateISO}T${defaults.dayShiftStart}:00`,
-        end: `${dateISO}T${defaults.dayShiftEnd}:00`,
-        needed: 1,
-      });
+  // Try both weekday systems and choose whichever yields more items
+  const makeWithSystem = (sundayZero: boolean): Requirement[] => {
+    const result: Requirement[] = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateISO = `${monthISO}-${pad(day)}`;
+      const jsDay = weekday(dateISO); // JavaScript getDay(): 0=Sun, 6=Sat
+      const idx = sundayZero ? jsDay : (jsDay === 0 ? 6 : jsDay - 1); // Convert to Mon=0 if needed
+      const spec = legacy[String(idx)];
+      if (!spec) continue;
+      
+      // Process all shift types in the spec
+      for (const [key, value] of Object.entries(spec)) {
+        const need = Number(value ?? 0);
+        if (need <= 0) continue;
+        
+        // Normalize the key (could be "Day", "D", "Night", "N", etc.)
+        const code = toCode(key);
+        if (!isValidCode(code)) continue;
+        
+        // Determine shift times based on code
+        let shiftStart = defaults.dayShiftStart;
+        let shiftEnd = defaults.dayShiftEnd;
+        let needsOvernightRoll = false;
+        
+        if (code === "N") {
+          shiftStart = defaults.nightShiftStart;
+          shiftEnd = defaults.nightShiftEnd;
+          needsOvernightRoll = shiftEnd < shiftStart;
+        } else if (code === "E") {
+          shiftStart = "06:00";
+          shiftEnd = "14:00";
+        } else if (code === "L") {
+          shiftStart = "14:00";
+          shiftEnd = "22:00";
+        }
+        
+        const endDate = needsOvernightRoll ? addDays(dateISO, 1) : dateISO;
+        
+        for (let i = 0; i < need; i++) {
+          result.push({
+            role_id: code,
+            site_id: defaults.siteId ?? "DEFAULT",
+            start: `${dateISO}T${shiftStart}:00`,
+            end: `${endDate}T${shiftEnd}:00`,
+            needed: 1,
+          });
+        }
+      }
     }
-    // Night shift (spans to next day if end < start)
-    const nNeed = Number(spec["N"] ?? 0);
-    for (let i = 0; i < nNeed; i++) {
-      const endDate = (defaults.nightShiftEnd < defaults.nightShiftStart) ? addDays(dateISO, 1) : dateISO;
-      out.push({
-        role_id: "N",
-        site_id: defaults.siteId ?? "DEFAULT",
-        start: `${dateISO}T${defaults.nightShiftStart}:00`,
-        end: `${endDate}T${defaults.nightShiftEnd}:00`,
-        needed: 1,
-      });
-    }
-  }
-  return out;
+    return result;
+  };
+  
+  const withSunday = makeWithSystem(true);
+  const withMonday = makeWithSystem(false);
+  
+  // Return whichever system produced more requirements
+  return withSunday.length >= withMonday.length ? withSunday : withMonday;
 }
 
 /** Parse requirements whether new or legacy format. */
 function parseRequirements(raw: any, monthISO: string, defaults: GeneratorConfig["defaults"]): Requirement[] {
   if (!raw) return [];
   if (raw.days && typeof raw.days === "object") {
-    // New format
+    // New format: { days: { "2025-10-01": [{ role_id: "N", start: "...", end: "...", needed: 2 }] } }
     const reqs: Requirement[] = [];
     for (const [dateISO, list] of Object.entries(raw.days as RequirementsByDate)) {
       if (!dateISO.startsWith(monthISO)) continue;
-      for (const r of (list as Requirement[])) {
+      for (const r of (list as any[])) {
+        // Normalize role_id/code/logical to canonical code
+        const rawCode = r.role_id ?? r.code ?? r.logical ?? "D";
+        const code = toCode(rawCode);
+        
+        if (!isValidCode(code)) {
+          console.warn(`Skipping invalid shift code: ${rawCode} -> ${code}`);
+          continue;
+        }
+        
+        // Handle overnight shifts
+        const startTime = new Date(r.start);
+        const endTime = new Date(r.end);
+        let finalEnd = r.end;
+        
+        // If end time is before start time (overnight shift), roll to next day
+        if (endTime <= startTime) {
+          const nextDay = new Date(endTime);
+          nextDay.setDate(nextDay.getDate() + 1);
+          finalEnd = nextDay.toISOString();
+        }
+        
         reqs.push({
-          role_id: r.role_id,
+          role_id: code,
           site_id: r.site_id ?? (defaults.siteId ?? "DEFAULT"),
           start: r.start,
-          end: r.end,
+          end: finalEnd,
           needed: Math.max(1, Number(r.needed ?? 1)),
         });
       }
@@ -286,23 +335,31 @@ export async function generateRoster(params: GenerateParams): Promise<GenerateSu
   });
   
   // Post-plan validation: ensure required logical shifts have assignments
-  const requiredLogicalShifts = new Set<string>();
+  const requiredCodes = new Set<string>();
   for (const req of requirements) {
-    if (req.role_id) requiredLogicalShifts.add(req.role_id);
+    if (req.role_id) {
+      const code = toCode(req.role_id);
+      if (isValidCode(code)) {
+        requiredCodes.add(code);
+      }
+    }
   }
+  
+  // Detect framework from required codes
+  const framework = detectFramework(requiredCodes);
+  console.log(`🔍 Detected framework: ${framework}, Required codes:`, Array.from(requiredCodes));
   
   const plannedCodes = new Set(rows.map(r => r[c.asgShiftCode]));
   const missingShifts: string[] = [];
   
-  for (const logical of requiredLogicalShifts) {
-    const code = toCode(logical);
+  for (const code of requiredCodes) {
     if (!plannedCodes.has(code)) {
-      missingShifts.push(`${logical} (${code})`);
+      missingShifts.push(code);
     }
   }
   
   if (missingShifts.length > 0) {
-    throw new Error(`Night-enabled configuration produced 0 assignments for required shift(s): ${missingShifts.join(", ")}. Check staff eligibility and rest constraints.`);
+    throw new Error(`${framework} configuration produced 0 assignments for required shift(s): ${missingShifts.join(", ")}. Check staff eligibility and rest constraints.`);
   }
 
   // 5) Insert in batches with explicit RLS/FK errors and month guard
