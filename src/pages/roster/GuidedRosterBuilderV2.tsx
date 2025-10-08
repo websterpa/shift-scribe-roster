@@ -242,19 +242,21 @@ export default function GuidedRosterBuilderV2() {
       // Generate assignments using enhanced generator
       const { generateRosterEnhanced } = await import('@/utils/roster/enhancedRosterGenerator');
       
-      const requirementsByDay: Record<number, Record<string, number>> = {};
-      values.staffing.forEach(day => {
-        const dailyReqs: Record<string, number> = {};
-        Object.entries(day.need).forEach(([token, count]) => {
-          if (count > 0) {
-            assertShiftToken(token);
-            dailyReqs[token] = count;
-          }
-        });
-        if (Object.keys(dailyReqs).length > 0) {
-          requirementsByDay[day.dow] = dailyReqs;
+      // Normalize requirements to ensure N tokens are preserved
+      const { normalizeRequirements, printRequirementsSummary } = await import('@/utils/roster/normalizeRequirements');
+      const requirementsByDay = normalizeRequirements(values.staffing);
+      
+      // DEV diagnostic: Print total requirements
+      if (import.meta.env.DEV) {
+        printRequirementsSummary(requirementsByDay);
+      }
+      
+      // Validate all tokens are valid
+      for (const [dow, reqs] of Object.entries(requirementsByDay)) {
+        for (const token of Object.keys(reqs)) {
+          assertShiftToken(token);
         }
-      });
+      }
 
       const result = await generateRosterEnhanced({
         system: values.system,
@@ -263,16 +265,31 @@ export default function GuidedRosterBuilderV2() {
         requirementsByDay,
         startDate: configData.start_date,
         allowSupervisorNights: values.allowSupervisorNights,
-        includeNights: values.system === "12h" || values.pattern.includes("N")
+        includeNights: values.system === "12h" || values.pattern.includes("N"),
+        patternTokens: values.pattern.split('')
       });
+
+      // DEV diagnostic: Print result summary
+      if (import.meta.env.DEV) {
+        console.log('🎯 Generation Result:', {
+          totalAssignments: result.assignments.length,
+          nightsGenerated: result.nightsGenerated,
+          tokenBreakdown: result.assignments.reduce((acc, a) => {
+            acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        });
+      }
 
       toast({
         title: "Roster Generated Successfully",
         description: `Generated ${result.assignments.length} assignments with ${result.nightsGenerated} night shifts`,
       });
 
-      // Navigate to summary
-      window.location.href = `/roster/summary?version=${version.id}`;
+      // Navigate to summary with fresh start date to fix "blank until date change" bug
+      const startDate = new Date(configData.start_date);
+      const monthParam = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+      window.location.href = `/roster/summary?version=${version.id}&month=${monthParam}`;
 
     } catch (error) {
       console.error("Generation failed:", error);

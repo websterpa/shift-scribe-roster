@@ -38,15 +38,43 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
     includeNights: input.includeNights 
   });
   
-  // 1) Correct pool selection per token
+  // 1) Enhanced pool selection per token with eligibility checks
   const allStaffIds = input.staff.filter(s => s.is_active).map(s => s.id);
-  const nightPool = input.staff.filter(s => 
-    s.is_active && 
-    (!s.role?.includes('supervisor') || input.allowSupervisorNights)
-  ).map(s => s.id);
+  
+  // Night pool: consider role AND eligible_shifts
+  const nightPool = input.staff.filter(s => {
+    if (!s.is_active) return false;
+    
+    // Check role-based eligibility
+    const roleOk = !s.role?.includes('supervisor') || input.allowSupervisorNights;
+    if (!roleOk) return false;
+    
+    // Check eligible_shifts if defined
+    if (s.eligible_shifts && s.eligible_shifts.length > 0) {
+      // Accept "N" or "Night" in eligible_shifts
+      return s.eligible_shifts.some(shift => 
+        shift === 'N' || shift === 'Night' || shift === 'night'
+      );
+    }
+    
+    // If no eligible_shifts defined, allow by default (configurable)
+    return true;
+  }).map(s => s.id);
 
   function poolFor(token: "D"|"N"|"E"|"L"): string[] {
     return token === "N" ? nightPool : allStaffIds;
+  }
+  
+  // DEV diagnostic: Log pool sizes
+  if (import.meta.env.DEV) {
+    console.log('[G1] Staff pools:', {
+      total: allStaffIds.length,
+      nightEligible: nightPool.length,
+      nightPoolStaff: nightPool.map(id => {
+        const s = input.staff.find(x => x.id === id);
+        return `${s?.name || id} (${s?.role || 'staff'}, eligible: ${s?.eligible_shifts?.join(',') || 'default'})`;
+      })
+    });
   }
   
   if (expects.expectsNights) {

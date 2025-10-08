@@ -145,8 +145,9 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
           </div>
         </div>
 
-        {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
-        {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
+      {versionId && <DiagnosticsBanner versionId={versionId} monthStartISO={monthStartISO} monthEndISO={monthEndISO} assignments={rows} />}
+      {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
+      {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
       </div>
 
       <div className="flex-1 p-6 overflow-hidden">
@@ -171,15 +172,7 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
         )}
 
         {!loading && !error && versionId && (
-          <>
-            <DiagnosticsBanner 
-              versionId={versionId}
-              monthStartISO={monthStartISO}
-              monthEndISO={monthEndISO}
-              assignments={rows}
-            />
-            <MonthlyGrid monthISO={monthISO} rows={rows} />
-          </>
+          <MonthlyGrid monthISO={monthISO} rows={rows} />
         )}
       </div>
     </div>
