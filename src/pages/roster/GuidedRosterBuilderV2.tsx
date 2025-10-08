@@ -28,6 +28,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 
 interface PreviewData {
   requirements?: Record<string, number>;
@@ -574,60 +575,26 @@ export default function GuidedRosterBuilderV2() {
                       </div>
                     )}
                     
-                    {(() => {
-                      const system = form.watch('system');
-                      const tokens = allowedTokens(system);
-                      const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                      
-                      // Calculate debug totals
-                      const debugTotals = React.useMemo(() => {
-                        const totals: Record<string, number> = { D: 0, E: 0, L: 0, N: 0, R: 0, S: 0 };
-                        const staffingData = form.getValues('staffing');
-                        staffingData.forEach((d: any) => {
-                          tokens.forEach(t => {
-                            totals[t] += Number(d?.need?.[t] || 0);
-                          });
-                        });
-                        return totals;
-                      }, [form.watch('staffing'), tokens]);
-
-                      return (
-                        <div className="space-y-4">
-                          {/* Grid layout */}
-                          <div className={`grid gap-2 text-sm ${tokens.length === 2 ? 'grid-cols-3' : 'grid-cols-4'}`}>
-                            {/* Headers */}
-                            <div className="font-medium">Day</div>
-                            {tokens.map(token => (
-                              <div key={token} className="font-medium text-center">{LABEL[token]}</div>
-                            ))}
-                            
-                            {/* Rows for each day */}
-                            {DAYS.map((day, idx) => (
-                              <React.Fragment key={day}>
-                                <div className="font-medium">{day}</div>
-                                {tokens.map(token => (
-                                  <Input
-                                    key={`${idx}-${token}`}
-                                    type="number"
-                                    min="0"
-                                    className="w-16"
-                                    data-testid={`need-${idx}-${token}`}
-                                    {...form.register(`staffing.${idx}.need.${token}` as any, { valueAsNumber: true })}
-                                  />
-                                ))}
-                              </React.Fragment>
-                            ))}
-                          </div>
-                          
-                          {/* Debug totals in development */}
-                          {import.meta.env.DEV && (
-                            <div className="text-xs text-slate-600 font-mono">
-                              Debug totals: {tokens.map(t => `${t}:${debugTotals[t]}`).join(' • ')}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    <RequirementsMiniComposer
+                      framework={form.watch('system')}
+                      onFrameworkChange={(fw) => {
+                        form.setValue('system', fw);
+                        // Update pattern default
+                        if (fw === "8h") {
+                          form.setValue('pattern', "EELLNNRRRR");
+                        } else {
+                          form.setValue('pattern', "DDNNRRRR");
+                        }
+                      }}
+                      onChange={(requirementsByDay) => {
+                        // Convert to array format expected by form
+                        const staffingArray = Object.entries(requirementsByDay).map(([dow, need]) => ({
+                          dow: Number(dow),
+                          need
+                        }));
+                        form.setValue('staffing', staffingArray);
+                      }}
+                    />
                   </CardContent>
                 </CollapsibleContent>
               </Collapsible>
