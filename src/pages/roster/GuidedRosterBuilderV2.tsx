@@ -281,6 +281,21 @@ export default function GuidedRosterBuilderV2() {
         });
       }
 
+      // 💾 CRITICAL: Save assignments to database
+      const assignmentsWithVersion = result.assignments.map(assignment => ({
+        ...assignment,
+        version_id: version.id
+      }));
+
+      const { error: assignmentsError } = await supabase
+        .from('roster_assignments')
+        .insert(assignmentsWithVersion);
+
+      if (assignmentsError) {
+        console.error("Failed to save assignments:", assignmentsError);
+        throw new Error(`Failed to save assignments: ${assignmentsError.message}`);
+      }
+
       toast({
         title: "Roster Generated Successfully",
         description: `Generated ${result.assignments.length} assignments with ${result.nightsGenerated} night shifts`,
