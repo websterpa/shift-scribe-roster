@@ -1,16 +1,9 @@
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isToday } from "date-fns";
 import { useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { X } from "lucide-react";
+import type { EnrichedAssignment } from "./types";
 
-type Row = { 
-  shift_start: string; 
-  shift_end?: string; 
-  shift_code: string; 
-  staff_id: string;
-  staff_name: string;
-};
-type Props = { monthISO: string; rows: Row[] };
+type Props = { monthISO: string; rows: EnrichedAssignment[] };
 
 export function MonthlyGrid({ monthISO, rows }: Props) {
   const first = new Date(`${monthISO}-01T00:00:00`);
@@ -26,7 +19,7 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
   }));
 
   const byDate = useMemo(() => {
-    const m: Record<string, Row[]> = {};
+    const m: Record<string, EnrichedAssignment[]> = {};
     for (const r of rows) {
       const d = r.shift_start.slice(0,10);
       if (!d.startsWith(monthISO)) continue;

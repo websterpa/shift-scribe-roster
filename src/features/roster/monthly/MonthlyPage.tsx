@@ -7,16 +7,7 @@ import { MonthlyGrid } from "./MonthlyGrid";
 import { StaffingOverview, loadStaffingOverview } from "./StaffingOverview";
 import { resolveActiveRosterVersion } from "./useActiveRoster";
 import DiagnosticsBanner from "./DiagnosticsBanner";
-
-type Assignment = {
-  id: string;
-  date: string;
-  shift_code: string;
-  shift_start: string;
-  shift_end: string;
-  staff_id: string;
-  staff_name: string;
-};
+import type { EnrichedAssignment } from "./types";
 
 const SHIFT_LABEL: Record<string,string> = { E:"Early (E)", L:"Late (L)", N:"Night (N)", D:"Day (D)" };
 
@@ -28,7 +19,7 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
   const [versionId, setVersionId] = useState(sp.get("version") ?? "");
   const [humanLabel, setHumanLabel] = useState("");
   
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<EnrichedAssignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);

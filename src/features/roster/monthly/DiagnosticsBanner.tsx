@@ -1,14 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchRequiredCodes } from "./requirements";
-
-type EnrichedAssignment = {
-  date: string;
-  shift_code: string;
-  shift_start: string;
-  shift_end: string;
-  staff_id: string | null;
-  staff_name: string;
-};
+import type { EnrichedAssignment } from "./types";
 
 type Props = {
   versionId: string;

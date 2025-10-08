@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { EnrichedAssignment } from "./types";
 
 type FetchArgs = {
   sb: SupabaseClient;
@@ -15,7 +16,7 @@ function fullName(p: { name?: string | null; first_name?: string | null; last_na
   return combo || "Unnamed";
 }
 
-export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCodeFilter = "ALL" }: FetchArgs) {
+export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCodeFilter = "ALL" }: FetchArgs): Promise<EnrichedAssignment[]> {
   const start = `${monthISO}-01`;
   const endDate = new Date(start);
   endDate.setMonth(endDate.getMonth() + 1);
@@ -35,8 +36,7 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   const { data, error } = await q;
   if (error) throw error;
   
-  type RawRow = { staff_id: string; shift_code: string; shift_start: string; shift_end: string; date: string; hours: number; cost: number; [key: string]: any };
-  const raw = (data ?? []) as RawRow[];
+  const raw = (data ?? []) as any[];
   
   // Filter out rows with falsy staff_id early (prevent empty UUID queries)
   const valid = raw.filter(r => !!r.staff_id && r.staff_id.trim() !== "");
@@ -62,13 +62,30 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   
   // Enrich with staff_name; blanks become "Unassigned"
   const enrichedValid = valid.map(r => ({ 
-    ...r, 
+    id: r.id,
+    version_id: r.version_id,
+    date: r.date,
+    shift_code: r.shift_code,
+    shift_start: r.shift_start,
+    shift_end: r.shift_end,
+    staff_id: r.staff_id,
+    hours: r.hours,
+    cost: r.cost,
     staff_name: nameMap.get(r.staff_id) ?? r.staff_id 
-  }));
+  } as EnrichedAssignment));
+  
   const enrichedInvalid = invalid.map(r => ({ 
-    ...r, 
+    id: r.id,
+    version_id: r.version_id,
+    date: r.date,
+    shift_code: r.shift_code,
+    shift_start: r.shift_start,
+    shift_end: r.shift_end,
+    staff_id: null,
+    hours: r.hours,
+    cost: r.cost,
     staff_name: "Unassigned" 
-  }));
+  } as EnrichedAssignment));
   
   return [...enrichedValid, ...enrichedInvalid];
 }

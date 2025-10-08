@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toCode } from "./shiftMapping";
 
 type ReqLegacy = Record<string, Record<string, number>>;
+// Note: role_id is legacy config JSON field name, not a database column
 type ReqNew = { days: Record<string, Array<{ role_id?: string; code?: string; logical?: string; needed: number }>> };
 
 export async function fetchRequiredCodes(versionId: string, monthStartISO: string, monthEndISO: string): Promise<Set<string>> {
@@ -19,6 +20,7 @@ export async function fetchRequiredCodes(versionId: string, monthStartISO: strin
     for (const [date, items] of Object.entries(req.days || {})) {
       if (date < monthStartISO || date > monthEndISO) continue;
       for (const it of items || []) {
+        // role_id is a legacy field in config JSON (not DB column); map all variants to shift_code
         const raw = it.code ?? it.role_id ?? it.logical ?? "";
         out.add(toCode(raw).toUpperCase());
       }
