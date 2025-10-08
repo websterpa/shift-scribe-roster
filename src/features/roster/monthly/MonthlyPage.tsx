@@ -6,6 +6,7 @@ import { MonthlyHeader } from "./MonthlyHeader";
 import { MonthlyGrid } from "./MonthlyGrid";
 import { StaffingOverview, loadStaffingOverview } from "./StaffingOverview";
 import { resolveActiveRosterVersion } from "./useActiveRoster";
+import DiagnosticsBanner from "./DiagnosticsBanner";
 
 type Assignment = {
   id: string;
@@ -117,6 +118,9 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
   }
 
   const monthStart = new Date(monthISO + "-01");
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const monthStartISO = monthISO + "-01";
+  const monthEndISO = monthEnd.toISOString().slice(0, 10);
 
   return (
     <div className="flex flex-col h-screen">
@@ -176,7 +180,15 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
         )}
 
         {!loading && !error && versionId && (
-          <MonthlyGrid monthISO={monthISO} rows={rows} />
+          <>
+            <DiagnosticsBanner 
+              versionId={versionId}
+              monthStartISO={monthStartISO}
+              monthEndISO={monthEndISO}
+              assignments={rows}
+            />
+            <MonthlyGrid monthISO={monthISO} rows={rows} />
+          </>
         )}
       </div>
     </div>

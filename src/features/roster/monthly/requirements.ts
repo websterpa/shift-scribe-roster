@@ -1,0 +1,35 @@
+import { supabase } from "@/integrations/supabase/client";
+import { toCode } from "./shiftMapping";
+
+type ReqLegacy = Record<string, Record<string, number>>;
+type ReqNew = { days: Record<string, Array<{ role_id?: string; code?: string; logical?: string; needed: number }>> };
+
+export async function fetchRequiredCodes(versionId: string, monthStartISO: string, monthEndISO: string): Promise<Set<string>> {
+  const v = await supabase.from("roster_versions").select("id, config_id").eq("id", versionId).single();
+  if (v.error || !v.data) return new Set();
+  
+  const c = await supabase.from("roster_config").select("id, staffing_requirements").eq("id", v.data.config_id).single();
+  if (c.error || !c.data) return new Set();
+  
+  const json: any = c.data.staffing_requirements || {};
+  const out = new Set<string>();
+  
+  if ("days" in json) {
+    const req = json as ReqNew;
+    for (const [date, items] of Object.entries(req.days || {})) {
+      if (date < monthStartISO || date > monthEndISO) continue;
+      for (const it of items || []) {
+        const raw = it.code ?? it.role_id ?? it.logical ?? "";
+        out.add(toCode(raw).toUpperCase());
+      }
+    }
+  } else {
+    const req = json as ReqLegacy;
+    // Consider every weekday defined in legacy map
+    Object.values(req || {}).forEach(day => {
+      Object.keys(day || {}).forEach(k => out.add(toCode(k).toUpperCase()));
+    });
+  }
+  
+  return out;
+}
