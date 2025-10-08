@@ -200,6 +200,11 @@ export default function GuidedRosterBuilderV2() {
       }
 
       // Create roster configuration
+      // Always start on the 1st of the current month
+      const today = new Date();
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const startDateISO = firstOfMonth.toISOString().split('T')[0];
+      
       const configData = {
         config_name: `Generated ${values.system} Roster`,
         shift_type: values.system,
@@ -207,7 +212,7 @@ export default function GuidedRosterBuilderV2() {
         timezone: values.tz,
         cycle_length_weeks: values.horizonWeeks,
         operational_hours_per_day: 24,
-        start_date: new Date().toISOString().split('T')[0],
+        start_date: startDateISO,
         staffing_requirements: Object.fromEntries(
           values.staffing.map(day => [
             day.dow,
