@@ -5,9 +5,14 @@
 ### A. Persistence-before-navigation ✅
 **Location:** `src/pages/roster/GuidedRosterBuilderV2.tsx`
 
+**CRITICAL FIX:** Added unique constraint on `roster_assignments` table to enable upsert idempotency.
+
+**Migration:** Added `idx_roster_assignments_unique` on `(version_id, date, staff_id)` - ensures one assignment per staff per date per roster version.
+
 1. **Upsert for idempotency:**
    - Changed from `insert()` to `upsert()` with conflict resolution on `(version_id, date, staff_id)`
    - Prevents duplicate assignments on retry/re-generation
+   - Fixed 42P10 error: "no unique or exclusion constraint matching ON CONFLICT specification"
 
 2. **Row count verification:**
    - After save, compares `savedCount` vs `expectedCount`
@@ -221,7 +226,14 @@ npm run playwright test e2e/night-persistence.spec.ts
 2. `src/utils/roster/enhancedRosterGenerator.ts` - Enhanced diagnostics, horizon expansion
 3. `src/__tests__/horizon.expansion.test.ts` - NEW: Horizon expansion tests
 4. `src/__tests__/night.presence.test.ts` - NEW: Night presence tests
-5. `e2e/night-persistence.spec.ts` - NEW: E2E persistence tests
+5. `src/__tests__/roster/upsert.idempotency.test.ts` - NEW: Upsert idempotency tests
+6. `e2e/night-persistence.spec.ts` - NEW: E2E persistence tests
+
+## Database Migration
+
+**File:** Supabase migration (auto-generated)
+**Change:** Added unique index `idx_roster_assignments_unique` on `public.roster_assignments(version_id, date, staff_id)`
+**Purpose:** Enables upsert idempotency to prevent duplicate assignments
 
 ## Next Steps
 

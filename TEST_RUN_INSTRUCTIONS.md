@@ -8,6 +8,9 @@
 # Run all night-related tests
 npm test -- -t @nights
 
+# Run persistence/upsert idempotency tests
+npm test -- -t @persist
+
 # Expected output:
 # ✓ src/__tests__/night.presence.test.ts (7 tests)
 #   ✓ generates Night shifts when N demand exists (8h)
@@ -22,6 +25,11 @@ npm test -- -t @nights
 #   ✓ 16-day pattern expands demand across full horizon
 #   ✓ weekly requirements repeat across full horizon
 #   ✓ demand does not stop at day 7
+#
+# ✓ src/__tests__/roster/upsert.idempotency.test.ts (3 tests)
+#   ✓ should not duplicate assignments on repeated upsert with same key
+#   ✓ should allow different staff on same date and version
+#   ✓ should allow same staff on different dates
 
 # Run enhanced generator tests
 npm test -- enhancedGenerator.nights.test

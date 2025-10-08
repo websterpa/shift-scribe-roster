@@ -304,6 +304,20 @@ export default function GuidedRosterBuilderV2() {
       // Verify row count matches expected
       const savedCount = savedAssignments?.length ?? 0;
       const expectedCount = result.assignments.length;
+
+      // DEV diagnostic: Show saved token counts from DB
+      if (import.meta.env.DEV && savedAssignments) {
+        const savedTokenCounts = savedAssignments.reduce((acc, a) => {
+          acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('💾 Saved to DB:', {
+          totalSaved: savedCount,
+          nightsSaved: savedTokenCounts['N'] || 0,
+          tokenCounts: savedTokenCounts
+        });
+      }
       
       if (savedCount !== expectedCount) {
         const msg = `⚠️ Persistence mismatch: expected ${expectedCount} assignments, saved ${savedCount}`;
