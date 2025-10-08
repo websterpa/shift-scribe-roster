@@ -281,38 +281,69 @@ export default function GuidedRosterBuilderV2() {
         });
       }
 
-      // 💾 CRITICAL: Save assignments to database
+      // 💾 CRITICAL: Save assignments to database with idempotency
       const assignmentsWithVersion = result.assignments.map(assignment => ({
         ...assignment,
         version_id: version.id
       }));
 
-      const { error: assignmentsError } = await supabase
+      // Upsert to prevent duplicates on retry (idempotency)
+      const { data: savedAssignments, error: assignmentsError } = await supabase
         .from('roster_assignments')
-        .insert(assignmentsWithVersion);
+        .upsert(assignmentsWithVersion, {
+          onConflict: 'version_id,date,staff_id',
+          ignoreDuplicates: false
+        })
+        .select('id, shift_code');
 
       if (assignmentsError) {
-        console.error("Failed to save assignments:", assignmentsError);
+        console.error("❌ Failed to save assignments:", assignmentsError);
         throw new Error(`Failed to save assignments: ${assignmentsError.message}`);
+      }
+
+      // Verify row count matches expected
+      const savedCount = savedAssignments?.length ?? 0;
+      const expectedCount = result.assignments.length;
+      
+      if (savedCount !== expectedCount) {
+        const msg = `⚠️ Persistence mismatch: expected ${expectedCount} assignments, saved ${savedCount}`;
+        console.error(msg);
+        throw new Error(msg);
+      }
+
+      // DEV diagnostic: Print saved token counts from DB
+      if (import.meta.env.DEV && savedAssignments) {
+        const savedTokenCounts = savedAssignments.reduce((acc, a) => {
+          acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('💾 Saved to DB:', {
+          totalSaved: savedCount,
+          nightsSaved: savedTokenCounts.N || 0,
+          tokenCounts: savedTokenCounts
+        });
       }
 
       toast({
         title: "Roster Generated Successfully",
-        description: `Generated ${result.assignments.length} assignments with ${result.nightsGenerated} night shifts`,
+        description: `Saved ${savedCount} assignments with ${result.nightsGenerated} night shifts`,
       });
 
-      // Navigate to summary with fresh start date to fix "blank until date change" bug
+      // Navigate to summary with fresh start date
       const startDate = new Date(configData.start_date);
       const monthParam = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
       window.location.href = `/roster/summary?version=${version.id}&month=${monthParam}`;
 
     } catch (error) {
-      console.error("Generation failed:", error);
+      console.error("❌ Generation failed:", error);
       toast({
         title: "Generation Failed",
         description: error instanceof Error ? error.message : "Failed to generate roster",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 10000 // Longer duration for errors
       });
+      // CRITICAL: Do NOT navigate on failure
     } finally {
       setIsGenerating(false);
     }

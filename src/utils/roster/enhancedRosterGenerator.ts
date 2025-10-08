@@ -40,6 +40,22 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   
   console.log("[G1] Expanded requirements from", Object.keys(input.requirementsByDay).length, "weekdays to", horizonDays, "days");
   
+  // DEV diagnostic: Print expanded requirements summary
+  if (import.meta.env.DEV) {
+    const totalByToken = Object.values(expandedReqs).reduce((acc, dayReqs) => {
+      Object.entries(dayReqs).forEach(([token, count]) => {
+        acc[token] = (acc[token] || 0) + count;
+      });
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.table({
+      'Horizon Days': horizonDays,
+      'Days with Requirements': Object.keys(expandedReqs).length,
+      ...Object.fromEntries(Object.entries(totalByToken).map(([k, v]) => [`Total ${k}`, v]))
+    });
+  }
+  
   // 2) Build demand from expanded requirements
   const demand = buildDemand(input.system, expandedReqs);
   console.log("[G1] Built demand:", demand);
