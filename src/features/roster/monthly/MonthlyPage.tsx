@@ -114,43 +114,45 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
   const monthEndISO = monthEnd.toISOString().slice(0, 10);
 
   return (
-    <div className="flex flex-col h-screen">
-      <div className="flex-shrink-0 p-6 border-b">
-        <h1 className="text-2xl font-bold mb-4">Monthly Schedule</h1>
-        
-        <div className="flex items-center gap-2 mb-4">
-          <label className="text-xs text-muted-foreground">Month</label>
-          <div className="flex items-center gap-1">
-            <button 
-              className="px-2 py-1 text-sm border rounded hover:bg-muted"
-              onClick={() => handleMonthChange('prev')}
-            >
-              ←
-            </button>
-            <span className="px-3 py-1 text-sm font-medium min-w-[120px] text-center">
-              {monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </span>
-            <button 
-              className="px-2 py-1 text-sm border rounded hover:bg-muted"
-              onClick={() => handleMonthChange('next')}
-            >
-              →
-            </button>
-            <button 
-              className="px-2 py-1 text-sm border rounded hover:bg-muted"
-              onClick={() => handleMonthChange('current')}
-            >
-              Today
-            </button>
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold mb-4">Monthly Schedule</h1>
+          
+          <div className="flex items-center gap-2 mb-4">
+            <label className="text-xs text-muted-foreground">Month</label>
+            <div className="flex items-center gap-1">
+              <button 
+                className="px-2 py-1 text-sm border rounded hover:bg-muted"
+                onClick={() => handleMonthChange('prev')}
+              >
+                ←
+              </button>
+              <span className="px-3 py-1 text-sm font-medium min-w-[120px] text-center">
+                {monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </span>
+              <button 
+                className="px-2 py-1 text-sm border rounded hover:bg-muted"
+                onClick={() => handleMonthChange('next')}
+              >
+                →
+              </button>
+              <button 
+                className="px-2 py-1 text-sm border rounded hover:bg-muted"
+                onClick={() => handleMonthChange('current')}
+              >
+                Today
+              </button>
+            </div>
           </div>
+
+          {versionId && <DiagnosticsBanner versionId={versionId} monthStartISO={monthStartISO} monthEndISO={monthEndISO} assignments={rows} />}
+          {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
+          {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
         </div>
+      </header>
 
-      {versionId && <DiagnosticsBanner versionId={versionId} monthStartISO={monthStartISO} monthEndISO={monthEndISO} assignments={rows} />}
-      {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
-      {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
-      </div>
-
-      <div className="flex-1 p-6 overflow-hidden">
+      <main className="flex-1 overflow-y-auto overscroll-contain p-6">
         {loading && (
           <div className="text-sm text-muted-foreground">Loading…</div>
         )}
@@ -174,7 +176,7 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
         {!loading && !error && versionId && (
           <MonthlyGrid monthISO={monthISO} rows={rows} />
         )}
-      </div>
+      </main>
     </div>
   );
 }

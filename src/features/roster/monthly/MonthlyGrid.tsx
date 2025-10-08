@@ -39,8 +39,38 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
 
   const [openDay, setOpenDay] = useState<string | null>(null);
 
+  // DEV diagnostics - log framework detection once
+  if (import.meta.env.DEV && rows.length > 0) {
+    const fw = allCodes.has('D') && !allCodes.has('E') && !allCodes.has('L') ? '12h' : 
+               allCodes.has('E') || allCodes.has('L') ? '8h' : 'mixed';
+    console.log('📊 Shift order comparator:', { 
+      frameworkDetected: fw, 
+      order: fw === '12h' ? ['D','N','E','L','R','S'] : ['E','L','N','D','R','S'],
+      codesInMonth: Array.from(allCodes)
+    });
+  }
+
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)]">
+    <div className="flex flex-col pb-24">
+      {/* Helper buttons */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          onClick={() => {
+            const todayCell = document.querySelector('[data-today]');
+            todayCell?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }}
+          className="px-3 py-1.5 text-xs border rounded hover:bg-muted transition-colors"
+        >
+          Jump to Today
+        </button>
+        <button
+          onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+          className="px-3 py-1.5 text-xs border rounded hover:bg-muted transition-colors"
+        >
+          Jump to Bottom
+        </button>
+      </div>
+
       {/* Header */}
       <div className="grid grid-cols-7 border-b border-border">
         {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
@@ -51,7 +81,7 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
       </div>
       
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 border border-border rounded-b-lg overflow-hidden flex-1">
+      <div className="grid grid-cols-7 border border-border rounded-b-lg overflow-hidden">
         {/* Padding cells for days before month starts */}
         {paddingCells.map(cell => (
           <div 
@@ -72,7 +102,9 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
           return (
             <button
               key={iso}
-              className={`p-2 flex flex-col text-left hover:bg-muted/50 transition-colors border-r border-b ${
+              data-day={dayNum}
+              {...(isTodayDate ? { 'data-today': 'true' } : {})}
+              className={`p-2 flex flex-col text-left hover:bg-muted/50 transition-colors border-r border-b min-h-[120px] ${
                 isTodayDate ? "bg-primary/5 ring-2 ring-primary/20 ring-inset" : "bg-card"
               }`}
               onClick={() => setOpenDay(iso)}
