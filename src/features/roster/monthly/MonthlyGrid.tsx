@@ -2,6 +2,7 @@ import { startOfMonth, endOfMonth, eachDayOfInterval, format, isToday } from "da
 import { useMemo, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { EnrichedAssignment } from "./types";
+import { makeShiftComparator, collectCodes } from "./shiftOrder";
 
 type Props = { monthISO: string; rows: EnrichedAssignment[] };
 
@@ -18,6 +19,10 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
     key: `padding-${i}`
   }));
 
+  // Collect all shift codes in the month for framework detection
+  const allCodes = useMemo(() => collectCodes(rows), [rows]);
+  const cmp = useMemo(() => makeShiftComparator(allCodes), [allCodes]);
+
   const byDate = useMemo(() => {
     const m: Record<string, EnrichedAssignment[]> = {};
     for (const r of rows) {
@@ -25,8 +30,12 @@ export function MonthlyGrid({ monthISO, rows }: Props) {
       if (!d.startsWith(monthISO)) continue;
       (m[d] ??= []).push(r);
     }
+    // Sort each day's assignments by the framework order
+    Object.keys(m).forEach(day => {
+      m[day].sort(cmp);
+    });
     return m;
-  }, [rows, monthISO]);
+  }, [rows, monthISO, cmp]);
 
   const [openDay, setOpenDay] = useState<string | null>(null);
 
