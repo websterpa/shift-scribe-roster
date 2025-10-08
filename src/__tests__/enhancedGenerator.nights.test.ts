@@ -54,20 +54,20 @@ describe('@nights Enhanced Generator', () => {
       versionId: 'test-version',
       staff: mockStaff,
       requirementsByDay: {
-        0: { E: 1, L: 1, N: 2 },
-        1: { E: 1, L: 1, N: 2 }
+        0: { E: 1, L: 1, N: 2 }, // Sunday
+        1: { E: 1, L: 1, N: 2 }  // Monday
       },
       startDate: '2025-10-13', // Monday
       allowSupervisorNights: false,
       includeNights: true,
-      patternTokens: ['E', 'E', 'L', 'L', 'N', 'N', 'R', 'R']
+      patternTokens: ['E', 'E', 'L', 'L', 'N', 'N', 'R', 'R', 'E', 'E', 'L', 'L', 'N', 'N', 'R', 'R'] // 16-day pattern
     });
 
     expect(result.nightsGenerated).toBeGreaterThan(0);
     expect(result.assignments.some(a => a.shift_code === 'N')).toBe(true);
     
     const nightShifts = result.assignments.filter(a => a.shift_code === 'N');
-    expect(nightShifts.length).toBeGreaterThanOrEqual(2); // At least one day's worth
+    expect(nightShifts.length).toBeGreaterThanOrEqual(4); // At least 2 days × 2 weeks worth
   });
 
   test('generates Night shifts when N demand exists (12h system)', () => {

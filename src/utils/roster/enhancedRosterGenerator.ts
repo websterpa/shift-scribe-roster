@@ -27,8 +27,21 @@ export interface GeneratorResult {
 export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   console.log("[G1] Enhanced generator starting with input:", input);
 
-  // 1) Build demand from requirements
-  const demand = buildDemand(input.system, input.requirementsByDay);
+  // 1) Expand weekly requirements across full horizon
+  const horizonDays = (input.patternTokens?.length || 14); // Use pattern length as horizon
+  const expandedReqs: Record<number, Record<string, number>> = {};
+  
+  for (let dayIdx = 0; dayIdx < horizonDays; dayIdx++) {
+    const weekday = dayIdx % 7; // Map to 0-6 weekday
+    if (input.requirementsByDay[weekday]) {
+      expandedReqs[dayIdx] = input.requirementsByDay[weekday];
+    }
+  }
+  
+  console.log("[G1] Expanded requirements from", Object.keys(input.requirementsByDay).length, "weekdays to", horizonDays, "days");
+  
+  // 2) Build demand from expanded requirements
+  const demand = buildDemand(input.system, expandedReqs);
   console.log("[G1] Built demand:", demand);
 
   // 2) Check night readiness before proceeding
