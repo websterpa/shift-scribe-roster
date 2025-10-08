@@ -269,15 +269,43 @@ export default function GuidedRosterBuilderV2() {
         patternTokens: values.pattern.split('')
       });
 
-      // DEV diagnostic: Print result summary
+      // Calculate expected counts by code for the full month
+      const genStartDate = new Date(configData.start_date);
+      const monthStart = new Date(genStartDate.getFullYear(), genStartDate.getMonth(), 1);
+      const monthEnd = new Date(genStartDate.getFullYear(), genStartDate.getMonth() + 1, 0);
+      const monthStartISO = monthStart.toISOString().slice(0, 10);
+      const monthEndISO = monthEnd.toISOString().slice(0, 10);
+      const daysInMonth = monthEnd.getDate();
+
+      // Calculate expected counts per code across the full month
+      const expectedByCode: Record<string, number> = {};
+      for (let dayIdx = 0; dayIdx < daysInMonth; dayIdx++) {
+        const currentDate = new Date(monthStart);
+        currentDate.setDate(monthStart.getDate() + dayIdx);
+        const weekday = currentDate.getDay();
+        
+        const dayReqs = requirementsByDay[weekday] || {};
+        Object.entries(dayReqs).forEach(([code, count]) => {
+          expectedByCode[code] = (expectedByCode[code] || 0) + (count as number);
+        });
+      }
+
+      // DEV diagnostic: Print generation result and expected counts
       if (import.meta.env.DEV) {
-        console.log('🎯 Generation Result:', {
-          totalAssignments: result.assignments.length,
-          nightsGenerated: result.nightsGenerated,
-          tokenBreakdown: result.assignments.reduce((acc, a) => {
-            acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
+        const generatedByCode = result.assignments.reduce((acc, a) => {
+          acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        console.log('📊 STAGE 2: Generation Complete');
+        console.table({
+          'Month Start': monthStartISO,
+          'Month End': monthEndISO,
+          'Days Expanded': daysInMonth,
+          'Total Assignments': result.assignments.length,
+          'Nights Generated': result.nightsGenerated,
+          ...Object.fromEntries(Object.entries(expectedByCode).map(([k, v]) => [`Expected ${k}`, v])),
+          ...Object.fromEntries(Object.entries(generatedByCode).map(([k, v]) => [`Generated ${k}`, v]))
         });
       }
 
@@ -294,49 +322,79 @@ export default function GuidedRosterBuilderV2() {
           onConflict: 'version_id,date,staff_id',
           ignoreDuplicates: false
         })
-        .select('id, shift_code');
+        .select('id, shift_code, date');
 
       if (assignmentsError) {
         console.error("❌ Failed to save assignments:", assignmentsError);
         throw new Error(`Failed to save assignments: ${assignmentsError.message}`);
       }
 
-      // Verify row count matches expected
+      // Verify row count and code distribution matches expected
       const savedCount = savedAssignments?.length ?? 0;
       const expectedCount = result.assignments.length;
+      
+      // Build saved counts by code
+      const savedByCode = (savedAssignments || []).reduce((acc, a) => {
+        acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
 
-      // DEV diagnostic: Show saved token counts from DB
-      if (import.meta.env.DEV && savedAssignments) {
-        const savedTokenCounts = savedAssignments.reduce((acc, a) => {
-          acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        
-        console.log('💾 Saved to DB:', {
-          totalSaved: savedCount,
-          nightsSaved: savedTokenCounts['N'] || 0,
-          tokenCounts: savedTokenCounts
+      // DEV diagnostic: Show final saved token counts from DB
+      if (import.meta.env.DEV) {
+        console.log('📊 STAGE 3: Database Persistence');
+        console.table({
+          'Total Saved': savedCount,
+          'Total Expected': expectedCount,
+          ...Object.fromEntries(Object.entries(expectedByCode).map(([k, v]) => [`Expected ${k}`, v])),
+          ...Object.fromEntries(Object.entries(savedByCode).map(([k, v]) => [`Saved ${k}`, v]))
         });
       }
       
+      // Verify total count
       if (savedCount !== expectedCount) {
         const msg = `⚠️ Persistence mismatch: expected ${expectedCount} assignments, saved ${savedCount}`;
         console.error(msg);
-        throw new Error(msg);
+        
+        toast({
+          title: "Save Error",
+          description: msg,
+          variant: "destructive"
+        });
+        
+        // Retry once
+        console.log("Retrying save...");
+        const { data: retryAssignments, error: retryError } = await supabase
+          .from('roster_assignments')
+          .upsert(assignmentsWithVersion, {
+            onConflict: 'version_id,date,staff_id',
+            ignoreDuplicates: false
+          })
+          .select('id, shift_code, date');
+        
+        if (retryError || (retryAssignments?.length ?? 0) !== expectedCount) {
+          throw new Error(`Retry failed: ${retryError?.message || 'count mismatch persists'}`);
+        }
       }
 
-      // DEV diagnostic: Print saved token counts from DB
-      if (import.meta.env.DEV && savedAssignments) {
-        const savedTokenCounts = savedAssignments.reduce((acc, a) => {
-          acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        
-        console.log('💾 Saved to DB:', {
-          totalSaved: savedCount,
-          nightsSaved: savedTokenCounts.N || 0,
-          tokenCounts: savedTokenCounts
+      // Verify code distribution
+      const missingCodes: string[] = [];
+      Object.entries(expectedByCode).forEach(([code, expectedCnt]) => {
+        const savedCnt = savedByCode[code] || 0;
+        if (savedCnt < expectedCnt) {
+          missingCodes.push(`${code}: expected ${expectedCnt}, saved ${savedCnt}`);
+        }
+      });
+
+      if (missingCodes.length > 0) {
+        const msg = `⚠️ Code distribution mismatch: ${missingCodes.join('; ')}`;
+        console.error(msg);
+        toast({
+          title: "Incomplete Save",
+          description: msg,
+          variant: "destructive"
         });
+        setIsGenerating(false);
+        return; // DO NOT navigate on failure
       }
 
       toast({

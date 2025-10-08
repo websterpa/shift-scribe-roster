@@ -27,12 +27,31 @@ export interface GeneratorResult {
 export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   console.log("[G1] Enhanced generator starting with input:", input);
 
-  // 1) Expand weekly requirements across full horizon
-  const horizonDays = (input.patternTokens?.length || 14); // Use pattern length as horizon
+  // 1) Calculate full month range (inclusive)
+  const startDate = new Date(input.startDate);
+  const monthStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Last day of month
+  
+  // Calculate days in month (inclusive)
+  const daysInMonth = monthEnd.getDate();
+  const horizonDays = daysInMonth;
+  
+  console.log("[G1] Full month expansion:", {
+    monthStart: monthStart.toISOString().slice(0, 10),
+    monthEnd: monthEnd.toISOString().slice(0, 10),
+    daysInMonth,
+    horizonDays
+  });
+
+  // 2) Expand weekly requirements across EVERY day in the month (inclusive)
   const expandedReqs: Record<number, Record<string, number>> = {};
   
+  // Iterate through every day from 1st to last day (inclusive with <=)
   for (let dayIdx = 0; dayIdx < horizonDays; dayIdx++) {
-    const weekday = dayIdx % 7; // Map to 0-6 weekday
+    const currentDate = new Date(monthStart);
+    currentDate.setDate(monthStart.getDate() + dayIdx);
+    const weekday = currentDate.getDay(); // 0=Sunday, 6=Saturday
+    
     if (input.requirementsByDay[weekday]) {
       expandedReqs[dayIdx] = input.requirementsByDay[weekday];
     }
@@ -40,7 +59,7 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
   
   console.log("[G1] Expanded requirements from", Object.keys(input.requirementsByDay).length, "weekdays to", horizonDays, "days");
   
-  // DEV diagnostic: Print expanded requirements summary
+  // DEV diagnostic: Print expanded requirements summary BEFORE generation
   if (import.meta.env.DEV) {
     const totalByToken = Object.values(expandedReqs).reduce((acc, dayReqs) => {
       Object.entries(dayReqs).forEach(([token, count]) => {
@@ -49,10 +68,13 @@ export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
       return acc;
     }, {} as Record<string, number>);
     
+    console.log('📊 STAGE 1: Requirements Expansion');
     console.table({
-      'Horizon Days': horizonDays,
+      'Month Start': monthStart.toISOString().slice(0, 10),
+      'Month End': monthEnd.toISOString().slice(0, 10),
+      'Days Expanded': horizonDays,
       'Days with Requirements': Object.keys(expandedReqs).length,
-      ...Object.fromEntries(Object.entries(totalByToken).map(([k, v]) => [`Total ${k}`, v]))
+      ...Object.fromEntries(Object.entries(totalByToken).map(([k, v]) => [`Expected ${k}`, v]))
     });
   }
   
