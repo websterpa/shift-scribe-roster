@@ -171,6 +171,34 @@ export async function generateAndSaveRoster(
     };
   });
 
+  // VALIDATION: Ensure requirements only use valid shift type keys
+  const validShiftTypes = new Set(['E', 'L', 'N']);
+  days.forEach((dateISO, dayIndex) => {
+    const dayReqs = requirements[dateISO];
+    const keys = Object.keys(dayReqs);
+    
+    for (const key of keys) {
+      const normalized = key.trim().toUpperCase();
+      
+      // Check if normalized key is valid
+      if (!validShiftTypes.has(normalized)) {
+        throw new Error(
+          `Invalid requirement key "${key}" on day ${dayIndex + 1} (${dateISO}). ` +
+          `Only E/L/N are allowed.`
+        );
+      }
+      
+      // Normalize key if needed (case/whitespace cleanup)
+      if (normalized !== key) {
+        logger.warn(`Normalizing requirement key "${key}" → "${normalized}" on ${dateISO}`);
+        (dayReqs as any)[normalized] = (dayReqs as any)[key];
+        delete (dayReqs as any)[key];
+      }
+    }
+  });
+
+  logger.info('Requirements validated', { daysCount: days.length });
+
   // Diagnostic logging for staff pool and configuration
   console.info("[DIAG] staff.count", correctiveStaff.length);
   console.info("[DIAG] staff.names", correctiveStaff.map(s => s.name));
