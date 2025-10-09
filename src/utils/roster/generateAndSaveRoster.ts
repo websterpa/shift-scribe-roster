@@ -114,6 +114,16 @@ export async function generateAndSaveRoster(
     };
   });
 
+  // Diagnostic logging for staff pool and configuration
+  console.info("[DIAG] staff.count", correctiveStaff.length);
+  console.info("[DIAG] staff.names", correctiveStaff.map(s => s.name));
+  console.info("[DIAG] availability.sample", correctiveStaff.slice(0, 3).map(s => ({
+    name: s.name, 
+    daysAvail: Object.values(s.availability).filter(Boolean).length 
+  })));
+  console.info("[DIAG] requirements", requirements);
+  console.info("[DIAG] policy", DEFAULT_CORRECTIVE_POLICY);
+
   logger.info('Generating roster with corrective engine', { 
     staffCount: correctiveStaff.length,
     daysCount: days.length,
