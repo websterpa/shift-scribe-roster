@@ -57,6 +57,14 @@ export interface CorrectiveResult {
   };
   violations: string[];
   utilizationReport: Record<string, number>; // staffId -> total assignments
+  unfilledShifts?: Array<{ // Diagnostic: why shifts couldn't be filled
+    dateISO: string;
+    dayIndex: number;
+    shift: 'E' | 'L' | 'N';
+    needed: number;
+    filled: number;
+    rejectionReasons: string[];
+  }>;
 }
 
 // ============================================================================
@@ -135,6 +143,61 @@ function isEligible(ctx: EligibilityContext): boolean {
   }
 
   return true;
+}
+
+// Enhanced eligibility check that returns rejection reasons
+function checkEligibilityWithReasons(ctx: EligibilityContext): { eligible: boolean; reasons: string[] } {
+  const { staffId, dateISO, shiftType, currentAssignments, staff, policy, days } = ctx;
+  const reasons: string[] = [];
+
+  // 1. Availability
+  if (!staff.availability[dateISO]) {
+    reasons.push('unavailable');
+    return { eligible: false, reasons };
+  }
+
+  // 2. Night eligibility
+  if (shiftType === 'N' && !staff.isNightEligible) {
+    reasons.push('not-night-eligible');
+    return { eligible: false, reasons };
+  }
+
+  const staffAssignments = currentAssignments.get(staffId) || new Map();
+
+  // 3. Already assigned on this day
+  if (staffAssignments.has(dateISO)) {
+    reasons.push('already-assigned');
+    return { eligible: false, reasons };
+  }
+
+  // 4. Illegal turnaround (previous day)
+  const dayIndex = days.indexOf(dateISO);
+  if (dayIndex > 0) {
+    const prevDate = days[dayIndex - 1];
+    const prevShift = staffAssignments.get(prevDate);
+    if (isIllegalTurnaround(prevShift || null, shiftType)) {
+      reasons.push('illegal-turnaround');
+      return { eligible: false, reasons };
+    }
+  }
+
+  // 5. Consecutive days limit
+  const consecDays = countConsecutiveDaysBackward(staffId, dayIndex, days, staffAssignments);
+  if (consecDays >= policy.maxConsecDays) {
+    reasons.push('max-consec-days');
+    return { eligible: false, reasons };
+  }
+
+  // 6. Consecutive nights limit
+  if (shiftType === 'N') {
+    const consecNights = countConsecutiveNightsBackward(staffId, dayIndex, days, staffAssignments);
+    if (consecNights >= policy.maxConsecNights) {
+      reasons.push('max-consec-nights');
+      return { eligible: false, reasons };
+    }
+  }
+
+  return { eligible: true, reasons: [] };
 }
 
 // ============================================================================
@@ -231,6 +294,7 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
   // Initialize tracking
   const currentAssignments = new Map<string, Map<string, ShiftCode>>();
   const assigned: Record<string, { E: number; L: number; N: number }> = {};
+  const unfilledShifts: Array<{ dateISO: string; dayIndex: number; shift: 'E' | 'L' | 'N'; needed: number; filled: number; rejectionReasons: string[] }> = [];
   
   staff.forEach(s => {
     currentAssignments.set(s.id, new Map());
@@ -266,7 +330,31 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
         );
 
         if (candidates.length === 0) {
-          logger.warn(`No eligible staff for ${shiftType} on ${dateISO}`, { filled, needed });
+          // Collect rejection reasons from all staff
+          const allReasons = new Set<string>();
+          staff.forEach(s => {
+            const check = checkEligibilityWithReasons({
+              staffId: s.id,
+              dateISO,
+              shiftType,
+              currentAssignments,
+              staff: s,
+              policy,
+              days,
+            });
+            check.reasons.forEach(r => allReasons.add(r));
+          });
+          
+          unfilledShifts.push({
+            dateISO,
+            dayIndex: days.indexOf(dateISO),
+            shift: shiftType,
+            needed,
+            filled,
+            rejectionReasons: Array.from(allReasons),
+          });
+          
+          logger.warn(`No eligible staff for ${shiftType} on ${dateISO}`, { filled, needed, reasons: Array.from(allReasons) });
           break;
         }
 
@@ -328,11 +416,12 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
   ensureAllStaffUtilized(staff, days, currentAssignments, assigned, targets, policy, requirements);
 
   // STEP 4: Build result
-  const result = buildResult(staff, days, currentAssignments, assigned, targets, requirements);
+  const result = buildResult(staff, days, currentAssignments, assigned, targets, requirements, unfilledShifts);
 
   logger.info('Corrective roster generation complete', {
     totalAssignments: result.assignments.length,
     violations: result.violations.length,
+    unfilledShifts: unfilledShifts.length,
   });
 
   return result;
@@ -418,7 +507,8 @@ function buildResult(
   currentAssignments: Map<string, Map<string, ShiftCode>>,
   assigned: Record<string, { E: number; L: number; N: number }>,
   targets: { E: number; L: number; N: number },
-  requirements: CoverageRequirements
+  requirements: CoverageRequirements,
+  unfilledShifts: Array<{ dateISO: string; dayIndex: number; shift: 'E' | 'L' | 'N'; needed: number; filled: number; rejectionReasons: string[] }>
 ): CorrectiveResult {
   const assignments: Assignment[] = [];
   const roster: Record<string, Record<string, ShiftCode>> = {};
@@ -497,6 +587,7 @@ function buildResult(
     },
     violations,
     utilizationReport,
+    unfilledShifts: unfilledShifts.length > 0 ? unfilledShifts : undefined,
   };
 }
 
