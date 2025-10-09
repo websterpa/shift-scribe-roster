@@ -12,12 +12,18 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
   logger.info('Fetching staff members');
   
   try {
-    const { data, error } = await supabase
-      .from('staff_profiles')
-      .select('*')
-      .eq('is_active', true); // Keep filtering for active for roster generation
+    // TEMP DIAGNOSTIC: Set to true to bypass is_active filter
+    const BYPASS_ACTIVE_FILTER = false; // Toggle this to test with all staff
+    
+    let query = supabase.from('staff_profiles').select('*');
+    if (!BYPASS_ACTIVE_FILTER) {
+      query = query.eq('is_active', true);
+    }
+    
+    const { data, error } = await query;
 
     console.info("[DIAG] raw staff rows from DB", data?.length || 0);
+    console.info("[DIAG] BYPASS_ACTIVE_FILTER", BYPASS_ACTIVE_FILTER);
 
     if (error) {
       logger.error(new Error('Failed to fetch staff members'), { error });
