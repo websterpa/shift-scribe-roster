@@ -460,41 +460,138 @@ function ensureAllStaffUtilized(
   policy: CorrectivePolicy,
   requirements: CoverageRequirements
 ) {
-  const unused = staff.filter(s => {
-    const stats = assigned[s.id];
-    return stats.E + stats.L + stats.N === 0;
+  const countAssignments = (staffId: string) => {
+    const stats = assigned[staffId];
+    return stats.E + stats.L + stats.N;
+  };
+
+  const unused = staff.filter(s => countAssignments(s.id) === 0);
+
+  if (unused.length === 0) {
+    logger.info('All staff already utilized');
+    return;
+  }
+
+  logger.info('Ensuring all staff utilized', { 
+    unusedCount: unused.length,
+    unusedStaff: unused.map(s => s.name)
   });
 
-  if (unused.length === 0) return;
+  for (const u of unused) {
+    let wasAssigned = false;
 
-  logger.info('Ensuring all staff utilized', { unusedCount: unused.length });
-
-  for (const s of unused) {
-    // Find a day where we can swap or insert
+    // STRATEGY 1: Try simple assignment (add to unfilled spot)
     for (const dateISO of days) {
+      if (wasAssigned) break;
+      
       const shifts: Array<'E' | 'L' | 'N'> = ['E', 'L', 'N'];
       
       for (const shiftType of shifts) {
         if (isEligible({
-          staffId: s.id,
+          staffId: u.id,
           dateISO,
           shiftType,
           currentAssignments,
-          staff: s,
+          staff: u,
           policy,
           days,
         })) {
-          // Assign this shift
-          currentAssignments.get(s.id)!.set(dateISO, shiftType);
-          assigned[s.id][shiftType]++;
-          logger.info(`Assigned ${s.id} to ${shiftType} on ${dateISO} for utilization`);
+          // Check if this would overfill coverage
+          const currentCoverage = staff.filter(s => {
+            const shift = currentAssignments.get(s.id)?.get(dateISO);
+            return shift === shiftType;
+          }).length;
+          const needed = requirements[dateISO]?.[shiftType] || 0;
+
+          if (currentCoverage < needed) {
+            // Safe to add without overfilling
+            currentAssignments.get(u.id)!.set(dateISO, shiftType);
+            assigned[u.id][shiftType]++;
+            logger.info(`[UTILISATION] Simple add: ${u.name} → ${shiftType} on ${dateISO}`);
+            wasAssigned = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // STRATEGY 2: If simple add failed, try swapping with over-utilized staff
+    if (!wasAssigned) {
+      for (const dateISO of days) {
+        if (wasAssigned) break;
+        
+        const shifts: Array<'E' | 'L' | 'N'> = ['E', 'L', 'N'];
+        
+        for (const shiftType of shifts) {
+          if (wasAssigned) break;
+
+          // Check if unused staff is eligible for this shift
+          if (!isEligible({
+            staffId: u.id,
+            dateISO,
+            shiftType,
+            currentAssignments,
+            staff: u,
+            policy,
+            days,
+          })) continue;
+
+          // Find candidates who are currently assigned this shift and are over target
+          const candidates = staff.filter(s => {
+            if (s.id === u.id) return false;
+            const shift = currentAssignments.get(s.id)?.get(dateISO);
+            if (shift !== shiftType) return false;
+            
+            // Check if they're over their target for this shift type
+            const currentCount = assigned[s.id][shiftType];
+            const target = targets[shiftType];
+            return currentCount > target;
+          });
+
+          if (candidates.length === 0) continue;
+
+          // Sort by how far over target they are
+          candidates.sort((a, b) => {
+            const aOverage = assigned[a.id][shiftType] - targets[shiftType];
+            const bOverage = assigned[b.id][shiftType] - targets[shiftType];
+            return bOverage - aOverage;
+          });
+
+          const swapCandidate = candidates[0];
+          
+          // Perform the swap
+          currentAssignments.get(swapCandidate.id)!.set(dateISO, 'R'); // Replace with rest
+          assigned[swapCandidate.id][shiftType]--;
+          
+          currentAssignments.get(u.id)!.set(dateISO, shiftType);
+          assigned[u.id][shiftType]++;
+          
+          logger.info(`[UTILISATION] Swap: ${u.name} ↔ ${swapCandidate.name} for ${shiftType} on ${dateISO}`);
+          wasAssigned = true;
           break;
         }
       }
-      
-      if (assigned[s.id].E + assigned[s.id].L + assigned[s.id].N > 0) break;
+    }
+
+    if (!wasAssigned) {
+      logger.warn(`[UTILISATION] Failed to assign ${u.name} - no eligible slots or swaps available`);
     }
   }
+
+  // Log final utilization summary
+  const utilSummary = staff.map(s => ({
+    name: s.name,
+    total: countAssignments(s.id),
+    E: assigned[s.id].E,
+    L: assigned[s.id].L,
+    N: assigned[s.id].N,
+  }));
+  
+  console.info("[UTILISATION] Final assignment counts:", utilSummary);
+  logger.info('Utilization pass complete', { 
+    staffWithZero: utilSummary.filter(s => s.total === 0).length,
+    summary: utilSummary 
+  });
 }
 
 // ============================================================================
