@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember } from "@/types/roster";
-import { generateRoster, getDefaultRatePolicy, getDefaultRestRules, getDefaultGeneratorConfig } from "./rosterGeneration";
+import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, DEFAULT_CORRECTIVE_POLICY } from "@/engine2/generators/correctiveRosterGenerator";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('GenerateAndSaveRoster');
@@ -63,28 +63,124 @@ export async function generateAndSaveRoster(
 
   logger.info('Created roster version', { versionId: versionData.id });
 
-  // Generate roster using new engine
-  const result = await generateRoster({
-    supabase,
-    rosterVersionId: versionData.id,
-    monthISO,
-    ratePolicy: getDefaultRatePolicy(),
-    restRules: getDefaultRestRules(),
-    holidays: [],
-    staffIds,
-    config: getDefaultGeneratorConfig(),
+  // Fetch roster config to get coverage requirements
+  const { data: configData, error: configError } = await supabase
+    .from('roster_config')
+    .select('*')
+    .eq('id', configId)
+    .single();
+
+  if (configError || !configData) {
+    logger.error(new Error('Failed to fetch roster config'), { error: configError });
+    throw new Error(`Failed to fetch roster config: ${configError?.message || 'Unknown error'}`);
+  }
+
+  // Build days array for the month
+  const [year, month] = monthISO.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const days: string[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    days.push(`${monthISO}-${String(day).padStart(2, '0')}`);
+  }
+
+  // Convert staffList to CorrectiveStaffMember format
+  const correctiveStaff: CorrectiveStaffMember[] = staffList.map(s => ({
+    id: s.id,
+    name: s.name || `${s.first_name} ${s.last_name}`,
+    availability: {}, // All days available by default
+    isNightEligible: s.eligible_shifts?.includes('Night') ?? true,
+  }));
+
+  // Set all days as available for all staff
+  correctiveStaff.forEach(s => {
+    days.forEach(d => {
+      s.availability[d] = true;
+    });
   });
+
+  // Parse coverage requirements from config
+  const requirements: CoverageRequirements = {};
+  const staffingReqs = configData.staffing_requirements || {};
+  
+  days.forEach(dateISO => {
+    const jsDay = new Date(dateISO + 'T00:00:00').getDay();
+    const dayOfWeek = String(jsDay); // 0=Sunday, 6=Saturday
+    const dayReqs = staffingReqs[dayOfWeek] || {};
+    
+    requirements[dateISO] = {
+      E: dayReqs.E || dayReqs.D || 2, // Default 2 early shifts
+      L: dayReqs.L || 1, // Default 1 late shift
+      N: dayReqs.N || 1, // Default 1 night shift
+    };
+  });
+
+  logger.info('Generating roster with corrective engine', { 
+    staffCount: correctiveStaff.length,
+    daysCount: days.length,
+    sampleRequirements: requirements[days[0]]
+  });
+
+  // Generate roster using corrective engine
+  const result = generateCorrectiveRoster({
+    days,
+    staff: correctiveStaff,
+    requirements,
+    policy: DEFAULT_CORRECTIVE_POLICY,
+  });
+
+  logger.info('Corrective roster generated', { 
+    assignmentsCount: result.assignments.length,
+    utilizationReport: result.utilizationReport
+  });
+
+  // Convert assignments to database format and insert
+  const assignmentsToInsert = result.assignments.map(a => ({
+    version_id: versionData.id,
+    staff_id: a.staffId,
+    date: a.dateISO,
+    shift_code: a.shiftType,
+    shift_start: a.shiftType === 'E' ? `${a.dateISO}T06:00:00` :
+                 a.shiftType === 'L' ? `${a.dateISO}T14:00:00` :
+                 `${a.dateISO}T22:00:00`,
+    shift_end: a.shiftType === 'E' ? `${a.dateISO}T14:00:00` :
+               a.shiftType === 'L' ? `${a.dateISO}T22:00:00` :
+               addDay(`${a.dateISO}T06:00:00`),
+    hours: 8,
+    cost: 0, // Will be calculated later
+  }));
+
+  if (assignmentsToInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from('roster_assignments')
+      .insert(assignmentsToInsert);
+
+    if (insertError) {
+      logger.error(new Error('Failed to insert assignments'), { error: insertError });
+      throw new Error(`Failed to insert assignments: ${insertError.message}`);
+    }
+  }
 
   logger.info('Roster generation complete', { 
-    versionId: result.versionId, 
-    assignments: result.assignmentsInserted 
+    versionId: versionData.id, 
+    assignments: assignmentsToInsert.length,
+    fairness: result.fairness
   });
 
+  // Calculate total variance as sum of E, L, N variances
+  const totalVariance = result.fairness.variance.E + result.fairness.variance.L + result.fairness.variance.N;
+
   return {
-    versionId: result.versionId,
-    totalAssignments: result.assignmentsInserted,
-    optimizationResult: { score: 100 },
-    wtrResult: { violations: [] },
+    versionId: versionData.id,
+    totalAssignments: assignmentsToInsert.length,
+    optimizationResult: { score: Math.max(0, 100 - totalVariance) },
+    wtrResult: { violations: result.violations },
     costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
   };
+}
+
+// Helper to add one day to ISO timestamp
+function addDay(isoTimestamp: string): string {
+  const d = new Date(isoTimestamp);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().replace('Z', '').replace('.000', '');
 }
