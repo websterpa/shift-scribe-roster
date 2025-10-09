@@ -1,9 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_CORRECTIVE_POLICY } from "@/engine2/generators/correctiveRosterGenerator";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function GeneratorDiagnosticPanel({ versionId }: { versionId?: string | null }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   if (import.meta.env.PROD) return null;
   if (!versionId) return null;
 
@@ -53,35 +57,54 @@ export default function GeneratorDiagnosticPanel({ versionId }: { versionId?: st
 
   return (
     <div className="rounded-md border border-amber-300 bg-amber-50 p-3 mb-4">
-      <h3 className="text-sm font-bold text-amber-900 mb-2">🔍 Generator Diagnostics</h3>
-      {isLoading ? (
-        <div className="text-xs text-amber-700">Loading...</div>
-      ) : data ? (
-        <div className="space-y-2 text-xs text-amber-900">
-          <div>
-            <span className="font-semibold">Staff Pool:</span> {data.staffCount} active staff
-          </div>
-          <div>
-            <span className="font-semibold">Staff Used:</span> {data.staffUsedCount} / {data.staffCount}
-          </div>
-          <div>
-            <span className="font-semibold">Names:</span> {data.staffNames.join(', ')}
-          </div>
-          <div>
-            <span className="font-semibold">Policy:</span>
-            <pre className="text-[10px] bg-amber-100 p-1 rounded mt-1 overflow-x-auto">
-              {JSON.stringify(data.policy, null, 2)}
-            </pre>
-          </div>
-          <div>
-            <span className="font-semibold">Sample Requirements (day 0):</span>
-            <pre className="text-[10px] bg-amber-100 p-1 rounded mt-1 overflow-x-auto">
-              {JSON.stringify(data.requirements['0'] || data.requirements, null, 2)}
-            </pre>
-          </div>
-        </div>
-      ) : (
-        <div className="text-xs text-amber-700">No data available</div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold text-amber-900">🔍 Generator Diagnostics</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-6 px-2 text-amber-900 hover:bg-amber-100"
+        >
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      
+      {isExpanded && (
+        <>
+          {isLoading ? (
+            <div className="text-xs text-amber-700">Loading...</div>
+          ) : data ? (
+            <div className="space-y-2 text-xs text-amber-900">
+              <div>
+                <span className="font-semibold">Staff Pool:</span> {data.staffCount} active staff
+              </div>
+              <div>
+                <span className="font-semibold">Staff Used:</span> {data.staffUsedCount} / {data.staffCount}
+              </div>
+              <div>
+                <span className="font-semibold">Names:</span> {data.staffNames.join(', ')}
+              </div>
+              <div>
+                <span className="font-semibold">Policy:</span>
+                <pre className="text-[10px] bg-amber-100 p-1 rounded mt-1 overflow-x-auto">
+                  {JSON.stringify(data.policy, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <span className="font-semibold">Sample Requirements (day 0):</span>
+                <pre className="text-[10px] bg-amber-100 p-1 rounded mt-1 overflow-x-auto">
+                  {JSON.stringify(data.requirements['0'] || data.requirements, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-amber-700">No data available</div>
+          )}
+        </>
       )}
     </div>
   );
