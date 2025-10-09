@@ -248,6 +248,37 @@ interface PriorityContext {
   staffAssignments: Map<string, ShiftCode>;
 }
 
+// Deterministic jitter for tie-breaking to avoid always picking the same staff
+function jitter(seed: number, dayIndex: number, staffId: string): number {
+  // Convert staffId to numeric hash
+  let idHash = 0;
+  for (let i = 0; i < staffId.length; i++) {
+    idHash = ((idHash << 5) - idHash) + staffId.charCodeAt(i);
+    idHash = idHash & idHash; // Convert to 32bit integer
+  }
+  
+  // Mix seed, day, and staffId
+  let x = Math.imul(seed ^ dayIndex ^ idHash, 2654435761) >>> 0;
+  x ^= x >>> 13;
+  x = Math.imul(x, 2246822519) >>> 0;
+  return (x >>> 8) / 1e9;
+}
+
+// Find the last day index when this staff was assigned this specific shift type
+function findLastDayAssigned(
+  staffAssignments: Map<string, ShiftCode>,
+  shiftType: 'E' | 'L' | 'N',
+  currentDayIndex: number,
+  days: string[]
+): number {
+  for (let i = currentDayIndex - 1; i >= 0; i--) {
+    if (staffAssignments.get(days[i]) === shiftType) {
+      return i;
+    }
+  }
+  return -999; // Never assigned this shift type
+}
+
 function calculatePriority(ctx: PriorityContext): number {
   const { staffId, shiftType, assigned, targets, currentDayIndex, days, staffAssignments } = ctx;
 
@@ -290,6 +321,15 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
   });
 
   const { days, staff, requirements, policy } = input;
+  
+  // Generate seed for deterministic jitter (based on first day)
+  let seed = 0;
+  if (days.length > 0) {
+    for (let i = 0; i < days[0].length; i++) {
+      seed = ((seed << 5) - seed) + days[0].charCodeAt(i);
+      seed = seed & seed; // Convert to 32bit integer
+    }
+  }
   
   // Initialize tracking
   const currentAssignments = new Map<string, Map<string, ShiftCode>>();
@@ -358,27 +398,30 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
           break;
         }
 
-        // Sort by priority
+        // ROTATION-FRIENDLY SORT: Order by fairness, spread, and jitter
+        const currentDayIndex = days.indexOf(dateISO);
         candidates.sort((a, b) => {
-          const prioA = calculatePriority({
-            staffId: a.id,
-            shiftType,
-            assigned,
-            targets,
-            currentDayIndex: days.indexOf(dateISO),
-            days,
-            staffAssignments: currentAssignments.get(a.id)!,
-          });
-          const prioB = calculatePriority({
-            staffId: b.id,
-            shiftType,
-            assigned,
-            targets,
-            currentDayIndex: days.indexOf(dateISO),
-            days,
-            staffAssignments: currentAssignments.get(b.id)!,
-          });
-          return prioA - prioB;
+          const aStats = assigned[a.id];
+          const bStats = assigned[b.id];
+          const targetForShift = targets[shiftType];
+          
+          // 1. Fairness ratio: assigned/target for this specific shift type
+          const aRatio = targetForShift > 0 ? aStats[shiftType] / targetForShift : 0;
+          const bRatio = targetForShift > 0 ? bStats[shiftType] / targetForShift : 0;
+          if (Math.abs(aRatio - bRatio) > 0.01) return aRatio - bRatio;
+          
+          // 2. Last day assigned this specific shift type (encourage spread)
+          const aLastDay = findLastDayAssigned(currentAssignments.get(a.id)!, shiftType, currentDayIndex, days);
+          const bLastDay = findLastDayAssigned(currentAssignments.get(b.id)!, shiftType, currentDayIndex, days);
+          if (aLastDay !== bLastDay) return aLastDay - bLastDay;
+          
+          // 3. Total assignments (overall fairness)
+          const aTotal = aStats.E + aStats.L + aStats.N;
+          const bTotal = bStats.E + bStats.L + bStats.N;
+          if (aTotal !== bTotal) return aTotal - bTotal;
+          
+          // 4. Deterministic jitter (tie-breaker to avoid always picking same staff)
+          return jitter(seed, currentDayIndex, a.id) - jitter(seed, currentDayIndex, b.id);
         });
 
         // Assign to highest priority
