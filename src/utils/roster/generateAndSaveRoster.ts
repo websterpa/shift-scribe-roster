@@ -98,6 +98,22 @@ export async function generateAndSaveRoster(
     });
   });
 
+  // GUARDRAIL: Block generation if staff pool is too small
+  const EXPECTED_MIN_STAFF = 11; // TODO: Move to settings
+  if (correctiveStaff.length < EXPECTED_MIN_STAFF) {
+    const errorMsg = `Cannot generate roster: only ${correctiveStaff.length}/${EXPECTED_MIN_STAFF} eligible staff found. Go to Settings → Staff and ensure more team members are marked as active.`;
+    console.error("[BLOCK] Eligible staff below expected", {
+      found: correctiveStaff.length,
+      expected: EXPECTED_MIN_STAFF,
+      names: correctiveStaff.map(s => s.name),
+    });
+    logger.error(new Error('Insufficient staff pool'), {
+      found: correctiveStaff.length,
+      expected: EXPECTED_MIN_STAFF,
+    });
+    throw new Error(errorMsg);
+  }
+
   // Parse coverage requirements from config
   const requirements: CoverageRequirements = {};
   const staffingReqs = configData.staffing_requirements || {};
