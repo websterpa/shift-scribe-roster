@@ -17,6 +17,8 @@ export async function fetchStaffMembers(): Promise<StaffMember[]> {
       .select('*')
       .eq('is_active', true); // Keep filtering for active for roster generation
 
+    console.info("[DIAG] raw staff rows from DB", data?.length || 0);
+
     if (error) {
       logger.error(new Error('Failed to fetch staff members'), { error });
       return [];
