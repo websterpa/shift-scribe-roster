@@ -57,6 +57,10 @@ export interface CorrectiveResult {
   };
   violations: string[];
   utilizationReport: Record<string, number>; // staffId -> total assignments
+  diagnostics: {
+    staffPoolCount: number;
+    staffUsedCount: number;
+  };
   unfilledShifts?: Array<{ // Diagnostic: why shifts couldn't be filled
     dateISO: string;
     dayIndex: number;
@@ -655,6 +659,9 @@ function buildResult(
   const coverage: Record<string, { E: number; L: number; N: number }> = {};
   const violations: string[] = [];
   const utilizationReport: Record<string, number> = {};
+  
+  // Count staff used
+  let staffUsedCount = 0;
 
   // Build assignments and roster
   for (const s of staff) {
@@ -672,6 +679,7 @@ function buildResult(
     }
 
     utilizationReport[s.id] = totalAssignments;
+    if (totalAssignments > 0) staffUsedCount++;
   }
 
   // Calculate coverage
@@ -727,6 +735,10 @@ function buildResult(
     },
     violations,
     utilizationReport,
+    diagnostics: {
+      staffPoolCount: staff.length,
+      staffUsedCount,
+    },
     unfilledShifts: unfilledShifts.length > 0 ? unfilledShifts : undefined,
   };
 }

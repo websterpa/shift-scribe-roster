@@ -26,6 +26,14 @@ export interface RosterSummary {
   };
   violations: string[]; // any compliance messages
   notes?: string[];
+  // Diagnostic info
+  staffPoolCount?: number;
+  staffUsedCount?: number;
+  misses?: Array<{
+    day: number;
+    shift: 'E' | 'L' | 'N';
+    reasons: string[];
+  }>;
 }
 
 export interface GenerateRosterResult {

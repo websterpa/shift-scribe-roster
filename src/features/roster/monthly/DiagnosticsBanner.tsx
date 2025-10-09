@@ -4,17 +4,18 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchRequiredCodes } from "./requirements";
 import type { EnrichedAssignment } from "./types";
+import type { RosterSummary } from "@/types/managerUI";
 
 type Props = {
   versionId: string;
   monthStartISO: string;
   monthEndISO: string;
   assignments: EnrichedAssignment[];
+  summary?: RosterSummary | null;
 };
 
-export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndISO, assignments }: Props) {
+export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndISO, assignments, summary }: Props) {
   const [missing, setMissing] = useState<string[]>([]);
-  const [unfilledDetails, setUnfilledDetails] = useState<Array<{ dateISO: string; dayIndex: number; shift: string; needed: number; filled: number; rejectionReasons: string[] }>>([]);
   const [dismissed, setDismissed] = useState(false);
   const [hasEverShownWarning, setHasEverShownWarning] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -22,13 +23,6 @@ export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndIS
   useEffect(() => {
     let cancel = false;
     (async () => {
-      // Fetch version to get diagnostic data
-      const { data: versionData } = await supabase
-        .from('roster_versions')
-        .select('version_name')
-        .eq('id', versionId)
-        .single();
-      
       const required = await fetchRequiredCodes(versionId, monthStartISO, monthEndISO);
       if (cancel) return;
       
@@ -43,16 +37,13 @@ export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndIS
       });
       setMissing(miss.sort());
       
-      // TODO: Fetch unfilled shifts from generator result if available
-      // For now, we'll just show basic missing shifts
-      
       // Persist warning once it appears
-      if (miss.length > 0) {
+      if (miss.length > 0 || (summary?.misses && summary.misses.length > 0)) {
         setHasEverShownWarning(true);
       }
     })();
     return () => { cancel = true; };
-  }, [versionId, monthStartISO, monthEndISO, assignments]);
+  }, [versionId, monthStartISO, monthEndISO, assignments, summary]);
 
   // Reset dismissed state when version changes
   useEffect(() => {
@@ -74,18 +65,40 @@ export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndIS
     return labels[reason] || reason;
   };
   
+  const misses = summary?.misses || [];
+  
   return (
     <div className="mb-2 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
-          <div className="font-medium mb-1">
-            Missing required shift(s): <strong>{missing.join(", ")}</strong>
-          </div>
+          {/* Staff utilization info */}
+          {summary?.staffPoolCount !== undefined && summary?.staffUsedCount !== undefined && (
+            <div className="font-medium mb-1">
+              Staff Used: <strong>{summary.staffUsedCount} / {summary.staffPoolCount}</strong>
+            </div>
+          )}
+          
+          {/* Missing shifts info */}
+          {missing.length > 0 && (
+            <div className="font-medium mb-1">
+              Missing required shift(s): <strong>{missing.join(", ")}</strong>
+            </div>
+          )}
+          
+          {/* Detailed miss reasons */}
+          {misses.length > 0 && (
+            <div className="text-xs text-destructive/80 mb-1">
+              Missing: {misses.map(m => 
+                `D${m.day}-${m.shift}[${m.reasons.map(formatReason).join('|')}]`
+              ).join(', ')}
+            </div>
+          )}
+          
           <div className="text-xs text-destructive/80">
             Check mapping / generator configuration.
           </div>
           
-          {unfilledDetails.length > 0 && (
+          {misses.length > 0 && (
             <>
               <Button
                 variant="ghost"
@@ -99,15 +112,15 @@ export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndIS
               
               {showDetails && (
                 <div className="mt-2 space-y-1 text-xs">
-                  {unfilledDetails.map((detail, idx) => (
+                  {misses.map((detail, idx) => (
                     <div key={idx} className="bg-destructive/5 p-2 rounded">
                       <span className="font-semibold">
-                        Day {detail.dayIndex + 1} - {detail.shift}:
+                        Day {detail.day} - {detail.shift}:
                       </span>{" "}
-                      needed {detail.needed}, filled {detail.filled}
-                      {detail.rejectionReasons.length > 0 && (
+                      unfilled
+                      {detail.reasons.length > 0 && (
                         <div className="ml-2 mt-1 text-destructive/70">
-                          Blocked by: {detail.rejectionReasons.map(formatReason).join(", ")}
+                          Blocked by: {detail.reasons.map(formatReason).join(", ")}
                         </div>
                       )}
                     </div>

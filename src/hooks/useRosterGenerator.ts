@@ -128,7 +128,15 @@ async function apiGenerateRoster(form: ManagerRosterForm): Promise<GenerateRoste
         `Roster generated with ${result.totalAssignments} assignments`,
         `Optimization score: ${result.optimizationResult?.score || 0}`,
         'Generated using engine2 deterministic algorithms'
-      ]
+      ],
+      // Add diagnostic info
+      staffPoolCount: result.generatorResult?.diagnostics?.staffPoolCount,
+      staffUsedCount: result.generatorResult?.diagnostics?.staffUsedCount,
+      misses: result.generatorResult?.unfilledShifts?.map(uf => ({
+        day: uf.dayIndex + 1,
+        shift: uf.shift,
+        reasons: uf.rejectionReasons,
+      })),
     };
 
     return {

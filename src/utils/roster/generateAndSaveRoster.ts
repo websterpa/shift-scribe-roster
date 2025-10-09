@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember } from "@/types/roster";
-import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, DEFAULT_CORRECTIVE_POLICY } from "@/engine2/generators/correctiveRosterGenerator";
+import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, type CorrectiveResult, DEFAULT_CORRECTIVE_POLICY } from "@/engine2/generators/correctiveRosterGenerator";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('GenerateAndSaveRoster');
@@ -19,6 +19,7 @@ export async function generateAndSaveRoster(
   optimizationResult?: { score: number };
   wtrResult?: { violations: unknown[] };
   costResult?: { totalCost: number; averageCost: number; breakdown: Record<string, unknown> };
+  generatorResult?: CorrectiveResult;
 }> {
   // Extract config properties - handle both new and legacy formats
   const configId = config.configId || config.id;
@@ -270,6 +271,7 @@ export async function generateAndSaveRoster(
     optimizationResult: { score: Math.max(0, 100 - totalVariance) },
     wtrResult: { violations: result.violations },
     costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
+    generatorResult: result,
   };
 }
 
