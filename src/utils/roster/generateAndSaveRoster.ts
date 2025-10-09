@@ -31,8 +31,30 @@ export async function generateAndSaveRoster(
     throw new Error("configId and monthISO are required");
   }
 
-  // Extract staff IDs
-  const staffIds = staffList.map(s => s.id);
+  // DEDUPLICATION: Collapse duplicate staff records differing only by case/spacing
+  const norm = (v: string) => v.trim().toLowerCase();
+  const keyFor = (s: StaffMember) => 
+    s.email ? norm(s.email) : norm(`${s.first_name || ''} ${s.last_name || ''}`);
+  
+  const dedupMap: Record<string, StaffMember> = {};
+  for (const s of staffList) {
+    const key = keyFor(s);
+    // Keep the first occurrence of each unique staff member
+    if (!dedupMap[key]) {
+      dedupMap[key] = s;
+    }
+  }
+  const dedupedStaffList = Object.values(dedupMap);
+  
+  console.info("[DEDUP] raw:", staffList.length, "deduped:", dedupedStaffList.length);
+  logger.info('Staff deduplication', { 
+    raw: staffList.length, 
+    deduped: dedupedStaffList.length,
+    duplicatesRemoved: staffList.length - dedupedStaffList.length 
+  });
+
+  // Use deduplicated staff list for all subsequent operations
+  const staffIds = dedupedStaffList.map(s => s.id);
 
   // Create roster version with version_number
   const { data: existingVersions } = await supabase
@@ -83,8 +105,8 @@ export async function generateAndSaveRoster(
     days.push(`${monthISO}-${String(day).padStart(2, '0')}`);
   }
 
-  // Convert staffList to CorrectiveStaffMember format
-  const correctiveStaff: CorrectiveStaffMember[] = staffList.map(s => ({
+  // Convert deduplicated staff list to CorrectiveStaffMember format
+  const correctiveStaff: CorrectiveStaffMember[] = dedupedStaffList.map(s => ({
     id: s.id,
     name: s.name || `${s.first_name} ${s.last_name}`,
     availability: {}, // All days available by default
