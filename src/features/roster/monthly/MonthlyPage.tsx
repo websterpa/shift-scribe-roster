@@ -7,6 +7,7 @@ import { MonthlyGrid } from "./MonthlyGrid";
 import { StaffingOverview, loadStaffingOverview } from "./StaffingOverview";
 import { resolveActiveRosterVersion } from "./useActiveRoster";
 import DiagnosticsBanner from "./DiagnosticsBanner";
+import GeneratorDiagnosticPanel from "@/components/debug/GeneratorDiagnosticPanel";
 import type { EnrichedAssignment } from "./types";
 
 const SHIFT_LABEL: Record<string,string> = { E:"Early (E)", L:"Late (L)", N:"Night (N)", D:"Day (D)" };
@@ -146,6 +147,7 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
             </div>
           </div>
 
+          {versionId && <GeneratorDiagnosticPanel versionId={versionId} />}
           {versionId && <DiagnosticsBanner versionId={versionId} monthStartISO={monthStartISO} monthEndISO={monthEndISO} assignments={rows} />}
           {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
           {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
