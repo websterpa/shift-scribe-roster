@@ -91,11 +91,13 @@ export async function generateAndSaveRoster(
     isNightEligible: s.eligible_shifts?.includes('Night') ?? true,
   }));
 
-  // Set all days as available for all staff
+  // Default-open availability: all staff available for all days unless explicitly unavailable
+  // This ensures newly activated staff are immediately schedulable; admins can refine later
   correctiveStaff.forEach(s => {
     days.forEach(d => {
       s.availability[d] = true;
     });
+    console.info("[AVAIL-DEFAULT] applied for", s.name);
   });
 
   // GUARDRAIL: Block generation if staff pool is too small
