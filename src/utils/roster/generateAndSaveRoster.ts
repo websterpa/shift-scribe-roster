@@ -94,10 +94,27 @@ export async function generateAndSaveRoster(
   // Default-open availability: all staff available for all days unless explicitly unavailable
   // This ensures newly activated staff are immediately schedulable; admins can refine later
   correctiveStaff.forEach(s => {
+    let hasAvailabilitySet = false;
+    
+    // Check if any availability was explicitly set (future: check DB for explicit records)
+    for (const d of days) {
+      if (s.availability[d] !== undefined) {
+        hasAvailabilitySet = true;
+        break;
+      }
+    }
+    
+    // Apply default-open availability for all days
     days.forEach(d => {
-      s.availability[d] = true;
+      if (s.availability[d] === undefined) {
+        s.availability[d] = true;
+      }
     });
-    console.info("[AVAIL-DEFAULT] applied for", s.name);
+    
+    // Log when defaults are applied
+    if (!hasAvailabilitySet) {
+      console.info("[AVAIL-DEFAULT] applied for", s.name, `(${days.length} days available)`);
+    }
   });
 
   // GUARDRAIL: Block generation if staff pool is too small
