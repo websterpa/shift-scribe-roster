@@ -11,12 +11,43 @@ export interface UITestResult {
 }
 
 /**
+ * Switches to the Pattern Library tab
+ */
+async function switchToPatternLibrary(): Promise<void> {
+  const patternLibraryTab = Array.from(document.querySelectorAll('[role="tab"]')).find(
+    tab => tab.textContent?.includes('Pattern Library')
+  ) as HTMLElement;
+  
+  if (patternLibraryTab) {
+    patternLibraryTab.click();
+    await new Promise(resolve => setTimeout(resolve, 300)); // Wait for DOM update
+  }
+}
+
+/**
+ * Opens the Create Pattern view
+ */
+async function openCreatePatternView(): Promise<void> {
+  const createButton = Array.from(document.querySelectorAll('button')).find(
+    btn => btn.textContent?.includes('Create Pattern')
+  ) as HTMLElement;
+  
+  if (createButton) {
+    createButton.click();
+    await new Promise(resolve => setTimeout(resolve, 300)); // Wait for DOM update
+  }
+}
+
+/**
  * Tests if pattern selection UI updates correctly
  */
 export async function testPatternSelectionUI(): Promise<UITestResult> {
   logger.info('Testing pattern selection UI');
   
   try {
+    // Switch to Pattern Library tab first
+    await switchToPatternLibrary();
+    
     // Test if pattern selector elements exist
     const patternSelectorExists = document.querySelector('[data-testid="pattern-selector"]') || 
                                   document.querySelector('select') ||
@@ -66,6 +97,10 @@ export async function testCustomPatternBuilderUI(): Promise<UITestResult> {
   logger.info('Testing custom pattern builder UI');
 
   try {
+    // Switch to Pattern Library tab and open Create Pattern view
+    await switchToPatternLibrary();
+    await openCreatePatternView();
+    
     // Look for shift code buttons
     const shiftButtons = document.querySelectorAll('button');
     const hasShiftButtons = Array.from(shiftButtons).some(button => 
@@ -82,10 +117,11 @@ export async function testCustomPatternBuilderUI(): Promise<UITestResult> {
       };
     }
 
-    // Look for pattern name input
-    const patternNameInput = document.querySelector('input[placeholder*="pattern" i]') ||
+    // Look for pattern name input with correct data-testid
+    const patternNameInput = document.querySelector('[data-testid="pattern-name-input"]') ||
+                            document.querySelector('input[placeholder*="pattern" i]') ||
                             document.querySelector('input[placeholder*="name" i]') ||
-                            document.querySelector('#patternName');
+                            document.querySelector('#pattern-name');
 
     if (!patternNameInput) {
       return {
@@ -118,10 +154,11 @@ export async function testPatternCardsUI(): Promise<UITestResult> {
   logger.info('Testing pattern cards UI');
 
   try {
-    // Look for pattern cards or pattern list items
-    const patternCards = document.querySelectorAll('[data-testid="pattern-card"]') ||
-                        document.querySelectorAll('.pattern-card') ||
-                        document.querySelectorAll('[class*="pattern"]');
+    // Switch to Pattern Library tab first
+    await switchToPatternLibrary();
+    
+    // Look for pattern cards with correct data-testid
+    const patternCards = document.querySelectorAll('[data-testid="pattern-card"]');
 
     if (patternCards.length === 0) {
       return {

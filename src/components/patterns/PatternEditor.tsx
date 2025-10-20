@@ -245,7 +245,7 @@ export function PatternEditor({
           </div>
 
           {/* Pattern Preview */}
-          <div className="space-y-2">
+          <div className="space-y-2" data-testid="pattern-preview">
             <Label className="text-sm font-medium">Pattern Preview</Label>
             <div className="flex flex-wrap gap-1 p-3 border rounded-md bg-gray-50 min-h-[60px] items-center">
               {patternCodes.map((code, index) => {
