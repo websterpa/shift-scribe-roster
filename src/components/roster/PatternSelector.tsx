@@ -287,8 +287,13 @@ export default function PatternSelector({
   const showCustomBuilder = selectedTemplate === 'custom';
   console.log('🔍 AUDIT: showCustomBuilder final check =', showCustomBuilder, 'selectedTemplate =', selectedTemplate);
 
+  // Show placeholder when loading
+  if (isLoading) {
+    return <div data-testid="pattern-selector-placeholder">Loading patterns...</div>;
+  }
+
   return (
-    <Card>
+    <Card data-testid="pattern-selector">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           Pattern Configuration

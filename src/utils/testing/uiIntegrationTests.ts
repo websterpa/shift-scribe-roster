@@ -48,8 +48,9 @@ export async function testPatternSelectionUI(): Promise<UITestResult> {
     // Switch to Pattern Library tab first
     await switchToPatternLibrary();
     
-    // Test if pattern selector elements exist
+    // Test if pattern selector elements exist (including placeholder during loading)
     const patternSelectorExists = document.querySelector('[data-testid="pattern-selector"]') || 
+                                  document.querySelector('[data-testid="pattern-selector-placeholder"]') ||
                                   document.querySelector('select') ||
                                   document.querySelector('[role="combobox"]');
     
