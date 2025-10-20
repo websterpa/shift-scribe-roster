@@ -64,7 +64,7 @@ export function PatternLibrary({
   );
 
   const PatternCard = ({ pattern, isCustom = false }: { pattern: Pattern; isCustom?: boolean }) => (
-    <Card className="relative hover:shadow-md transition-shadow">
+    <Card className="relative hover:shadow-md transition-shadow" data-testid="pattern-card">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -175,7 +175,7 @@ export function PatternLibrary({
       </div>
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative" data-testid="pattern-selector">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search patterns..."

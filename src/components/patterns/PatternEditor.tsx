@@ -121,6 +121,7 @@ export function PatternEditor({
               <Label htmlFor="pattern-name">Pattern Name</Label>
               <Input
                 id="pattern-name"
+                data-testid="pattern-name-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. My Weekend Pattern"
