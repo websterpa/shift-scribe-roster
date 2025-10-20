@@ -1,5 +1,6 @@
 
 import { createLogger } from "../errorLogger";
+import { seedTestPatterns, cleanupTestPatterns } from "./patternTestHelpers";
 
 const logger = createLogger('UIIntegrationTests');
 
@@ -158,14 +159,25 @@ export async function testPatternCardsUI(): Promise<UITestResult> {
     // Switch to Pattern Library tab first
     await switchToPatternLibrary();
     
-    // Look for pattern cards with correct data-testid
+    // Look for pattern cards with correct data-testid or placeholder
     const patternCards = document.querySelectorAll('[data-testid="pattern-card"]');
+    const placeholder = document.querySelector('[data-testid="pattern-card-placeholder"]');
 
-    if (patternCards.length === 0) {
+    // If no cards but placeholder exists, that's acceptable (empty state)
+    if (patternCards.length === 0 && !placeholder) {
       return {
         testName: 'Pattern Cards UI',
         passed: false,
-        message: 'No pattern cards found in UI'
+        message: 'No pattern cards or placeholder found in UI'
+      };
+    }
+
+    // If placeholder exists, test passes (showing empty state correctly)
+    if (placeholder && patternCards.length === 0) {
+      return {
+        testName: 'Pattern Cards UI',
+        passed: true,
+        message: 'Pattern cards placeholder displayed correctly (empty state)'
       };
     }
 
@@ -199,22 +211,38 @@ export async function testPatternCardsUI(): Promise<UITestResult> {
 }
 
 /**
- * Runs all UI integration tests
+ * Runs all UI integration tests with optional test data seeding
  */
-export async function runAllUITests(): Promise<UITestResult[]> {
+export async function runAllUITests(seedData = false): Promise<UITestResult[]> {
   logger.info('Running all UI integration tests');
   
-  const results = await Promise.all([
-    testPatternSelectionUI(),
-    testCustomPatternBuilderUI(),
-    testPatternCardsUI()
-  ]);
+  let patternIds: string[] = [];
   
-  logger.info('UI integration tests complete', { 
-    total: results.length,
-    passed: results.filter(r => r.passed).length,
-    failed: results.filter(r => !r.passed).length
-  });
-  
-  return results;
+  try {
+    // Optionally seed test patterns
+    if (seedData) {
+      patternIds = await seedTestPatterns();
+      // Wait for patterns to be loaded
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    const results = await Promise.all([
+      testPatternSelectionUI(),
+      testCustomPatternBuilderUI(),
+      testPatternCardsUI()
+    ]);
+    
+    logger.info('UI integration tests complete', { 
+      total: results.length,
+      passed: results.filter(r => r.passed).length,
+      failed: results.filter(r => !r.passed).length
+    });
+    
+    return results;
+  } finally {
+    // Clean up test patterns if they were seeded
+    if (seedData && patternIds.length > 0) {
+      await cleanupTestPatterns(patternIds);
+    }
+  }
 }

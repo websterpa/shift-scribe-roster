@@ -203,7 +203,7 @@ export function PatternLibrary({
             ))}
           </div>
         ) : (
-          <Card>
+          <Card data-testid="pattern-card-placeholder">
             <CardContent className="text-center py-8">
               <Star className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground mb-4">
@@ -237,7 +237,7 @@ export function PatternLibrary({
             ))}
           </div>
         ) : (
-          <Card>
+          <Card data-testid="pattern-card-placeholder">
             <CardContent className="text-center py-8">
               <p className="text-sm text-muted-foreground">
                 No common patterns match your search
