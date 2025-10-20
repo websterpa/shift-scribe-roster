@@ -166,9 +166,9 @@ export async function generateAndSaveRoster(
     const dayReqs = staffingReqs[dayOfWeek] || {};
     
     requirements[dateISO] = {
-      E: dayReqs.E || dayReqs.D || 2, // Default 2 early shifts
-      L: dayReqs.L || 1, // Default 1 late shift
-      N: dayReqs.N || 1, // Default 1 night shift
+      E: (dayReqs.E ?? 2), // Default 2 early shifts, respect 0
+      L: (dayReqs.L ?? 1), // Default 1 late shift, respect 0
+      N: (dayReqs.N ?? 1), // Default 1 night shift, respect 0
     };
   });
 

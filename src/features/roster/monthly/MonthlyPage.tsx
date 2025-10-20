@@ -147,9 +147,17 @@ export function MonthlyPage({ siteName }: { siteName?: string } = {}) {
             </div>
           </div>
 
-          {versionId && <GeneratorDiagnosticPanel versionId={versionId} />}
+          {versionId && <GeneratorDiagnosticPanel versionId={versionId} monthISO={monthISO} />}
           {versionId && <DiagnosticsBanner versionId={versionId} monthStartISO={monthStartISO} monthEndISO={monthEndISO} assignments={rows} />}
-          {versionId && <MonthlyHeader sb={supabase} versionId={versionId} monthISO={monthISO} humanLabel={humanLabel || "Loading…"} warnings={warnings} />}
+          {versionId && (
+            <MonthlyHeader 
+              sb={supabase} 
+              versionId={versionId} 
+              monthISO={monthISO} 
+              humanLabel={humanLabel || ""} 
+              warnings={warnings} 
+            />
+          )}
           {versionId && <StaffingOverview sb={supabase} versionId={versionId} monthISO={monthISO} />}
         </div>
       </header>

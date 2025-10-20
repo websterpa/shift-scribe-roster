@@ -65,10 +65,12 @@ export function MonthlyHeader({
       <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-2 flex-wrap">
           <span title={versionId ? `Full UUID: ${versionId}` : "No version selected"} className="flex items-center gap-2">
-            Active Roster: <strong>{humanLabel}</strong>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-              Active
-            </span>
+            Active Roster: <strong>{humanLabel || "Loading…"}</strong>
+            {humanLabel && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                Active
+              </span>
+            )}
           </span>
           <span>•</span>
           <span>Month: {monthISO}</span>

@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function GeneratorDiagnosticPanel({ versionId }: { versionId?: string | null }) {
+export default function GeneratorDiagnosticPanel({ versionId, monthISO }: { versionId?: string | null; monthISO?: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
   
   if (import.meta.env.PROD) return null;
   if (!versionId) return null;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['generator-diagnostics', versionId],
+    queryKey: ['generator-diagnostics', versionId, monthISO],
     queryFn: async () => {
       // Get version and config
       const { data: version } = await supabase
@@ -38,11 +38,25 @@ export default function GeneratorDiagnosticPanel({ versionId }: { versionId?: st
         .select('*')
         .eq('is_active', true);
 
-      // Get assignments to see who was actually used
-      const { data: assignments } = await supabase
+      // Get assignments to see who was actually used (filtered by month if provided)
+      let assignmentsQuery = supabase
         .from('roster_assignments')
         .select('staff_id')
         .eq('version_id', versionId);
+      
+      // Add month filtering if monthISO provided
+      if (monthISO) {
+        const monthStart = new Date(monthISO + '-01');
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+        const monthStartISO = monthISO + '-01';
+        const monthEndISO = monthEnd.toISOString().slice(0, 10);
+        
+        assignmentsQuery = assignmentsQuery
+          .gte('shift_start', monthStartISO)
+          .lt('shift_start', monthEndISO);
+      }
+      
+      const { data: assignments } = await assignmentsQuery;
 
       const uniqueStaffUsed = new Set(assignments?.map(a => a.staff_id) || []).size;
 
