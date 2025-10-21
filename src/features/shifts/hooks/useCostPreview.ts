@@ -1,7 +1,6 @@
 import { useMemo } from "react";
-import type { ShiftSpec, RatePolicy } from "../../../engine2/types";
-import { expandShift } from "../../../engine2/time/expandShift";
-import { costShift } from "../../../engine2/cost/costShift";
+import type { ShiftSpec, RatePolicy } from "@/features/roster/engine";
+import { expandShift, costShift } from "@/features/roster/engine";
 
 export interface UseCostPreviewArgs {
   shift: ShiftSpec;

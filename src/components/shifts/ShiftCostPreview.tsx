@@ -1,6 +1,6 @@
 import React from "react";
 import { useCostPreview } from "../../features/shifts/hooks/useCostPreview";
-import type { RatePolicy, ShiftSpec } from "../../engine2/types";
+import type { RatePolicy, ShiftSpec } from "@/features/roster/engine";
 
 interface ShiftCostPreviewProps {
   shift: ShiftSpec;

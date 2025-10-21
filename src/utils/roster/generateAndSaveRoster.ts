@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember } from "@/types/roster";
-import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, type CorrectiveResult, DEFAULT_CORRECTIVE_POLICY } from "@/engine2/generators/correctiveRosterGenerator";
+import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, type CorrectiveResult, DEFAULT_CORRECTIVE_POLICY } from "@/features/roster/engine";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('GenerateAndSaveRoster');

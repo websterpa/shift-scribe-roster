@@ -1,8 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { expandShift } from "../../engine2/time/expandShift";
-import { costShift } from "../../engine2/cost/costShift";
-import { validateRest } from "../../engine2/rules/validateRest";
-import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "../../engine2/types";
+import { expandShift, costShift, validateRest } from "@/features/roster/engine";
+import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "@/features/roster/engine";
 import { toCode, isValidCode, detectFramework } from "@/features/roster/shiftMap";
 
 /** ––––– Config for schema/columns and defaults ––––– */
