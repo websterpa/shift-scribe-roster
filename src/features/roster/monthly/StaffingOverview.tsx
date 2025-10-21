@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { toCode } from "./shiftMapping";
+import { toCode } from "@/features/roster/shiftMap";
 
 type Item = { shift_code: string; required: number; assigned: number };
 

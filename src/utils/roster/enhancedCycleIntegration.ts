@@ -1,7 +1,5 @@
 import { StaffMember } from "@/types/roster";
-import { isStaffEligibleForShift, shiftCodeToName } from "./shiftCodeMapping";
-
-export type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
+import { isStaffEligibleForShift, shiftCodeToName, type ShiftCode } from "@/features/roster/shiftMap";
 
 interface CycleAssignment {
   [weekIndex: number]: { [dayIndex: number]: { [staffId: string]: ShiftCode } };

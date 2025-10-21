@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toCode } from '@/features/roster/monthly/shiftMapping';
+import { toCode } from '@/features/roster/shiftMap';
 
 interface CoverageStripProps {
   versionId: string;

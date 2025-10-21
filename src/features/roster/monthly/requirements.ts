@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { toCode } from "./shiftMapping";
+import { toCode } from "@/features/roster/shiftMap";
 
 type ReqLegacy = Record<string, Record<string, number>>;
 // Note: role_id is legacy config JSON field name, not a database column

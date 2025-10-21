@@ -3,7 +3,7 @@ import { expandShift } from "../../engine2/time/expandShift";
 import { costShift } from "../../engine2/cost/costShift";
 import { validateRest } from "../../engine2/rules/validateRest";
 import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "../../engine2/types";
-import { toCode, isValidCode, detectFramework } from "../../features/roster/monthly/shiftMapping";
+import { toCode, isValidCode, detectFramework } from "@/features/roster/shiftMap";
 
 /** ––––– Config for schema/columns and defaults ––––– */
 export type GeneratorConfig = {
