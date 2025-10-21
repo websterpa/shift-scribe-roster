@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: package.json
+@@
+-    "lint": "eslint .",
+-    "preview": "vite preview"
++    "lint": "eslint .",
++    "typecheck": "tsc -noEmit",
++    "test": "vitest run --reporter=dot",
++    "preview": "vite preview"
+*** End Patch
