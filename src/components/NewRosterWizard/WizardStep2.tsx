@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Users } from 'lucide-react';
 import { WizardStepProps, StaffingRequirements } from './types';
 
@@ -74,6 +75,9 @@ export function WizardStep2({ config, setConfig, staffList }: WizardStepProps) {
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Shift Staffing Requirements
+                <Badge variant="outline" className="ml-auto">
+                  {config.shiftType === '12h' ? '12-Hour (D/N)' : '8-Hour (E/L/N)'}
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -142,7 +146,9 @@ export function WizardStep2({ config, setConfig, staffList }: WizardStepProps) {
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-3">
-                Set how many staff members are required to work each shift type to ensure adequate coverage.
+                {config.shiftType === '12h' 
+                  ? 'Set how many staff are needed for Day and Night shifts in a 12-hour system.'
+                  : 'Set how many staff are needed for Early, Late, and Night shifts in an 8-hour system.'}
               </p>
             </CardContent>
           </Card>

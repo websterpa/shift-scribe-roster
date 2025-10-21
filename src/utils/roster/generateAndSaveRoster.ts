@@ -25,8 +25,9 @@ export async function generateAndSaveRoster(
   const configId = config.configId || config.id;
   const monthISO = config.monthISO || config.start_date?.substring(0, 7);
   const versionNameToUse = versionName || config.versionName || config.config_name;
+  const shiftSystem = config.shift_type || '8h'; // Driven by wizard UI selection
   
-  logger.info('generateAndSaveRoster called', { configId, monthISO });
+  logger.info('generateAndSaveRoster called', { configId, monthISO, shiftSystem });
   
   if (!configId || !monthISO) {
     throw new Error("configId and monthISO are required");

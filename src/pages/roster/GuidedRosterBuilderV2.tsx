@@ -27,7 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock } from 'lucide-react';
 import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 
 interface PreviewData {
@@ -464,15 +464,28 @@ export default function GuidedRosterBuilderV2() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="system">Shift System</Label>
-                        <Select onValueChange={(value) => form.setValue('system', value as any)}>
-                          <SelectTrigger>
+                        <Label htmlFor="system" className="text-base font-semibold">Shift System</Label>
+                        <Select 
+                          value={form.watch('system')}
+                          onValueChange={(value) => form.setValue('system', value as any)}
+                        >
+                          <SelectTrigger className="mt-1">
                             <SelectValue placeholder="Select system" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="8h">8 Hour (E/L/N)</SelectItem>
-                            <SelectItem value="12h">12 Hour (D/N)</SelectItem>
-                          </SelectContent>
+                           <SelectContent className="z-50 bg-background">
+                             <SelectItem value="8h">
+                               <div className="flex items-center gap-2">
+                                 <Clock className="h-4 w-4" />
+                                 <span>8-Hour (E/L/N)</span>
+                               </div>
+                             </SelectItem>
+                             <SelectItem value="12h">
+                               <div className="flex items-center gap-2">
+                                 <Clock className="h-4 w-4" />
+                                 <span>12-Hour (D/N)</span>
+                               </div>
+                             </SelectItem>
+                           </SelectContent>
                         </Select>
                       </div>
                       <div>
@@ -655,6 +668,41 @@ export default function GuidedRosterBuilderV2() {
 
           {/* Right Column - Preview & Generate */}
           <div className="space-y-6">
+            {/* Framework Summary Card */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-base">Selected Framework</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Shift System:</span>
+                    <Badge variant="default" className="gap-1">
+                      <Clock className="h-3 w-3" />
+                      {form.watch('system') === '8h' ? '8-Hour' : '12-Hour'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="text-sm text-muted-foreground">Available Shifts:</span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {form.watch('system') === '8h' ? (
+                        <>
+                          <Badge variant="secondary">E - Early</Badge>
+                          <Badge variant="secondary">L - Late</Badge>
+                          <Badge variant="secondary">N - Night</Badge>
+                        </>
+                      ) : (
+                        <>
+                          <Badge variant="secondary">D - Day</Badge>
+                          <Badge variant="secondary">N - Night</Badge>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

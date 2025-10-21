@@ -9,6 +9,7 @@ export interface StaffingRequirements {
 }
 
 export interface RosterConfig {
+  /** Shift framework: '8h' for E/L/N shifts, '12h' for D/N shifts */
   shiftType: '8h' | '12h';
   operationalWindow: '16h' | '24h' | 'custom';
   customHours?: number;
