@@ -1,3 +1,13 @@
+/**
+ * @deprecated Use `@/features/roster/engine` instead.
+ * 
+ * This module provides a schema-agnostic generator but is being phased out
+ * in favor of the canonical roster engine at @/features/roster/engine.
+ * 
+ * For new code, use generateCorrectiveRoster from @/features/roster/engine.
+ * This module is retained for backward compatibility with test components only.
+ */
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { expandShift, costShift, validateRest } from "@/features/roster/engine";
 import type { RatePolicy, RestRules, Holiday, ShiftSpec, Assignment } from "@/features/roster/engine";
