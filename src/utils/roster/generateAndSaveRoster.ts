@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember } from "@/types/roster";
 import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, type CorrectiveResult, DEFAULT_CORRECTIVE_POLICY } from "@/features/roster/engine";
+import { remapToFramework } from "@/features/roster/shiftMap";
+import { toast } from "@/hooks/use-toast";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('GenerateAndSaveRoster');
@@ -173,8 +175,45 @@ export async function generateAndSaveRoster(
     };
   });
 
+  // FRAMEWORK REMAPPING: Convert E/L → D when 12h mode is selected
+  let remappingOccurred = false;
+  if (shiftSystem === '12h') {
+    days.forEach(dateISO => {
+      const dayReqs = requirements[dateISO];
+      const codes = Object.keys(dayReqs);
+      const remapped = remapToFramework(codes, '12h');
+      
+      // Check if remapping occurred
+      if (codes.some((c, i) => c !== remapped[i])) {
+        remappingOccurred = true;
+      }
+      
+      // Rebuild requirements with remapped codes
+      const newReqs: Record<string, number> = {};
+      codes.forEach((code, i) => {
+        const remappedCode = remapped[i];
+        newReqs[remappedCode] = (newReqs[remappedCode] || 0) + (dayReqs as any)[code];
+      });
+      
+      requirements[dateISO] = newReqs as any;
+    });
+    
+    // Show one-time info toast if remapping occurred
+    if (remappingOccurred) {
+      toast({
+        title: "12-hour mode active",
+        description: "Early and Late shifts were remapped to Day shifts.",
+        variant: "default",
+      });
+      logger.info('Remapped E/L → D for 12h framework', { shiftSystem });
+    }
+  }
+
   // VALIDATION: Ensure requirements only use valid shift type keys
-  const validShiftTypes = new Set(['E', 'L', 'N']);
+  const validShiftTypes = shiftSystem === '12h' 
+    ? new Set(['D', 'N']) 
+    : new Set(['E', 'L', 'N']);
+    
   days.forEach((dateISO, dayIndex) => {
     const dayReqs = requirements[dateISO];
     const keys = Object.keys(dayReqs);
@@ -182,11 +221,12 @@ export async function generateAndSaveRoster(
     for (const key of keys) {
       const normalized = key.trim().toUpperCase();
       
-      // Check if normalized key is valid
+      // Check if normalized key is valid for the selected framework
       if (!validShiftTypes.has(normalized)) {
+        const allowedShifts = shiftSystem === '12h' ? 'D/N' : 'E/L/N';
         throw new Error(
           `Invalid requirement key "${key}" on day ${dayIndex + 1} (${dateISO}). ` +
-          `Only E/L/N are allowed.`
+          `Only ${allowedShifts} are allowed in ${shiftSystem} mode.`
         );
       }
       

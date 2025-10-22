@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Star } from 'lucide-react';
 import { WizardStepProps, CustomPattern } from './types';
 import { COMMON_TEMPLATES } from './constants';
+import { remapToFramework } from '@/features/roster/shiftMap';
 
 interface WizardStep3Props extends WizardStepProps {
   customPatterns: CustomPattern[];
@@ -31,6 +32,15 @@ export function WizardStep3({
     } else {
       return templates.find(t => t.id === config.template);
     }
+  };
+
+  // Apply framework remapping to display codes (E/L → D in 12h mode)
+  const getDisplayCodes = (codes: readonly string[] | string[]) => {
+    const mutableCodes = [...codes]; // Convert readonly to mutable
+    if (config.shiftType === '12h') {
+      return remapToFramework(mutableCodes, '12h');
+    }
+    return mutableCodes;
   };
 
   const getShiftCodeColor = (code: string) => {
@@ -101,7 +111,7 @@ export function WizardStep3({
                               </p>
                             </div>
                             <div className="flex gap-1">
-                              {pattern.pattern.slice(0, 7).map((code, index) => (
+                              {getDisplayCodes(pattern.pattern.slice(0, 7)).map((code, index) => (
                                 <Badge key={index} variant="outline" className={`text-xs ${getShiftCodeColor(code)}`}>
                                   {code}
                                 </Badge>
@@ -140,7 +150,7 @@ export function WizardStep3({
                           </p>
                         </div>
                         <div className="flex gap-1">
-                          {template.pattern.slice(0, 7).map((code, index) => (
+                          {getDisplayCodes(template.pattern.slice(0, 7)).map((code, index) => (
                             <Badge key={index} variant="outline" className={`text-xs ${getShiftCodeColor(code)}`}>
                               {code}
                             </Badge>
@@ -163,7 +173,7 @@ export function WizardStep3({
                   {config.template.startsWith('custom-') && <Star className="h-4 w-4 text-yellow-500" />}
                 </h4>
                 <div className="flex flex-wrap gap-1">
-                  {selectedPattern.pattern.map((code, index) => (
+                  {getDisplayCodes(selectedPattern.pattern).map((code, index) => (
                     <Badge key={index} variant="secondary" className={getShiftCodeColor(code)}>
                       Day {index + 1}: {code}
                     </Badge>
