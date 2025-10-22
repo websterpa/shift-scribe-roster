@@ -270,21 +270,70 @@ export async function generateAndSaveRoster(
     utilizationReport: result.utilizationReport
   });
 
-  // Convert assignments to database format and insert
-  const assignmentsToInsert = result.assignments.map(a => ({
-    version_id: versionData.id,
-    staff_id: a.staffId,
-    date: a.dateISO,
-    shift_code: a.shiftType,
-    shift_start: a.shiftType === 'E' ? `${a.dateISO}T06:00:00` :
-                 a.shiftType === 'L' ? `${a.dateISO}T14:00:00` :
-                 `${a.dateISO}T22:00:00`,
-    shift_end: a.shiftType === 'E' ? `${a.dateISO}T14:00:00` :
-               a.shiftType === 'L' ? `${a.dateISO}T22:00:00` :
-               addDay(`${a.dateISO}T06:00:00`),
-    hours: 8,
-    cost: 0, // Will be calculated later
-  }));
+  // Convert assignments to database format with strict validation
+  const allowedCodes = shiftSystem === '12h' ? new Set(['D', 'N']) : new Set(['E', 'L', 'N']);
+  let correctionsMade = false;
+  const invalidAssignments: Array<{ staff: string; date: string; code: string }> = [];
+  const assignmentsToInsert = result.assignments.map(a => {
+    let finalCode: string = a.shiftType;
+    
+    // STRICT OUTPUT VALIDATOR: Ensure only valid shift codes for active framework
+    if (!allowedCodes.has(finalCode)) {
+      // Attempt final-pass correction for 12h mode
+      if (shiftSystem === '12h' && (finalCode === 'E' || finalCode === 'L')) {
+        logger.warn(`[VALIDATOR] Correcting invalid code "${finalCode}" → "D" (staff: ${a.staffId}, date: ${a.dateISO})`);
+        finalCode = 'D';
+        correctionsMade = true;
+      } else {
+        // Cannot correct - track as invalid
+        invalidAssignments.push({ staff: a.staffId, date: a.dateISO, code: finalCode });
+      }
+    }
+    
+    return {
+      version_id: versionData.id,
+      staff_id: a.staffId,
+      date: a.dateISO,
+      shift_code: finalCode,
+      shift_start: finalCode === 'E' ? `${a.dateISO}T06:00:00` :
+                   finalCode === 'L' ? `${a.dateISO}T14:00:00` :
+                   finalCode === 'D' ? `${a.dateISO}T07:00:00` :
+                   `${a.dateISO}T22:00:00`,
+      shift_end: finalCode === 'E' ? `${a.dateISO}T14:00:00` :
+                 finalCode === 'L' ? `${a.dateISO}T22:00:00` :
+                 finalCode === 'D' ? `${a.dateISO}T19:00:00` :
+                 addDay(`${a.dateISO}T06:00:00`),
+      hours: (finalCode === 'D' || finalCode === 'N') ? 12 : 8,
+      cost: 0, // Will be calculated later
+    };
+  });
+
+  // Log if corrections were made
+  if (correctionsMade) {
+    logger.warn(`[VALIDATOR] Applied final-pass corrections to enforce ${shiftSystem} framework`);
+  }
+
+  // BLOCK if invalid codes remain after correction attempts
+  if (invalidAssignments.length > 0) {
+    const invalidCodes = [...new Set(invalidAssignments.map(a => a.code))].join(', ');
+    const errorMsg = `Cannot save roster: ${invalidAssignments.length} assignments contain invalid shift codes (${invalidCodes}) for ${shiftSystem} mode. Expected: ${[...allowedCodes].join('/')}`;
+    
+    logger.error(new Error('Output validation failed'), {
+      shiftSystem,
+      allowedCodes: [...allowedCodes],
+      invalidCount: invalidAssignments.length,
+      invalidCodes: [...new Set(invalidAssignments.map(a => a.code))],
+      sampleInvalid: invalidAssignments.slice(0, 3)
+    });
+
+    toast({
+      title: "Generation conflict detected",
+      description: errorMsg,
+      variant: "destructive",
+    });
+
+    throw new Error(errorMsg);
+  }
 
   if (assignmentsToInsert.length > 0) {
     const { error: insertError } = await supabase
