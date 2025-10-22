@@ -70,10 +70,32 @@ export function parseOrDefault(json: string, system: ShiftSystem): Coverage {
   } catch { return defaultCoverage(system); }
 }
 
-export function serialiseCoverage(cov: Coverage): string {
-  // Stable key order Sun..Sat
+/**
+ * Serialize coverage to JSON string, filtering keys based on shift system.
+ * For 12h: only D/N are persisted
+ * For 8h: only E/L/N are persisted
+ */
+export function serialiseCoverage(cov: Coverage, system?: ShiftSystem): string {
   const ordered: any = {};
-  for (const d of [0,1,2,3,4,5,6] as DayIdx[]) ordered[d] = cov[d];
+  
+  // If system is provided, filter keys to only valid ones for that framework
+  if (system) {
+    const validKeys = system === "8h" ? ["E", "L", "N"] : ["D", "N"];
+    for (const d of [0,1,2,3,4,5,6] as DayIdx[]) {
+      const dayData = cov[d] as any;
+      const filtered: any = {};
+      for (const key of validKeys) {
+        if (dayData[key] !== undefined) {
+          filtered[key] = dayData[key];
+        }
+      }
+      ordered[d] = filtered;
+    }
+  } else {
+    // Legacy: serialize all keys
+    for (const d of [0,1,2,3,4,5,6] as DayIdx[]) ordered[d] = cov[d];
+  }
+  
   return JSON.stringify(ordered, null, 2);
 }
 

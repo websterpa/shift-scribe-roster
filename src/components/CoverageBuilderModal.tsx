@@ -109,7 +109,8 @@ export default function CoverageBuilderModal({
     setRoleMixByShift(prev => ({ ...prev, ...mixTemplate }));
   }
   async function save() {
-    const json = serialiseCoverage(coverage);
+    // Serialize with framework filtering: only persist valid keys for active system
+    const json = serialiseCoverage(coverage, shiftSystem);
 
     // Fire-and-forget save of defaults if toggled; don't block UI on failure.
     if (saveAsDefault) {
