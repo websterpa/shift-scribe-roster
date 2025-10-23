@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EnrichedAssignment } from "./types";
+import { safeSelect } from "@/integrations/supabase/safeQuery";
 
 type FetchArgs = {
   sb: SupabaseClient;
@@ -35,8 +36,8 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
     q = q.eq("shift_code", shiftCodeFilter);
   }
 
-  const { data, error } = await q;
-  if (error) throw error;
+  const { data, error } = await safeSelect<any[]>(q, "assignments");
+  if (error) return [];
   
   const raw = (data ?? []) as any[];
   
@@ -50,13 +51,16 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   const nameMap = new Map<string, string>();
   if (ids.length > 0) {
     // TODO(tenant): Add tenant_id filter when staff_profiles table has tenant_id column
-    const { data: staff, error: staffErr } = await sb
-      .from("staff_profiles")
-      .select("id, name, first_name, last_name")
-      .in("id", ids);
+    const { data: staff, error: staffErr } = await safeSelect<any[]>(
+      sb
+        .from("staff_profiles")
+        .select("id, name, first_name, last_name")
+        .in("id", ids),
+      "staff profiles"
+    );
       // .eq("tenant_id", getTenantId()) // Uncomment when column exists
     
-    if (staffErr) throw staffErr;
+    if (staffErr) return [];
     
     (staff ?? []).forEach(s => {
       const id = String((s as any).id);
@@ -101,14 +105,17 @@ export async function countMonthlyAssignments({ sb, versionId, monthISO }: { sb:
   const end = endDate.toISOString().slice(0, 10);
 
   // TODO(tenant): Add tenant_id filter when roster_assignments table has tenant_id column
-  const { count, error } = await sb
-    .from("roster_assignments")
-    .select("id", { count: "exact", head: true })
-    .eq("version_id", versionId)
-    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
-    .gte("shift_start", start)
-    .lt("shift_start", end);
+  const { data: result, error } = await safeSelect<any>(
+    sb
+      .from("roster_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("version_id", versionId)
+      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+      .gte("shift_start", start)
+      .lt("shift_start", end),
+    "assignment count"
+  );
 
-  if (error) throw error;
-  return count ?? 0;
+  if (error) return 0;
+  return (result as any)?.count ?? 0;
 }

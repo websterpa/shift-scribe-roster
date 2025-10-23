@@ -4,6 +4,7 @@ import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequ
 import { remapToFramework } from "@/features/roster/shiftMap";
 import { toast } from "@/hooks/use-toast";
 import { createLogger } from "../errorLogger";
+import { safeSelect, safeInsert } from "@/integrations/supabase/safeQuery";
 
 const logger = createLogger('GenerateAndSaveRoster');
 
@@ -61,44 +62,51 @@ export async function generateAndSaveRoster(
   const staffIds = dedupedStaffList.map(s => s.id);
 
   // Create roster version with version_number
-  const { data: existingVersions } = await supabase
-    .from('roster_versions')
-    .select('version_number')
-    .eq('config_id', configId)
-    .order('version_number', { ascending: false })
-    .limit(1);
+  const { data: existingVersions } = await safeSelect<any[]>(
+    supabase
+      .from('roster_versions')
+      .select('version_number')
+      .eq('config_id', configId)
+      .order('version_number', { ascending: false })
+      .limit(1),
+    'roster versions'
+  );
   
   const nextVersionNumber = (existingVersions && existingVersions[0]) 
     ? existingVersions[0].version_number + 1 
     : 1;
 
-  const { data: versionData, error: versionError } = await supabase
-    .from('roster_versions')
-    .insert({
-      config_id: configId,
-      version_name: versionNameToUse || `Version ${Date.now()}`,
-      version_number: nextVersionNumber,
-    })
-    .select()
-    .single();
+  const { data: versionData, error: versionError } = await safeInsert<any>(
+    supabase
+      .from('roster_versions')
+      .insert({
+        config_id: configId,
+        version_name: versionNameToUse || `Version ${Date.now()}`,
+        version_number: nextVersionNumber,
+      })
+      .select()
+      .single(),
+    'roster version'
+  );
 
   if (versionError || !versionData) {
-    logger.error(new Error('Failed to create roster version'), { error: versionError });
-    throw new Error(`Failed to create roster version: ${versionError?.message || 'Unknown error'}`);
+    return Promise.reject(versionError);
   }
 
   logger.info('Created roster version', { versionId: versionData.id });
 
   // Fetch roster config to get coverage requirements
-  const { data: configData, error: configError } = await supabase
-    .from('roster_config')
-    .select('*')
-    .eq('id', configId)
-    .single();
+  const { data: configData, error: configError } = await safeSelect<any>(
+    supabase
+      .from('roster_config')
+      .select('*')
+      .eq('id', configId)
+      .single(),
+    'roster config'
+  );
 
   if (configError || !configData) {
-    logger.error(new Error('Failed to fetch roster config'), { error: configError });
-    throw new Error(`Failed to fetch roster config: ${configError?.message || 'Unknown error'}`);
+    return Promise.reject(configError);
   }
 
   // Build days array for the month
@@ -336,13 +344,15 @@ export async function generateAndSaveRoster(
   }
 
   if (assignmentsToInsert.length > 0) {
-    const { error: insertError } = await supabase
-      .from('roster_assignments')
-      .insert(assignmentsToInsert);
+    const { error: insertError } = await safeInsert<any>(
+      supabase
+        .from('roster_assignments')
+        .insert(assignmentsToInsert),
+      'roster assignments'
+    );
 
     if (insertError) {
-      logger.error(new Error('Failed to insert assignments'), { error: insertError });
-      throw new Error(`Failed to insert assignments: ${insertError.message}`);
+      return Promise.reject(insertError);
     }
   }
 
