@@ -1,8 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { StaffMember } from "@/types/roster";
+import { getTenantId } from "@/features/tenant/useTenant";
 
 export function useStaffData() {
   console.log('🔄 useStaffData hook initialized');
@@ -15,10 +15,12 @@ export function useStaffData() {
     try {
       console.log('📥 useStaffData: Fetching staff list...');
       setError(null);
+      // TODO(tenant): Add tenant_id filter when staff_profiles table has tenant_id column
       // Remove the is_active filter to fetch ALL staff members
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("*")
+        // .eq('tenant_id', getTenantId()) // Uncomment when column exists
         .order("availability_status", { ascending: true }) // Show active first, then temporarily unavailable, then inactive
         .order("last_name", { ascending: true }); // Then order by last name
 
@@ -36,10 +38,12 @@ export function useStaffData() {
           console.log('👤 Processing staff member:', s.first_name, s.last_name, 'Status:', s.availability_status);
           
           // Count monthly leave requests for this staff member
+          // TODO(tenant): Add tenant_id filter when leave_requests table has tenant_id column
           const { data: leaveData, error: leaveError } = await supabase
             .from("leave_requests")
             .select("start_date, leave_type")
             .eq("staff_id", s.id)
+            // .eq("tenant_id", getTenantId()) // Uncomment when column exists
             .eq("status", "approved");
 
           if (leaveError) {

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createLogger } from "@/utils/errorLogger";
+import { getTenantId } from "@/features/tenant/useTenant";
 
 const logger = createLogger('RosterService');
 
@@ -21,6 +22,7 @@ export async function createRosterVersion(input: CreateRosterVersionInput) {
   logger.info('Creating roster version', { config_id: input.config_id, version_name: input.version_name });
 
   // Get next version number for this config
+  // TODO(tenant): Add tenant_id filter when roster_versions table has tenant_id column
   const { data: existingVersions, error: versionQueryError } = await supabase
     .from("roster_versions")
     .select("version_number")
@@ -38,12 +40,14 @@ export async function createRosterVersion(input: CreateRosterVersionInput) {
     : 1;
 
   // IMPORTANT: do NOT pass "id" — let DB default (gen_random_uuid()) generate it
+  // TODO(tenant): Include tenant_id in insert when roster_versions table has tenant_id column
   const { data, error } = await supabase
     .from("roster_versions")
     .insert({
       config_id: input.config_id,
       version_number: nextVersionNumber,
       version_name: input.version_name ?? `Version ${nextVersionNumber}`,
+      // tenant_id: getTenantId(), // Uncomment when column exists
     })
     .select("id, config_id, version_number, version_name, generated_at")
     .single();
@@ -64,9 +68,13 @@ export async function createRosterConfig(configData: any): Promise<string> {
   const cleanConfigData = { ...configData };
   delete cleanConfigData.id; // Let DB generate the UUID
 
+  // TODO(tenant): Include tenant_id in insert when roster_config table has tenant_id column
   const { data, error } = await supabase
     .from("roster_config")
-    .insert(cleanConfigData)
+    .insert({
+      ...cleanConfigData,
+      // tenant_id: getTenantId(), // Uncomment when column exists
+    })
     .select("id")
     .single();
 

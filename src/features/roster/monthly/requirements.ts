@@ -1,15 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toCode } from "@/features/roster/shiftMap";
+import { getTenantId } from "@/features/tenant/useTenant";
 
 type ReqLegacy = Record<string, Record<string, number>>;
 // Note: role_id is legacy config JSON field name, not a database column
 type ReqNew = { days: Record<string, Array<{ role_id?: string; code?: string; logical?: string; needed: number }>> };
 
 export async function fetchRequiredCodes(versionId: string, monthStartISO: string, monthEndISO: string): Promise<Set<string>> {
-  const v = await supabase.from("roster_versions").select("id, config_id").eq("id", versionId).single();
+  // TODO(tenant): Add tenant_id filter when roster_versions table has tenant_id column
+  const v = await supabase
+    .from("roster_versions")
+    .select("id, config_id")
+    .eq("id", versionId)
+    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+    .single();
   if (v.error || !v.data) return new Set();
   
-  const c = await supabase.from("roster_config").select("id, staffing_requirements").eq("id", v.data.config_id).single();
+  // TODO(tenant): Add tenant_id filter when roster_config table has tenant_id column
+  const c = await supabase
+    .from("roster_config")
+    .select("id, staffing_requirements")
+    .eq("id", v.data.config_id)
+    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+    .single();
   if (c.error || !c.data) return new Set();
   
   const json: any = c.data.staffing_requirements || {};

@@ -1,5 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { getTenantId } from "@/features/tenant/useTenant";
 
 export type LeaveCode = "A/L" | "S" | "SP" | "CL";
 export type LeaveMap = Record<string /* staffId */, Record<string /* yyyy-mm-dd */, LeaveCode>>;
@@ -9,9 +9,11 @@ export type LeaveMap = Record<string /* staffId */, Record<string /* yyyy-mm-dd 
  */
 export async function getLeaveMap(): Promise<LeaveMap> {
   try {
+    // TODO(tenant): Add tenant_id filter when leave_requests table has tenant_id column
     const { data: leaveRequests, error } = await supabase
       .from('leave_requests')
       .select('staff_id, start_date, end_date, leave_type')
+      // .eq('tenant_id', getTenantId()) // Uncomment when column exists
       .eq('status', 'approved');
 
     if (error) {

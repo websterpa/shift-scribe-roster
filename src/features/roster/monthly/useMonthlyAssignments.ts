@@ -22,10 +22,12 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toISOString().slice(0, 10);
 
+  // TODO(tenant): Add tenant_id filter when roster_assignments table has tenant_id column
   let q = sb
     .from("roster_assignments")
     .select("*")
     .eq("version_id", versionId)
+    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
     .gte("shift_start", start)
     .lt("shift_start", end);
 
@@ -47,10 +49,12 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   // Build staff name map - only if we have valid IDs
   const nameMap = new Map<string, string>();
   if (ids.length > 0) {
+    // TODO(tenant): Add tenant_id filter when staff_profiles table has tenant_id column
     const { data: staff, error: staffErr } = await sb
       .from("staff_profiles")
       .select("id, name, first_name, last_name")
       .in("id", ids);
+      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
     
     if (staffErr) throw staffErr;
     
@@ -96,10 +100,12 @@ export async function countMonthlyAssignments({ sb, versionId, monthISO }: { sb:
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toISOString().slice(0, 10);
 
+  // TODO(tenant): Add tenant_id filter when roster_assignments table has tenant_id column
   const { count, error } = await sb
     .from("roster_assignments")
     .select("id", { count: "exact", head: true })
     .eq("version_id", versionId)
+    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
     .gte("shift_start", start)
     .lt("shift_start", end);
 
