@@ -66,7 +66,7 @@ export function computeRestRiskBetweenDays(args: {
   const results: Array<any> = [];
   if (!args.sequence || args.sequence.length < 2) return results;
   const sys = args.system;
-  const T = parseHHmm(args.siteStartLocalTime); // minutes from midnight; used only for semantics
+  const siteStartMinutes = parseHHmm(args.siteStartLocalTime); // minutes from midnight
 
   for (let i = 0; i < args.sequence.length - 1; i++) {
     const prev = args.sequence[i] as Token;
@@ -89,11 +89,11 @@ export function computeRestRiskBetweenDays(args: {
       continue;
     }
 
-    // Day i ends at T + prevWin[1] (same day)
-    const prevEndAbs = T + prevWin[1];
+    // Day i ends at siteStartMinutes + prevWin[1] (same day)
+    const prevEndAbs = siteStartMinutes + prevWin[1];
 
-    // Day i+1 starts at next calendar day at T + nextWin[0] + 24h
-    const nextStartAbs = (T + 24*60) + nextWin[0];
+    // Day i+1 starts at next calendar day at siteStartMinutes + nextWin[0] + 24h
+    const nextStartAbs = (siteStartMinutes + 24*60) + nextWin[0];
 
     const restMin = nextStartAbs - prevEndAbs;
     const restHours = Math.round((restMin / 60) * 10) / 10; // one decimal
@@ -567,9 +567,9 @@ export default function RosterWizard() {
         title: "Success!",
         description: "Roster generated successfully 🎉"
       });
-    } catch (e:any) {
-      const raw = e?.message || "Error generating roster ❌";
-      const msg = /forEach/.test(raw) ? "Pattern looks invalid. Please pick a preset or add tokens, then try again." : raw;
+      } catch (e: any) {
+      const rawMsg = e?.message || "Error generating roster ❌";
+      const msg = /forEach/.test(rawMsg) ? "Pattern looks invalid. Please pick a preset or add tokens, then try again." : rawMsg;
       toast({
         title: "Generation Error",
         description: msg,
@@ -832,7 +832,7 @@ function StepPattern({ state, update, inlineTips, savedPatterns, loadingPatterns
   });
 
   // Validate current pattern
-  const { sequence: validatedSeq, issues } = validatePattern((state.pattern as any)?.sequence ?? state.pattern);
+  const { issues } = validatePattern((state.pattern as any)?.sequence ?? state.pattern);
 
   return (
     <div className="space-y-4">

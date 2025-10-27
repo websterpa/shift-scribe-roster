@@ -31,13 +31,11 @@ export default function CoverageBuilderModal({
 }: CoverageBuilderProps) {
   const [tabDay, setTabDay] = useState(1); // default Monday
   const [coverage, setCoverage] = useState<Coverage>(() => parseOrDefault(initialJSON, shiftSystem));
-  const [avgHourlyRate, setAvgHourlyRate] = useState<number>(18.0); // keep (legacy simple estimate) if you still display it
   const [roleRates, setRoleRates] = useState<ModalRateState>({ 
     staffRate: 18, 
     supervisorRate: 24
   });
   const [roleMixByShift, setRoleMixByShift] = useState<Record<string, number>>({}); // keys: E/L/N or D/N
-  const [isLoadingDefaults, setIsLoadingDefaults] = useState<boolean>(true);
   const [saveAsDefault, setSaveAsDefault] = useState<boolean>(false);
 
   // Reset when system changes or modal opens
@@ -60,8 +58,6 @@ export default function CoverageBuilderModal({
         const m: Record<string, number> = {};
         for (const k of keys) m[k] = Number(defaults.roleMixByShift?.[k] ?? 0);
         setRoleMixByShift(m);
-        // Optionally sync legacy simple avg to staff rate if you still show it
-        setAvgHourlyRate(defaults.avgStaffRate ?? 18);
       } catch {
         // Ignore; keep fallbacks
       }
@@ -72,7 +68,6 @@ export default function CoverageBuilderModal({
   const shiftKeys = useMemo(() => shiftSystem === "8h" ? (["E","L","N"] as const) : (["D","N"] as const), [shiftSystem]);
   const totals = useMemo(() => computeWeeklyTotals(shiftSystem, coverage), [shiftSystem, coverage]);
   const estHours = useMemo(() => computeEstimatedWeeklyHours(shiftSystem, coverage), [shiftSystem, coverage]);
-  const estCostSimple  = useMemo(() => computeEstimatedWeeklyWageCost(estHours, avgHourlyRate), [estHours, avgHourlyRate]); // keep if you still display "single rate" line
   const estCostBlended = useMemo(() => {
     const fullRoleRates = {
       staffRate: roleRates.staffRate,
@@ -96,8 +91,8 @@ export default function CoverageBuilderModal({
   function copyWeekdays() { setCoverage(prev => copyWeekdaysToWeekend(prev, shiftSystem)); }
   function applyAll() {
     // Read current tab's values as a template
-    const t = coverage[tabDay as 0|1|2|3|4|5|6];
-    setCoverage(prev => applyToAllDays(prev, shiftSystem, t));
+    const dayTemplate = coverage[tabDay as 0|1|2|3|4|5|6];
+    setCoverage(prev => applyToAllDays(prev, shiftSystem, dayTemplate));
   }
   function clearAll() { setCoverage(defaultCoverage(shiftSystem)); }
   function applyMixToAllShifts() {
@@ -106,7 +101,7 @@ export default function CoverageBuilderModal({
     for (const k of keys) {
       mixTemplate[k] = roleMixByShift[k] ?? 10;
     }
-    setRoleMixByShift(prev => ({ ...prev, ...mixTemplate }));
+    setRoleMixByShift({ ...mixTemplate });
   }
   async function save() {
     // Serialize with framework filtering: only persist valid keys for active system
@@ -136,7 +131,7 @@ export default function CoverageBuilderModal({
             variant: "destructive"
           });
         }
-      } catch (error) {
+      } catch {
         toast({
           title: "Save Error",
           description: "An error occurred while saving defaults.",

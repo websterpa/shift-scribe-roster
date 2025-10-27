@@ -181,11 +181,11 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
       console.log('✅ NewRosterWizard: Roster generated successfully');
       onRosterGenerated(configId); // Pass the temp config ID to parent for cleanup
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ NewRosterWizard: Generation failed:', error);
       toast({
         title: "Generation failed",
-        description: error?.message || "Failed to generate roster",
+        description: error instanceof Error ? error.message : "Failed to generate roster",
         variant: "destructive",
       });
       
