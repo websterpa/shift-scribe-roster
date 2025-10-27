@@ -3,30 +3,33 @@
  * Uses staff member's personal start date to anchor the pattern cycle
  */
 
-import { addDays, differenceInCalendarDays, parseISO } from 'date-fns';
+import { addDays, differenceInCalendarDays } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 import type { PatternTemplate, StaffPatternBinding, ExpandedPatternDay, ShiftCode } from './types';
+
+const VALID_SHIFT_CODES: ShiftCode[] = ['D', 'N', 'E', 'L', 'R'];
 
 /**
  * Expand a staff member's pattern across a date range
  * 
  * @param template - The pattern template to expand
  * @param binding - Staff pattern binding with start date anchor
- * @param rosterStartDate - Start of roster period (YYYY-MM-DD)
- * @param rosterEndDate - End of roster period (YYYY-MM-DD, exclusive)
+ * @param startDateISO - Start of roster period (YYYY-MM-DD)
+ * @param endDateISO - End of roster period (YYYY-MM-DD, inclusive)
  * @returns Array of daily shift assignments
  */
-export function expandPattern(
+export function expandPatternOverRange(
   template: PatternTemplate,
   binding: StaffPatternBinding,
-  rosterStartDate: string,
-  rosterEndDate: string
+  startDateISO: string,
+  endDateISO: string
 ): ExpandedPatternDay[] {
   console.log('📅 Expanding pattern:', {
     patternName: template.pattern_name,
     patternLength: template.pattern_length,
     staffId: binding.staff_id,
     startAnchor: binding.pattern_start_date,
-    rosterRange: `${rosterStartDate} to ${rosterEndDate}`,
+    rosterRange: `${startDateISO} to ${endDateISO}`,
   });
 
   // Validate inputs
@@ -43,48 +46,54 @@ export function expandPattern(
     throw new Error(`Pattern ${template.id} length mismatch`);
   }
 
-  const patternStart = parseISO(binding.pattern_start_date);
-  const rosterStart = parseISO(rosterStartDate);
-  const rosterEnd = parseISO(rosterEndDate);
-
-  // Calculate how many days from pattern start to roster start
-  const daysFromPatternStart = differenceInCalendarDays(rosterStart, patternStart);
+  const out: ExpandedPatternDay[] = [];
+  const start = new Date(startDateISO);
+  const end = new Date(endDateISO);
+  const anchor = new Date(binding.pattern_start_date);
   
-  // Find starting position in pattern cycle (handle negative offsets)
-  const patternLength = template.pattern_sequence.length;
-  let startIndex = daysFromPatternStart % patternLength;
-  if (startIndex < 0) {
-    startIndex += patternLength; // Handle dates before pattern start
+  let invalidCodesFound = false;
+  const invalidCodes = new Set<string>();
+
+  for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+    const offset = differenceInCalendarDays(d, anchor);
+    const idx = ((offset % template.pattern_length) + template.pattern_length) % template.pattern_length;
+    const code = template.pattern_sequence[idx] as ShiftCode;
+    
+    // Validate shift code
+    if (!VALID_SHIFT_CODES.includes(code)) {
+      console.error('❌ Invalid shift code in pattern:', code);
+      invalidCodesFound = true;
+      invalidCodes.add(code);
+      continue; // Skip this day
+    }
+    
+    out.push({ 
+      date: d.toISOString().slice(0, 10), 
+      shift_code: code, 
+      is_rest: code === 'R' 
+    });
   }
 
-  console.log('🔢 Pattern alignment:', {
-    daysFromPatternStart,
-    startIndex,
-    patternLength,
+  // Show toast if invalid codes were found
+  if (invalidCodesFound) {
+    toast({
+      title: "Invalid Shift Codes",
+      description: `Pattern "${template.pattern_name}" contains invalid codes: ${Array.from(invalidCodes).join(', ')}. Valid codes: ${VALID_SHIFT_CODES.join(', ')}`,
+      variant: "destructive",
+    });
+  }
+
+  // Validate output length
+  const expectedDays = differenceInCalendarDays(end, start) + 1;
+  console.log('🔢 Pattern expansion result:', {
+    expectedDays,
+    actualDays: out.length,
+    skippedDays: expectedDays - out.length,
   });
 
-  // Generate daily entries
-  const expanded: ExpandedPatternDay[] = [];
-  let currentDate = rosterStart;
-  let patternIndex = startIndex;
-
-  while (currentDate < rosterEnd) {
-    const shiftCode = template.pattern_sequence[patternIndex];
-    
-    expanded.push({
-      date: currentDate.toISOString().split('T')[0], // YYYY-MM-DD
-      shift_code: shiftCode,
-      is_rest: shiftCode === 'R',
-    });
-
-    // Advance to next day
-    currentDate = addDays(currentDate, 1);
-    patternIndex = (patternIndex + 1) % patternLength;
-  }
-
-  console.log(`✅ Expanded ${expanded.length} days for pattern ${template.pattern_name}`);
+  console.log(`✅ Expanded ${out.length} days for pattern ${template.pattern_name}`);
   
-  return expanded;
+  return out;
 }
 
 /**
@@ -102,7 +111,7 @@ export function expandPatternsBatch(
 
   for (const [staffId, { template, binding }] of resolutions.entries()) {
     try {
-      const expanded = expandPattern(template, binding, rosterStartDate, rosterEndDate);
+      const expanded = expandPatternOverRange(template, binding, rosterStartDate, rosterEndDate);
       results.set(staffId, expanded);
     } catch (err) {
       console.error(`❌ Failed to expand pattern for staff ${staffId}:`, err);
@@ -122,16 +131,11 @@ export function getShiftCodeForDate(
   binding: StaffPatternBinding,
   targetDate: string
 ): ShiftCode {
-  const patternStart = parseISO(binding.pattern_start_date);
-  const target = parseISO(targetDate);
+  const anchor = new Date(binding.pattern_start_date);
+  const target = new Date(targetDate);
   
-  const daysFromStart = differenceInCalendarDays(target, patternStart);
-  const patternLength = template.pattern_sequence.length;
+  const offset = differenceInCalendarDays(target, anchor);
+  const idx = ((offset % template.pattern_length) + template.pattern_length) % template.pattern_length;
   
-  let index = daysFromStart % patternLength;
-  if (index < 0) {
-    index += patternLength;
-  }
-  
-  return template.pattern_sequence[index];
+  return template.pattern_sequence[idx];
 }
