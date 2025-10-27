@@ -11,10 +11,14 @@ import { Settings, Calendar, DollarSign, Clock, Users, Shield } from 'lucide-rea
 import { RosterProgressTracker } from './RosterProgressTracker';
 import { RosterResultsSummary } from './RosterResultsSummary';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { createLogger } from '@/utils/errorLogger';
 import { 
   ManagerRosterConfig, 
   RosterGenerationResultUI 
 } from '@/features/roster/types';
+
+const logger = createLogger('ManagerRosterGenerator');
 
 // Re-export types for backwards compatibility
 export type { ManagerRosterConfig };
@@ -24,12 +28,16 @@ interface ManagerRosterGeneratorProps {
   onGenerateRoster: (config: ManagerRosterConfig) => Promise<RosterGenerationResultUI>;
   isGenerating?: boolean;
   lastResult?: RosterGenerationResultUI | null;
+  selectedMonth?: string; // Format: 'YYYY-MM'
+  tenantId?: string;
 }
 
 export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
   onGenerateRoster,
   isGenerating = false,
-  lastResult = null
+  lastResult = null,
+  selectedMonth,
+  tenantId
 }) => {
   const [config, setConfig] = useState<ManagerRosterConfig>({
     shiftSystem: '12h',
@@ -90,6 +98,60 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
       return;
     }
 
+    // Clear old assignments for this tenant and month before generating
+    if (selectedMonth) {
+      try {
+        setProgressMessage('Clearing old assignments...');
+        
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthStart = `${selectedMonth}-01`;
+        const monthEnd = `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`;
+        
+        // Build delete query with date range filter
+        let deleteQuery = supabase
+          .from('roster_assignments')
+          .delete()
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+        
+        // Add tenant filter if tenantId is provided (for future multi-tenancy)
+        // Note: tenant_id column doesn't exist yet in schema
+        // if (tenantId) {
+        //   deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+        // }
+        
+        const { error: deleteError } = await deleteQuery;
+        
+        if (deleteError) {
+          logger.error(new Error('Failed to clear old assignments'), { 
+            error: deleteError, 
+            selectedMonth, 
+            tenantId 
+          });
+          throw new Error(`Failed to clear old assignments: ${deleteError.message}`);
+        }
+        
+        logger.info('Cleared old assignments for month', { 
+          selectedMonth, 
+          tenantId,
+          dateRange: `${monthStart} to ${monthEnd}` 
+        });
+        
+        toast({
+          title: "Cleared old assignments",
+          description: `Removed existing assignments for ${selectedMonth}`,
+        });
+      } catch (error) {
+        logger.error(new Error('Delete operation failed'), { error, selectedMonth, tenantId });
+        toast({
+          title: "Warning",
+          description: "Could not clear old assignments. Proceeding with generation.",
+          variant: "destructive"
+        });
+      }
+    }
+    
     // Progress tracking simulation
     setProgress(0);
     setProgressMessage('Initializing roster generation...');
