@@ -78,33 +78,38 @@ export interface ResolvedShift {
 }
 
 // ============================================================================
-// PATTERN LIBRARY
+// PATTERN LIBRARY (Database-aligned canonical types)
 // ============================================================================
 
 /**
- * Site-wide or user-defined pattern template
+ * Pattern template stored in database (site_patterns/custom_patterns table)
+ * This is the canonical source of truth for pattern definitions.
  */
 export interface PatternTemplate {
-  /** Unique identifier */
   id: string;
-  
-  /** Display name */
-  name: string;
-  
-  /** The pattern sequence */
-  sequence: ShiftCode[];
-  
-  /** Which shift system */
-  shiftSystem: ShiftSystem;
-  
-  /** Created by user ID */
-  createdBy?: string;
-  
-  /** Site ID if site-specific */
-  siteId?: string;
-  
-  /** Timestamp */
-  createdAt: string;
+  tenant_id: string;
+  site_id?: string | null;
+  pattern_name: string;
+  pattern_sequence: ShiftCode[]; // e.g. ['D','D','N','N','R','R','R','R']
+  pattern_length: number;         // must equal pattern_sequence.length
+}
+
+/**
+ * Binds a staff member to a specific pattern with a start date
+ */
+export interface StaffPatternBinding {
+  staff_id: string;
+  pattern_id: string;
+  pattern_start_date: string; // ISO (first day this cycle applies to the staff member)
+}
+
+/**
+ * A single day in an expanded pattern sequence
+ */
+export interface ExpandedPatternDay {
+  date: string; // ISO yyyy-mm-dd
+  shift_code: ShiftCode;
+  is_rest: boolean;
 }
 
 // ============================================================================
