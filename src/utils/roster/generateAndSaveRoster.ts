@@ -68,6 +68,27 @@ export async function generateAndSaveRoster(
   // Use deduplicated staff list for all subsequent operations
   const staffIds = dedupedStaffList.map(s => s.id);
 
+  // Clear old assignments for this month before generating new ones
+  {
+    const [yr, mon] = monthISO.split('-').map(Number);
+    const days = new Date(yr, mon, 0).getDate();
+    const monthStart = `${monthISO}-01`;
+    const monthEnd = `${monthISO}-${String(days).padStart(2, '0')}`;
+    
+    const { error: deleteError } = await supabase
+      .from('roster_assignments')
+      .delete()
+      .gte('date', monthStart)
+      .lte('date', monthEnd);
+    
+    if (deleteError) {
+      logger.error(new Error('Failed to clear old assignments'), { error: deleteError, monthISO });
+      throw new Error(`Failed to clear old assignments: ${deleteError.message}`);
+    }
+    
+    logger.info('Cleared old assignments for month', { monthISO, dateRange: `${monthStart} to ${monthEnd}` });
+  }
+
   // Create roster version with version_number
   const { data: existingVersions } = await safeSelect<any[]>(
     supabase
