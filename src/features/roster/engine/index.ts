@@ -137,6 +137,12 @@ export {
  * Generate a roster using the corrective algorithm with hard constraint enforcement
  * and fairness-based optimization. This is the canonical roster generation function.
  * 
+ * FRAMEWORK SUPPORT:
+ * - 8h mode: Uses E (Early), L (Late), N (Night) shifts
+ * - 12h mode: Uses D (Day), N (Night) shifts only
+ * - Framework detection: Based on requirements or explicit parameter
+ * - Strict isolation: No E/L in 12h mode, no D in 8h mode
+ * 
  * HARD CONSTRAINTS (enforced before accepting assignments):
  * - Minimum rest hours: Default 11h between consecutive shifts (configurable)
  * - Maximum consecutive days: Default 6 working days before forced rest
@@ -161,21 +167,27 @@ export {
  * - Min/max/mean hours distribution
  * - REST days enforced during corrective pass
  * 
- * @param input - Generation parameters (staff, requirements, policy)
+ * @param input - Generation parameters (staff, requirements, policy, framework)
  * @returns Complete roster with assignments, fairness metrics, and diagnostics
  * 
  * @example
  * ```ts
- * const result = generateCorrectiveRoster({
+ * // 8h framework (E/L/N shifts)
+ * const result8h = generateCorrectiveRoster({
  *   days: ['2025-01-10', '2025-01-11', '2025-01-12'],
  *   staff: [{ id: '1', name: 'John', availability: {}, isNightEligible: true }],
  *   requirements: { '2025-01-10': { E: 2, L: 2, N: 1 } },
- *   policy: { 
- *     ...DEFAULT_CORRECTIVE_POLICY, 
- *     minGapHoursBetweenShifts: 11,
- *     maxConsecDays: 6,
- *     fairnessWeight: 0.3 
- *   }
+ *   policy: { ...DEFAULT_CORRECTIVE_POLICY, fairnessWeight: 0.3 },
+ *   framework: '8h'
+ * });
+ * 
+ * // 12h framework (D/N shifts only)
+ * const result12h = generateCorrectiveRoster({
+ *   days: ['2025-01-10', '2025-01-11'],
+ *   staff: [{ id: '1', name: 'John', availability: {}, isNightEligible: true }],
+ *   requirements: { '2025-01-10': { D: 2, N: 1 } },
+ *   policy: { ...DEFAULT_CORRECTIVE_POLICY },
+ *   framework: '12h'
  * });
  * ```
  */

@@ -31,7 +31,7 @@ export interface RosterSummary {
   staffUsedCount?: number;
   misses?: Array<{
     day: number;
-    shift: 'E' | 'L' | 'N';
+    shift: 'E' | 'L' | 'N' | 'D'; // Include D for 12h framework
     reasons: string[];
   }>;
 }

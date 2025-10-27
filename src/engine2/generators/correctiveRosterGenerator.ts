@@ -20,6 +20,7 @@ export interface CoverageRequirements {
     E?: number;
     L?: number;
     N?: number;
+    D?: number;  // 12h framework day shift
   };
 }
 
@@ -48,22 +49,23 @@ export interface CorrectiveInput {
   staff: CorrectiveStaffMember[];
   requirements: CoverageRequirements;
   policy: CorrectivePolicy;
+  framework?: '8h' | '12h'; // Optional framework (defaults to 8h)
 }
 
 export interface Assignment {
   staffId: string;
   dateISO: string;
-  shiftType: 'E' | 'L' | 'N';
+  shiftType: 'E' | 'L' | 'N' | 'D';  // D for 12h framework
 }
 
 export interface CorrectiveResult {
   assignments: Assignment[];
   roster: Record<string, Record<string, ShiftCode>>; // staffId -> dateISO -> ShiftCode
-  coverage: Record<string, { E: number; L: number; N: number }>;
+  coverage: Record<string, { E: number; L: number; N: number; D: number }>;
   fairness: {
-    staffTotals: Record<string, { E: number; L: number; N: number; total: number }>;
-    targets: { E: number; L: number; N: number };
-    variance: { E: number; L: number; N: number };
+    staffTotals: Record<string, { E: number; L: number; N: number; D: number; total: number }>;
+    targets: { E: number; L: number; N: number; D: number };
+    variance: { E: number; L: number; N: number; D: number };
   };
   violations: string[];
   utilizationReport: Record<string, number>; // staffId -> total assignments
@@ -74,7 +76,7 @@ export interface CorrectiveResult {
   unfilledShifts?: Array<{ // Diagnostic: why shifts couldn't be filled
     dateISO: string;
     dayIndex: number;
-    shift: 'E' | 'L' | 'N';
+    shift: 'E' | 'L' | 'N' | 'D';
     needed: number;
     filled: number;
     rejectionReasons: string[];
@@ -115,16 +117,20 @@ export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = {
  */
 function hasMinimumRest(
   prevShift: ShiftCode | null, 
-  nextShift: 'E' | 'L' | 'N',
+  nextShift: 'E' | 'L' | 'N' | 'D',
   shiftTimes: ShiftTimes,
   minRestHours: number
 ): boolean {
   if (!prevShift || prevShift === 'R') return true;
-  if (prevShift !== 'E' && prevShift !== 'L' && prevShift !== 'N') return true;
+  if (prevShift !== 'E' && prevShift !== 'L' && prevShift !== 'N' && prevShift !== 'D') return true;
+  
+  // For 'D' shift, use 'E' times as a proxy (day shift)
+  const prevKey = (prevShift === 'D' ? 'E' : prevShift) as 'E' | 'L' | 'N';
+  const nextKey = (nextShift === 'D' ? 'E' : nextShift) as 'E' | 'L' | 'N';
   
   const restHours = calculateRestHours(
-    shiftTimes[prevShift as 'E' | 'L' | 'N'].end,
-    shiftTimes[nextShift].start
+    shiftTimes[prevKey].end,
+    shiftTimes[nextKey].start
   );
   
   return restHours >= minRestHours;
@@ -137,7 +143,7 @@ function hasMinimumRest(
 interface EligibilityContext {
   staffId: string;
   dateISO: string;
-  shiftType: 'E' | 'L' | 'N';
+  shiftType: 'E' | 'L' | 'N' | 'D';
   currentAssignments: Map<string, Map<string, ShiftCode>>; // staffId -> dateISO -> ShiftCode
   staff: CorrectiveStaffMember;
   policy: CorrectivePolicy;
@@ -280,9 +286,9 @@ function countConsecutiveNightsBackward(
 
 interface PriorityContext {
   staffId: string;
-  shiftType: 'E' | 'L' | 'N';
-  assigned: Record<string, { E: number; L: number; N: number }>;
-  targets: { E: number; L: number; N: number };
+  shiftType: 'E' | 'L' | 'N' | 'D';
+  assigned: Record<string, { E: number; L: number; N: number; D: number }>;
+  targets: { E: number; L: number; N: number; D: number };
   currentDayIndex: number;
   days: string[];
   staffAssignments: Map<string, ShiftCode>;
@@ -307,7 +313,7 @@ function jitter(seed: number, dayIndex: number, staffId: string): number {
 // Find the last day index when this staff was assigned this specific shift type
 function findLastDayAssigned(
   staffAssignments: Map<string, ShiftCode>,
-  shiftType: 'E' | 'L' | 'N',
+  shiftType: 'E' | 'L' | 'N' | 'D',
   currentDayIndex: number,
   days: string[]
 ): number {
@@ -355,12 +361,19 @@ function calculatePriority(ctx: PriorityContext): number {
 // ============================================================================
 
 export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResult {
+  const framework = input.framework || '8h';
+  
   logger.info('Starting corrective roster generation', { 
     staffCount: input.staff.length, 
-    dayCount: input.days.length 
+    dayCount: input.days.length,
+    framework 
   });
 
   const { days, staff, requirements, policy } = input;
+  
+  // Framework-aware shift types: 12h uses D/N only, 8h uses E/L/N
+  const validShiftTypes = framework === '12h' ? ['D' as const, 'N' as const] : ['E' as const, 'L' as const, 'N' as const];
+  logger.info(`Valid shift types for ${framework} framework:`, validShiftTypes);
   
   // Generate seed for deterministic jitter (based on first day)
   let seed = 0;
@@ -373,20 +386,24 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
   
   // Initialize tracking
   const currentAssignments = new Map<string, Map<string, ShiftCode>>();
-  const assigned: Record<string, { E: number; L: number; N: number }> = {};
-  const unfilledShifts: Array<{ dateISO: string; dayIndex: number; shift: 'E' | 'L' | 'N'; needed: number; filled: number; rejectionReasons: string[] }> = [];
+  const assigned: Record<string, { E: number; L: number; N: number; D: number }> = {};
+  const unfilledShifts: Array<{ dateISO: string; dayIndex: number; shift: 'E' | 'L' | 'N' | 'D'; needed: number; filled: number; rejectionReasons: string[] }> = [];
   
   staff.forEach(s => {
     currentAssignments.set(s.id, new Map());
-    assigned[s.id] = { E: 0, L: 0, N: 0 };
+    assigned[s.id] = { E: 0, L: 0, N: 0, D: 0 };
   });
 
   // Calculate targets
   const targets = calculateTargets(requirements, staff.length);
   logger.info('Calculated fair-share targets', targets);
 
-  // STEP 1: Allocate in priority order: N → E → L
-  const shiftOrder: Array<'N' | 'E' | 'L'> = ['N', 'E', 'L'];
+  // STEP 1: Allocate in priority order based on framework
+  // 12h: N → D only
+  // 8h: N → E → L
+  const shiftOrder = framework === '12h' 
+    ? ['N' as const, 'D' as const] 
+    : ['N' as const, 'E' as const, 'L' as const];
   
   for (const shiftType of shiftOrder) {
     logger.info(`Allocating ${shiftType} shifts`);
@@ -549,18 +566,20 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
 // ============================================================================
 
 function calculateTargets(requirements: CoverageRequirements, staffCount: number) {
-  let totalE = 0, totalL = 0, totalN = 0;
+  let totalE = 0, totalL = 0, totalN = 0, totalD = 0;
 
   for (const req of Object.values(requirements)) {
     totalE += req.E || 0;
     totalL += req.L || 0;
     totalN += req.N || 0;
+    totalD += req.D || 0;
   }
 
   return {
     E: Math.round(totalE / staffCount),
     L: Math.round(totalL / staffCount),
     N: Math.round(totalN / staffCount),
+    D: Math.round(totalD / staffCount),
   };
 }
 
@@ -656,14 +675,14 @@ function ensureAllStaffUtilized(
   staff: CorrectiveStaffMember[],
   days: string[],
   currentAssignments: Map<string, Map<string, ShiftCode>>,
-  assigned: Record<string, { E: number; L: number; N: number }>,
-  targets: { E: number; L: number; N: number },
+  assigned: Record<string, { E: number; L: number; N: number; D: number }>,
+  targets: { E: number; L: number; N: number; D: number },
   policy: CorrectivePolicy,
   requirements: CoverageRequirements
 ) {
   const countAssignments = (staffId: string) => {
     const stats = assigned[staffId];
-    return stats.E + stats.L + stats.N;
+    return stats.E + stats.L + stats.N + stats.D;
   };
 
   const unused = staff.filter(s => countAssignments(s.id) === 0);
@@ -685,7 +704,7 @@ function ensureAllStaffUtilized(
     for (const dateISO of days) {
       if (wasAssigned) break;
       
-      const shifts: Array<'E' | 'L' | 'N'> = ['E', 'L', 'N'];
+      const shifts: Array<'E' | 'L' | 'N' | 'D'> = ['E', 'L', 'N', 'D'];
       
       for (const shiftType of shifts) {
         if (isEligible({
@@ -721,7 +740,7 @@ function ensureAllStaffUtilized(
       for (const dateISO of days) {
         if (wasAssigned) break;
         
-        const shifts: Array<'E' | 'L' | 'N'> = ['E', 'L', 'N'];
+        const shifts: Array<'E' | 'L' | 'N' | 'D'> = ['E', 'L', 'N', 'D'];
         
         for (const shiftType of shifts) {
           if (wasAssigned) break;
@@ -786,6 +805,7 @@ function ensureAllStaffUtilized(
     E: assigned[s.id].E,
     L: assigned[s.id].L,
     N: assigned[s.id].N,
+    D: assigned[s.id].D,
   }));
   
   console.info("[UTILISATION] Final assignment counts:", utilSummary);
@@ -803,14 +823,14 @@ function buildResult(
   staff: CorrectiveStaffMember[],
   days: string[],
   currentAssignments: Map<string, Map<string, ShiftCode>>,
-  assigned: Record<string, { E: number; L: number; N: number }>,
-  targets: { E: number; L: number; N: number },
+  assigned: Record<string, { E: number; L: number; N: number; D: number }>,
+  targets: { E: number; L: number; N: number; D: number },
   requirements: CoverageRequirements,
-  unfilledShifts: Array<{ dateISO: string; dayIndex: number; shift: 'E' | 'L' | 'N'; needed: number; filled: number; rejectionReasons: string[] }>
+  unfilledShifts: Array<{ dateISO: string; dayIndex: number; shift: 'E' | 'L' | 'N' | 'D'; needed: number; filled: number; rejectionReasons: string[] }>
 ): CorrectiveResult {
   const assignments: Assignment[] = [];
   const roster: Record<string, Record<string, ShiftCode>> = {};
-  const coverage: Record<string, { E: number; L: number; N: number }> = {};
+  const coverage: Record<string, { E: number; L: number; N: number; D: number }> = {};
   const violations: string[] = [];
   const utilizationReport: Record<string, number> = {};
   
@@ -826,7 +846,7 @@ function buildResult(
     for (const [dateISO, shiftCode] of staffMap.entries()) {
       roster[s.id][dateISO] = shiftCode;
       
-      if (shiftCode === 'E' || shiftCode === 'L' || shiftCode === 'N') {
+      if (shiftCode === 'E' || shiftCode === 'L' || shiftCode === 'N' || shiftCode === 'D') {
         assignments.push({ staffId: s.id, dateISO, shiftType: shiftCode });
         totalAssignments++;
       }
@@ -838,11 +858,11 @@ function buildResult(
 
   // Calculate coverage
   for (const dateISO of days) {
-    coverage[dateISO] = { E: 0, L: 0, N: 0 };
+    coverage[dateISO] = { E: 0, L: 0, N: 0, D: 0 };
     
     for (const s of staff) {
       const shift = roster[s.id][dateISO];
-      if (shift === 'E' || shift === 'L' || shift === 'N') {
+      if (shift === 'E' || shift === 'L' || shift === 'N' || shift === 'D') {
         coverage[dateISO][shift]++;
       }
     }
@@ -859,16 +879,19 @@ function buildResult(
       if (req.N && coverage[dateISO].N !== req.N) {
         violations.push(`Coverage mismatch on ${dateISO} for N: got ${coverage[dateISO].N}, needed ${req.N}`);
       }
+      if (req.D && coverage[dateISO].D !== req.D) {
+        violations.push(`Coverage mismatch on ${dateISO} for D: got ${coverage[dateISO].D}, needed ${req.D}`);
+      }
     }
   }
 
   // Calculate variance
-  const staffTotals: Record<string, { E: number; L: number; N: number; total: number }> = {};
+  const staffTotals: Record<string, { E: number; L: number; N: number; D: number; total: number }> = {};
   for (const s of staff) {
     const stats = assigned[s.id];
     staffTotals[s.id] = {
       ...stats,
-      total: stats.E + stats.L + stats.N,
+      total: stats.E + stats.L + stats.N + stats.D,
     };
   }
 
@@ -876,12 +899,13 @@ function buildResult(
     E: calculateVariance(staff.map(s => assigned[s.id].E)),
     L: calculateVariance(staff.map(s => assigned[s.id].L)),
     N: calculateVariance(staff.map(s => assigned[s.id].N)),
+    D: calculateVariance(staff.map(s => assigned[s.id].D)),
   };
   
   // Calculate total hours variance and Gini coefficient for fairness metrics
   const totalHoursPerStaff = staff.map(s => {
     const stats = assigned[s.id];
-    return (stats.E * 8) + (stats.L * 8) + (stats.N * 8); // Convert to hours
+    return (stats.E * 8) + (stats.L * 8) + (stats.N * 8) + (stats.D * 12); // D is 12h shift
   });
   const hoursVariance = calculateVariance(totalHoursPerStaff);
   const giniCoefficient = calculateGiniCoefficient(totalHoursPerStaff);
