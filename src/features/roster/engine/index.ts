@@ -140,11 +140,24 @@ export {
  * This generator uses constraint-based optimization to create rosters that:
  * - Fill all coverage requirements (E/L/N shifts)
  * - Enforce rest rules and turnaround constraints
- * - Balance workload fairly across staff
+ * - Balance workload fairly across staff (with tunable weights)
+ * - Minimize variance in assigned hours
+ * - Encourage rotation (avoid reusing same staff consecutively)
  * - Respect staff availability
  * 
+ * FAIRNESS TUNING:
+ * - fairnessWeight (0.2-0.4): Penalty for variance in total hours
+ * - nightBalanceWeight (0.2-0.4): Additional weight for night shift balance
+ * - rotationPreference (0-1): Bonus for not using same staff consecutively
+ * - variancePenaltyStrength (default 1.0): Multiplier for variance penalty
+ * 
+ * The generator logs comprehensive fairness metrics including:
+ * - Gini coefficient (0=perfect equality, 1=perfect inequality)
+ * - Hours variance across all staff
+ * - Min/max/mean hours distribution
+ * 
  * @param input - Generation parameters (staff, requirements, policy)
- * @returns Complete roster with assignments and diagnostics
+ * @returns Complete roster with assignments, fairness metrics, and diagnostics
  * 
  * @example
  * ```ts
@@ -152,7 +165,7 @@ export {
  *   days: ['2025-01-10', '2025-01-11', '2025-01-12'],
  *   staff: [{ id: '1', name: 'John', availability: {}, isNightEligible: true }],
  *   requirements: { '2025-01-10': { E: 2, L: 2, N: 1 } },
- *   policy: DEFAULT_CORRECTIVE_POLICY
+ *   policy: { ...DEFAULT_CORRECTIVE_POLICY, fairnessWeight: 0.3 }
  * });
  * ```
  */

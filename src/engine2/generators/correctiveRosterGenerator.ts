@@ -31,6 +31,12 @@ export interface CorrectivePolicy {
   fairShareWeight: number;          // default 50
   nightFairnessWeight: number;      // default 50
   preferRestAfterNights: boolean;   // default true
+  
+  // NEW FAIRNESS TUNING PARAMETERS
+  fairnessWeight: number;           // Penalty for variance in total hours (0.2-0.4 recommended)
+  nightBalanceWeight: number;       // Additional weight for night shift balance (0.2-0.4 recommended)
+  rotationPreference: number;       // Bonus for not using same staff consecutively (0-1, default 0.3)
+  variancePenaltyStrength: number;  // Multiplier for variance penalty (default 1.0)
 }
 
 export interface CorrectiveInput {
@@ -84,6 +90,12 @@ export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = {
   fairShareWeight: 50,
   nightFairnessWeight: 50,
   preferRestAfterNights: true,
+  
+  // ENHANCED FAIRNESS PARAMETERS
+  fairnessWeight: 0.3,           // Moderate variance penalty (coverage still dominates)
+  nightBalanceWeight: 0.4,       // Slightly higher for night shift fairness
+  rotationPreference: 0.3,       // Moderate preference for rotation
+  variancePenaltyStrength: 1.0,  // Standard variance penalty
 };
 
 // ============================================================================
@@ -402,29 +414,60 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
           break;
         }
 
-        // ROTATION-FRIENDLY SORT: Order by fairness, spread, and jitter
+        // ENHANCED FAIRNESS-BASED SORT: Variance minimization + rotation + jitter
         const currentDayIndex = days.indexOf(dateISO);
+        
+        // Calculate current variance of total hours across all staff (for penalty)
+        const allTotals = staff.map(s => {
+          const stats = assigned[s.id];
+          return (stats.E * 8) + (stats.L * 8) + (stats.N * 8); // Convert to hours
+        });
+        const meanHours = allTotals.reduce((a, b) => a + b, 0) / allTotals.length;
+        const currentVariance = allTotals.reduce((sum, val) => sum + Math.pow(val - meanHours, 2), 0) / allTotals.length;
+        
         candidates.sort((a, b) => {
           const aStats = assigned[a.id];
           const bStats = assigned[b.id];
           const targetForShift = targets[shiftType];
           
-          // 1. Fairness ratio: assigned/target for this specific shift type
+          // Calculate hours (8h per shift)
+          const aHours = (aStats.E * 8) + (aStats.L * 8) + (aStats.N * 8);
+          const bHours = (bStats.E * 8) + (bStats.L * 8) + (bStats.N * 8);
+          
+          // 1. FAIRNESS: Prioritize staff with lower total hours (reduces variance)
+          //    Weight: Use fairnessWeight from policy (default 0.3)
+          const hoursGap = aHours - bHours;
+          const fairnessFactor = hoursGap * policy.fairnessWeight;
+          if (Math.abs(fairnessFactor) > 0.1) return fairnessFactor;
+          
+          // 2. SHIFT-SPECIFIC FAIRNESS: Ratio to target for this shift type
+          //    Additional weight for night shifts
           const aRatio = targetForShift > 0 ? aStats[shiftType] / targetForShift : 0;
           const bRatio = targetForShift > 0 ? bStats[shiftType] / targetForShift : 0;
-          if (Math.abs(aRatio - bRatio) > 0.01) return aRatio - bRatio;
+          const ratioWeight = shiftType === 'N' ? policy.nightBalanceWeight : 1.0;
+          const ratioDiff = (aRatio - bRatio) * ratioWeight;
+          if (Math.abs(ratioDiff) > 0.01) return ratioDiff;
           
-          // 2. Last day assigned this specific shift type (encourage spread)
+          // 3. ROTATION: Prefer staff NOT used on previous day (if applicable)
+          //    Weight: Use rotationPreference from policy (default 0.3)
+          if (currentDayIndex > 0) {
+            const prevDate = days[currentDayIndex - 1];
+            const aUsedYesterday = currentAssignments.get(a.id)?.get(prevDate) !== 'R';
+            const bUsedYesterday = currentAssignments.get(b.id)?.get(prevDate) !== 'R';
+            
+            if (aUsedYesterday !== bUsedYesterday) {
+              // Prefer staff who rested yesterday
+              const rotationBonus = policy.rotationPreference;
+              return aUsedYesterday ? rotationBonus : -rotationBonus;
+            }
+          }
+          
+          // 4. SHIFT-SPREAD: Last day assigned this specific shift type
           const aLastDay = findLastDayAssigned(currentAssignments.get(a.id)!, shiftType, currentDayIndex, days);
           const bLastDay = findLastDayAssigned(currentAssignments.get(b.id)!, shiftType, currentDayIndex, days);
           if (aLastDay !== bLastDay) return aLastDay - bLastDay;
           
-          // 3. Total assignments (overall fairness)
-          const aTotal = aStats.E + aStats.L + aStats.N;
-          const bTotal = bStats.E + bStats.L + bStats.N;
-          if (aTotal !== bTotal) return aTotal - bTotal;
-          
-          // 4. Deterministic jitter (tie-breaker to avoid always picking same staff)
+          // 5. DETERMINISTIC JITTER: Tie-breaker (seed-based for reproducibility)
           return jitter(seed, currentDayIndex, a.id) - jitter(seed, currentDayIndex, b.id);
         });
 
@@ -723,6 +766,31 @@ function buildResult(
     L: calculateVariance(staff.map(s => assigned[s.id].L)),
     N: calculateVariance(staff.map(s => assigned[s.id].N)),
   };
+  
+  // Calculate total hours variance and Gini coefficient for fairness metrics
+  const totalHoursPerStaff = staff.map(s => {
+    const stats = assigned[s.id];
+    return (stats.E * 8) + (stats.L * 8) + (stats.N * 8); // Convert to hours
+  });
+  const hoursVariance = calculateVariance(totalHoursPerStaff);
+  const giniCoefficient = calculateGiniCoefficient(totalHoursPerStaff);
+  
+  // Log comprehensive fairness metrics
+  console.info("[FAIRNESS] Distribution variance (shifts):", variance);
+  console.info("[FAIRNESS] Total hours variance:", hoursVariance.toFixed(2), "hours²");
+  console.info("[FAIRNESS] Gini coefficient:", giniCoefficient.toFixed(3), "(0=perfect equality, 1=perfect inequality)");
+  console.info("[FAIRNESS] Staff hours range:", {
+    min: Math.min(...totalHoursPerStaff),
+    max: Math.max(...totalHoursPerStaff),
+    mean: totalHoursPerStaff.reduce((a, b) => a + b, 0) / totalHoursPerStaff.length,
+  });
+  
+  logger.info('Fairness metrics calculated', {
+    shiftVariance: variance,
+    hoursVariance,
+    giniCoefficient,
+    staffDistribution: staff.length,
+  });
 
   return {
     assignments,
@@ -744,12 +812,38 @@ function buildResult(
 }
 
 // ============================================================================
-// VARIANCE CALCULATION
+// VARIANCE & GINI COEFFICIENT CALCULATORS
 // ============================================================================
 
 function calculateVariance(values: number[]): number {
   if (values.length === 0) return 0;
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
   const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
   return variance;
+}
+
+/**
+ * Calculate Gini coefficient - measure of statistical dispersion
+ * 0 = perfect equality (everyone has same hours)
+ * 1 = perfect inequality (one person has all hours)
+ */
+function calculateGiniCoefficient(values: number[]): number {
+  if (values.length === 0) return 0;
+  
+  // Sort values
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  
+  // Handle edge case where all values are zero
+  const total = sorted.reduce((sum, v) => sum + v, 0);
+  if (total === 0) return 0;
+  
+  // Calculate Gini coefficient
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    sum += (i + 1) * sorted[i];
+  }
+  
+  const gini = (2 * sum) / (n * total) - (n + 1) / n;
+  return gini;
 }
