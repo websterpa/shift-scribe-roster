@@ -57,6 +57,21 @@ const { template, binding } = await resolvePatternForStaff(
 
 Patterns are expanded across the roster horizon using the staff member's anchor date:
 
+### 5. Absence Overlay
+
+**Approved absences supersede pattern duties.** When staff have approved leave or sick days, those dates are marked as rest ('R') with an absence marker ('A'), preventing duty assignment:
+
+```typescript
+// Pattern says: D, D, N, N, R, R, R, R
+// Staff has leave: Jan 2-3
+
+// Before overlay:
+// Jan 1: D, Jan 2: D, Jan 3: N, Jan 4: N
+
+// After overlay:
+// Jan 1: D, Jan 2: R (A=annual), Jan 3: R (A=annual), Jan 4: N
+```
+
 ```typescript
 const expandedDays = expandPatternOverRange(
   template,
@@ -75,6 +90,53 @@ const expandedDays = expandPatternOverRange(
   // ... continues cycling through pattern
 ]
 ```
+
+## Absence Overlay System
+
+### How Absences Work
+
+1. **Load Approved Absences**
+   - Queries `leave_requests` table for approved leave
+   - Filters by staff IDs and date range
+   - Includes annual leave, sick leave, unpaid leave, etc.
+
+2. **Overlay on Patterns**
+   - For each absence day, force `shift_code = 'R'`
+   - Add `absence: 'A'` marker for UI display
+   - Store `absenceType` (annual, sick, etc.)
+
+3. **Duty Generation Exclusion**
+   - Pattern generator skips days marked with absence
+   - No duties created on absence days
+   - Appears as blocked in roster
+
+### Usage Example
+
+```typescript
+import { applyAbsenceOverlay } from '@/features/roster/patterns';
+
+// After expanding patterns
+const expansions = expandPatternsBatch(resolutions, startDate, endDate);
+
+// Apply absence overlay
+const overlaid = await applyAbsenceOverlay(
+  expansions,
+  startDate,
+  endDate
+);
+
+// Now absence days are marked:
+// { date: '2025-01-05', shift_code: 'R', is_rest: true, absence: 'A', absenceType: 'annual' }
+```
+
+### Absence Precedence
+
+**Order of priority:**
+1. **Approved absence** (highest) - Blocks pattern duties
+2. **Pattern duty** - Work day from pattern
+3. **Pattern rest** (lowest) - Regular rest day
+
+Absences always win over pattern duties.
 
 ## Pattern-Locked Generation
 
@@ -112,7 +174,12 @@ const result = await generateCorrectiveRoster({
    - **Never** convert `R` (rest) days into duties
    - Framework remapping: In 12h mode, `E`/`L` → `D` automatically
 
-4. **Coverage Matching**
+4. **Absence Overlay** (NEW)
+   - Load approved absences from database
+   - Mark absence days as rest with 'A' marker
+   - Block duty generation on absence days
+
+5. **Coverage Matching**
    - Match pattern duties to coverage requirements
    - Prefer pattern-sourced duties over free assignments
    - If coverage needs exceed pattern supply, use overtime or unpatterned staff
@@ -135,6 +202,12 @@ const result = await generateCorrectiveRoster({
 - `R` days in patterns are **sacred**
 - Generator will never override `R` to assign a duty
 - If coverage requires more staff, unpatterned staff or OT must be used
+
+**Absence Protection:**
+- Approved absences supersede pattern duties
+- Days with absences are forced to 'R' with 'A' marker
+- Generator excludes absence days from duty creation
+- Absence type stored for UI display (annual, sick, etc.)
 
 **Pattern Integrity:**
 - Each staff member follows their own pattern cycle
@@ -236,6 +309,28 @@ const expansions = expandPatternsBatch(
   '2025-01-31'
 );
 // Returns: Map<staffId, ExpandedPatternDay[]>
+```
+
+### Absence Overlay
+
+```typescript
+// Load absences for staff
+const absences = await loadApprovedAbsences(
+  staffIds,
+  '2025-01-01',
+  '2025-01-31'
+);
+
+// Overlay absences on patterns
+const overlaid = overlayAbsencesOnPatterns(expansions, absences);
+
+// Or use convenience function
+const overlaid = await applyAbsenceOverlay(
+  expansions,
+  '2025-01-01',
+  '2025-01-31'
+);
+// Returns: Map<staffId, ExpandedPatternDayWithAbsence[]>
 ```
 
 ### Pattern-Locked Generation

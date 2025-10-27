@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import type { ShiftCode } from './types';
 import { resolvePatternsBatch } from './resolve';
 import { expandPatternsBatch } from './expand';
+import { applyAbsenceOverlay } from './overlayAbsence';
 
 // ============================================================================
 // TYPES
@@ -174,18 +175,33 @@ export async function generatePatternLockedDuties(
 
   console.log(`✓ Expanded patterns for ${expansions.size} staff members`);
 
+  // Step 2.5: Overlay approved absences (blocks pattern duties on leave days)
+  console.log('🚫 Step 2.5: Overlaying approved absences');
+  const expansionsWithAbsence = await applyAbsenceOverlay(
+    expansions,
+    input.startDate,
+    input.endDate
+  );
+
+  console.log(`✓ Applied absence overlay`);
+
   // Step 3: Convert pattern days to candidate duties
   console.log('🔨 Step 3: Creating candidate duties from patterns');
   let totalDays = 0;
   let workDays = 0;
   let remappedDays = 0;
+  let absenceDaysSkipped = 0;
 
-  for (const [staffId, expandedDays] of expansions.entries()) {
+  for (const [staffId, expandedDays] of expansionsWithAbsence.entries()) {
     totalDays += expandedDays.length;
 
     for (const day of expandedDays) {
       // Skip rest days - they are never duties
       if (day.is_rest) {
+        // Track if this is an absence day
+        if (day.absence === 'A') {
+          absenceDaysSkipped++;
+        }
         continue;
       }
 
@@ -220,6 +236,7 @@ export async function generatePatternLockedDuties(
     totalPatternDays: totalDays,
     workDays,
     restDays: totalDays - workDays,
+    absenceDaysBlocked: absenceDaysSkipped,
     dutiesCreated: duties.length,
     remappedCodes: remappedDays,
     staffWithPatterns: staffWithPatterns.length,
@@ -228,6 +245,10 @@ export async function generatePatternLockedDuties(
 
   if (remappedDays > 0) {
     console.log(`ℹ️ Remapped ${remappedDays} shift codes for ${input.framework} framework compatibility`);
+  }
+
+  if (absenceDaysSkipped > 0) {
+    console.log(`🚫 Blocked ${absenceDaysSkipped} days due to approved absences`);
   }
 
   return {

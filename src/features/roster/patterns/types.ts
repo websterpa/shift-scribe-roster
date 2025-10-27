@@ -110,6 +110,8 @@ export interface ExpandedPatternDay {
   date: string; // ISO yyyy-mm-dd
   shift_code: ShiftCode;
   is_rest: boolean;
+  absence?: 'A';        // Marker for approved absence (overrides pattern)
+  absenceType?: string; // Leave type if applicable
 }
 
 // ============================================================================

@@ -56,6 +56,18 @@ export {
 } from './expand';
 
 // ============================================================================
+// ABSENCE OVERLAY EXPORTS
+// ============================================================================
+
+export {
+  loadApprovedAbsences,
+  overlayAbsencesOnPatterns,
+  applyAbsenceOverlay,
+  type AbsenceRecord,
+  type ExpandedPatternDayWithAbsence,
+} from './overlayAbsence';
+
+// ============================================================================
 // GENERATOR EXPORTS
 // ============================================================================
 

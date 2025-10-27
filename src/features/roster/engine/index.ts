@@ -329,6 +329,12 @@ export {
   expandPatternsBatch,
   getShiftCodeForDate,
   
+  // Absence overlay
+  loadApprovedAbsences,
+  overlayAbsencesOnPatterns,
+  applyAbsenceOverlay,
+  type AbsenceRecord,
+  
   // Pattern-locked generation
   generatePatternLockedDuties,
   isPatternRestDay,
