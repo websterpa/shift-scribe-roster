@@ -29,11 +29,23 @@ vi.mock('@/hooks/use-toast', () => ({
   })
 }));
 
-// Mock enhanced generator
-vi.mock('@/utils/roster/enhancedRosterGenerator', () => ({
-  generateRosterEnhanced: vi.fn(() => Promise.resolve({
-    assignments: [],
-    nightsGenerated: 0
+// Mock the roster generator
+vi.mock('@/utils/roster/generateAndSaveRoster', () => ({
+  generateAndSaveRoster: vi.fn(() => Promise.resolve({
+    versionId: 'test-version-id',
+    totalAssignments: 0,
+    optimizationResult: { score: 100 },
+    wtrResult: { violations: [] },
+    costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
+    generatorResult: {
+      assignments: [],
+      roster: {},
+      coverage: {},
+      fairness: { staffTotals: {}, targets: { E: 0, L: 0, N: 0 }, variance: { E: 0, L: 0, N: 0 } },
+      violations: [],
+      utilizationReport: {},
+      diagnostics: { staffPoolCount: 0, staffUsedCount: 0 }
+    }
   }))
 }));
 

@@ -29,14 +29,26 @@ vi.mock('@/integrations/supabase/client', () => ({
   }
 }));
 
-// Mock the enhanced roster generator
-vi.mock('@/utils/roster/enhancedRosterGenerator', () => ({
-  generateRosterEnhanced: vi.fn(() => Promise.resolve({
-    assignments: [
-      { shift_code: 'D', staff_id: 'staff1' },
-      { shift_code: 'N', staff_id: 'staff2' }
-    ],
-    nightsGenerated: 1
+// Mock the roster generator
+vi.mock('@/utils/roster/generateAndSaveRoster', () => ({
+  generateAndSaveRoster: vi.fn(() => Promise.resolve({
+    versionId: 'test-version-id',
+    totalAssignments: 2,
+    optimizationResult: { score: 95 },
+    wtrResult: { violations: [] },
+    costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
+    generatorResult: {
+      assignments: [
+        { staffId: 'staff1', dateISO: '2025-01-01', shiftType: 'D' },
+        { staffId: 'staff2', dateISO: '2025-01-01', shiftType: 'N' }
+      ],
+      roster: {},
+      coverage: {},
+      fairness: { staffTotals: {}, targets: { E: 0, L: 0, N: 0 }, variance: { E: 0, L: 0, N: 0 } },
+      violations: [],
+      utilizationReport: {},
+      diagnostics: { staffPoolCount: 2, staffUsedCount: 2 }
+    }
   }))
 }));
 

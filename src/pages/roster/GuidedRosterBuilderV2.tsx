@@ -232,186 +232,39 @@ export default function GuidedRosterBuilderV2() {
 
       if (configError) throw configError;
 
-      // Create roster version
-      const { data: version, error: versionError } = await supabase
-        .from('roster_versions')
-        .insert({
-          config_id: config.id,
-          version_number: 1,
-          version_name: 'Initial Generation'
-        })
-        .select()
-        .single();
-
-      if (versionError) throw versionError;
-
-      // Generate assignments using enhanced generator
-      const { generateRosterEnhanced } = await import('@/utils/roster/enhancedRosterGenerator');
+      // Generate and save roster (this creates the version and saves assignments)
+      const { generateAndSaveRoster } = await import('@/utils/roster/generateAndSaveRoster');
       
-      // Normalize requirements to ensure N tokens are preserved
-      const { normalizeRequirements, printRequirementsSummary } = await import('@/utils/roster/normalizeRequirements');
-      const requirementsByDay = normalizeRequirements(values.staffing);
-      
-      // DEV diagnostic: Print total requirements
+      const result = await generateAndSaveRoster(
+        staffList, 
+        { ...config, start_date: configData.start_date }, 
+        'Initial Generation'
+      );
+
+      // Count night shifts from the generator result
+      const nightCount = result.generatorResult?.assignments.filter(a => a.shiftType === 'N').length || 0;
+
+      // DEV diagnostic: Log generation summary
       if (import.meta.env.DEV) {
-        printRequirementsSummary(requirementsByDay);
-      }
-      
-      // Validate all tokens are valid
-      for (const [dow, reqs] of Object.entries(requirementsByDay)) {
-        for (const token of Object.keys(reqs)) {
-          assertShiftToken(token);
-        }
-      }
-
-      const result = await generateRosterEnhanced({
-        system: values.system,
-        versionId: version.id,
-        staff: staffList,
-        requirementsByDay,
-        startDate: configData.start_date,
-        allowSupervisorNights: values.allowSupervisorNights,
-        includeNights: values.system === "12h" || values.pattern.includes("N"),
-        patternTokens: values.pattern.split('')
-      });
-
-      // Calculate expected counts by code for the full month
-      const genStartDate = new Date(configData.start_date);
-      const monthStart = new Date(genStartDate.getFullYear(), genStartDate.getMonth(), 1);
-      const monthEnd = new Date(genStartDate.getFullYear(), genStartDate.getMonth() + 1, 0);
-      const monthStartISO = monthStart.toISOString().slice(0, 10);
-      const monthEndISO = monthEnd.toISOString().slice(0, 10);
-      const daysInMonth = monthEnd.getDate();
-
-      // Calculate expected counts per code across the full month
-      const expectedByCode: Record<string, number> = {};
-      for (let dayIdx = 0; dayIdx < daysInMonth; dayIdx++) {
-        const currentDate = new Date(monthStart);
-        currentDate.setDate(monthStart.getDate() + dayIdx);
-        const weekday = currentDate.getDay();
-        
-        const dayReqs = requirementsByDay[weekday] || {};
-        Object.entries(dayReqs).forEach(([code, count]) => {
-          expectedByCode[code] = (expectedByCode[code] || 0) + (count as number);
-        });
-      }
-
-      // DEV diagnostic: Print generation result and expected counts
-      if (import.meta.env.DEV) {
-        const generatedByCode = result.assignments.reduce((acc, a) => {
-          acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        console.log('📊 STAGE 2: Generation Complete');
+        console.log('📊 Roster Generation Complete');
         console.table({
-          'Month Start': monthStartISO,
-          'Month End': monthEndISO,
-          'Days Expanded': daysInMonth,
-          'Total Assignments': result.assignments.length,
-          'Nights Generated': result.nightsGenerated,
-          ...Object.fromEntries(Object.entries(expectedByCode).map(([k, v]) => [`Expected ${k}`, v])),
-          ...Object.fromEntries(Object.entries(generatedByCode).map(([k, v]) => [`Generated ${k}`, v]))
+          'Version ID': result.versionId,
+          'Total Assignments': result.totalAssignments,
+          'Night Shifts': nightCount,
+          'Optimization Score': result.optimizationResult?.score,
+          'Violations': result.wtrResult?.violations.length
         });
-      }
-
-      // 💾 CRITICAL: Save assignments to database with idempotency
-      const assignmentsWithVersion = result.assignments.map(assignment => ({
-        ...assignment,
-        version_id: version.id
-      }));
-
-      // Upsert to prevent duplicates on retry (idempotency)
-      const { data: savedAssignments, error: assignmentsError } = await supabase
-        .from('roster_assignments')
-        .upsert(assignmentsWithVersion, {
-          onConflict: 'version_id,date,staff_id',
-          ignoreDuplicates: false
-        })
-        .select('id, shift_code, date');
-
-      if (assignmentsError) {
-        console.error("❌ Failed to save assignments:", assignmentsError);
-        throw new Error(`Failed to save assignments: ${assignmentsError.message}`);
-      }
-
-      // Verify row count and code distribution matches expected
-      const savedCount = savedAssignments?.length ?? 0;
-      const expectedCount = result.assignments.length;
-      
-      // Build saved counts by code
-      const savedByCode = (savedAssignments || []).reduce((acc, a) => {
-        acc[a.shift_code] = (acc[a.shift_code] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-      // DEV diagnostic: Show final saved token counts from DB
-      if (import.meta.env.DEV) {
-        console.log('📊 STAGE 3: Database Persistence');
-        console.table({
-          'Total Saved': savedCount,
-          'Total Expected': expectedCount,
-          ...Object.fromEntries(Object.entries(expectedByCode).map(([k, v]) => [`Expected ${k}`, v])),
-          ...Object.fromEntries(Object.entries(savedByCode).map(([k, v]) => [`Saved ${k}`, v]))
-        });
-      }
-      
-      // Verify total count
-      if (savedCount !== expectedCount) {
-        const msg = `⚠️ Persistence mismatch: expected ${expectedCount} assignments, saved ${savedCount}`;
-        console.error(msg);
-        
-        toast({
-          title: "Save Error",
-          description: msg,
-          variant: "destructive"
-        });
-        
-        // Retry once
-        console.log("Retrying save...");
-        const { data: retryAssignments, error: retryError } = await supabase
-          .from('roster_assignments')
-          .upsert(assignmentsWithVersion, {
-            onConflict: 'version_id,date,staff_id',
-            ignoreDuplicates: false
-          })
-          .select('id, shift_code, date');
-        
-        if (retryError || (retryAssignments?.length ?? 0) !== expectedCount) {
-          throw new Error(`Retry failed: ${retryError?.message || 'count mismatch persists'}`);
-        }
-      }
-
-      // Verify code distribution
-      const missingCodes: string[] = [];
-      Object.entries(expectedByCode).forEach(([code, expectedCnt]) => {
-        const savedCnt = savedByCode[code] || 0;
-        if (savedCnt < expectedCnt) {
-          missingCodes.push(`${code}: expected ${expectedCnt}, saved ${savedCnt}`);
-        }
-      });
-
-      if (missingCodes.length > 0) {
-        const msg = `⚠️ Code distribution mismatch: ${missingCodes.join('; ')}`;
-        console.error(msg);
-        toast({
-          title: "Incomplete Save",
-          description: msg,
-          variant: "destructive"
-        });
-        setIsGenerating(false);
-        return; // DO NOT navigate on failure
       }
 
       toast({
         title: "Roster Generated Successfully",
-        description: `Saved ${savedCount} assignments with ${result.nightsGenerated} night shifts`,
+        description: `Created ${result.totalAssignments} assignments with ${nightCount} night shifts`,
       });
 
       // Navigate to summary with fresh start date
       const startDate = new Date(configData.start_date);
       const monthParam = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
-      window.location.href = `/roster/summary?version=${version.id}&month=${monthParam}`;
+      window.location.href = `/roster/summary?version=${result.versionId}&month=${monthParam}`;
 
     } catch (error) {
       console.error("❌ Generation failed:", error);
