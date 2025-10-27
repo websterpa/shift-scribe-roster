@@ -98,30 +98,66 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
       return;
     }
 
-    // Clear old assignments for this tenant and month before generating
+    // Archive and clear old assignments for this tenant and month before generating
     if (selectedMonth) {
       try {
-        setProgressMessage('Clearing old assignments...');
+        setProgressMessage('Archiving existing roster...');
         
         const [year, month] = selectedMonth.split('-').map(Number);
         const daysInMonth = new Date(year, month, 0).getDate();
         const monthStart = `${selectedMonth}-01`;
         const monthEnd = `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`;
         
-        // Build delete query with date range filter
-        let deleteQuery = supabase
+        // Fetch existing assignments for archival
+        const { data: existingAssignments, error: fetchError } = await supabase
+          .from('roster_assignments')
+          .select('*')
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+        
+        if (fetchError) {
+          logger.error(new Error('Failed to fetch existing assignments'), { 
+            error: fetchError, 
+            selectedMonth 
+          });
+        }
+        
+        // Archive existing assignments if any exist
+        if (existingAssignments && existingAssignments.length > 0) {
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          const { error: archiveError } = await supabase
+            .from('archived_rosters')
+            .insert({
+              tenant_id: tenantId || null,
+              month: selectedMonth,
+              assignments: existingAssignments,
+              archived_by: user?.id || null,
+              reason: 'Regeneration',
+              version_id: existingAssignments[0]?.version_id || null
+            });
+          
+          if (archiveError) {
+            logger.error(new Error('Failed to archive assignments'), { 
+              error: archiveError, 
+              count: existingAssignments.length 
+            });
+          } else {
+            logger.info('Archived existing assignments', { 
+              selectedMonth, 
+              count: existingAssignments.length 
+            });
+          }
+        }
+        
+        // Now delete the old assignments
+        setProgressMessage('Clearing old assignments...');
+        
+        const { error: deleteError } = await supabase
           .from('roster_assignments')
           .delete()
           .gte('date', monthStart)
           .lte('date', monthEnd);
-        
-        // Add tenant filter if tenantId is provided (for future multi-tenancy)
-        // Note: tenant_id column doesn't exist yet in schema
-        // if (tenantId) {
-        //   deleteQuery = deleteQuery.eq('tenant_id', tenantId);
-        // }
-        
-        const { error: deleteError } = await deleteQuery;
         
         if (deleteError) {
           logger.error(new Error('Failed to clear old assignments'), { 
@@ -135,15 +171,16 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
         logger.info('Cleared old assignments for month', { 
           selectedMonth, 
           tenantId,
-          dateRange: `${monthStart} to ${monthEnd}` 
+          dateRange: `${monthStart} to ${monthEnd}`,
+          archived: existingAssignments?.length || 0
         });
         
         toast({
-          title: "Cleared old assignments",
-          description: `Removed existing assignments for ${selectedMonth}`,
+          title: "Ready to generate",
+          description: `Archived ${existingAssignments?.length || 0} existing assignments for ${selectedMonth}`,
         });
       } catch (error) {
-        logger.error(new Error('Delete operation failed'), { error, selectedMonth, tenantId });
+        logger.error(new Error('Archive/delete operation failed'), { error, selectedMonth, tenantId });
         toast({
           title: "Warning",
           description: "Could not clear old assignments. Proceeding with generation.",

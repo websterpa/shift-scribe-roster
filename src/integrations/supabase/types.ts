@@ -38,6 +38,42 @@ export type Database = {
         }
         Relationships: []
       }
+      archived_rosters: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          assignments: Json
+          created_at: string | null
+          id: string
+          month: string
+          reason: string | null
+          tenant_id: string | null
+          version_id: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          assignments: Json
+          created_at?: string | null
+          id?: string
+          month: string
+          reason?: string | null
+          tenant_id?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          assignments?: Json
+          created_at?: string | null
+          id?: string
+          month?: string
+          reason?: string | null
+          tenant_id?: string | null
+          version_id?: string | null
+        }
+        Relationships: []
+      }
       custom_patterns: {
         Row: {
           created_at: string
@@ -734,26 +770,16 @@ export type Database = {
       }
     }
     Functions: {
-      _hours_for_shift: {
-        Args: { token: string }
-        Returns: number
-      }
-      get_admin_status: {
-        Args: { check_user_id?: string }
-        Returns: boolean
-      }
+      _hours_for_shift: { Args: { token: string }; Returns: number }
+      get_admin_status: { Args: { check_user_id?: string }; Returns: boolean }
       get_user_admin_status: {
         Args: { check_user_id?: string }
         Returns: boolean
       }
-      is_admin: {
-        Args: Record<PropertyKey, never> | { user_id?: string }
-        Returns: boolean
-      }
-      rpc_night_gap: {
-        Args: { version_id: string }
-        Returns: Json
-      }
+      is_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { user_id?: string }; Returns: boolean }
+      rpc_night_gap: { Args: { version_id: string }; Returns: Json }
       rpc_requirements_token_counts: {
         Args: { version_id: string }
         Returns: {
@@ -761,22 +787,13 @@ export type Database = {
           token: string
         }[]
       }
-      rpc_roster_budget: {
-        Args: { version_id: string }
-        Returns: Json
-      }
-      rpc_roster_kpis: {
-        Args: { version_id: string }
-        Returns: Json
-      }
+      rpc_roster_budget: { Args: { version_id: string }; Returns: Json }
+      rpc_roster_kpis: { Args: { version_id: string }; Returns: Json }
       rpc_roster_staffing_matrix: {
         Args: { version_id: string }
         Returns: Json[]
       }
-      rpc_roster_tours: {
-        Args: { version_id: string }
-        Returns: Json[]
-      }
+      rpc_roster_tours: { Args: { version_id: string }; Returns: Json[] }
       rpc_version_token_counts: {
         Args: { version_id: string }
         Returns: {
