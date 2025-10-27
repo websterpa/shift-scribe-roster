@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { createLogger } from '@/utils/errorLogger';
 import { toast } from '@/hooks/use-toast';
 import { utils, writeFile } from 'xlsx';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const logger = createLogger('ArchivedRostersReport');
 
@@ -79,6 +80,19 @@ const ArchivedRostersReport = () => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
+
+  // Compute summary for chart
+  const summary = data.reduce((acc, r) => {
+    const key = r.month;
+    const existing = acc.find(i => i.month === key);
+    if (existing) {
+      existing.count++;
+    } else {
+      acc.push({ month: key, count: 1, archivedAt: r.archived_at });
+    }
+    return acc;
+  }, [] as Array<{ month: string; count: number; archivedAt: string }>)
+    .sort((a, b) => a.month.localeCompare(b.month)); // Sort chronologically
 
   const handleViewRoster = async (roster: ArchivedRoster) => {
     setSelectedRoster(roster);
@@ -252,6 +266,46 @@ const ArchivedRostersReport = () => {
           </div>
         </div>
       </div>
+
+      {/* Summary Chart */}
+      {!loading && !error && data.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Archive Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={summary}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '6px'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="count" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2} 
+                  dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Content */}
       <Card>
