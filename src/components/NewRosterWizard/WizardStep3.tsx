@@ -8,6 +8,7 @@ import { Star } from 'lucide-react';
 import { WizardStepProps, CustomPattern } from './types';
 import { COMMON_TEMPLATES } from './constants';
 import { remapToFramework } from '@/features/roster/shiftMap';
+import { EligibilityInspector } from '@/features/roster/debug/EligibilityInspector';
 
 interface WizardStep3Props extends WizardStepProps {
   customPatterns: CustomPattern[];
@@ -182,6 +183,14 @@ export function WizardStep3({
               </CardContent>
             </Card>
           )}
+
+          {/* Staff Eligibility Inspector */}
+          <div className="mt-6">
+            <EligibilityInspector 
+              monthISO={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
+              shiftSystem={config.shiftType}
+            />
+          </div>
         </div>
       </div>
     </div>

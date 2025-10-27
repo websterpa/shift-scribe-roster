@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock } from 'lucide-react';
 import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
+import { EligibilityInspector } from '@/features/roster/debug/EligibilityInspector';
 
 interface PreviewData {
   requirements?: Record<string, number>;
@@ -606,6 +607,12 @@ export default function GuidedRosterBuilderV2() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Eligibility Inspector */}
+            <EligibilityInspector 
+              monthISO={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
+              shiftSystem={form.watch('system')}
+            />
 
             {/* Validation Issues */}
             {warnings.length > 0 && (
