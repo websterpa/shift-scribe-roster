@@ -48,6 +48,13 @@ export interface RosterGenerationResult {
   };
   violations: string[];
   generatedVersionId?: string;
+  diagnostics?: {
+    distributionStats?: Record<string, {
+      nights: number;
+      weekendDays: number;
+      totalHours: number;
+    }>;
+  };
 }
 
 interface ManagerRosterGeneratorProps {
