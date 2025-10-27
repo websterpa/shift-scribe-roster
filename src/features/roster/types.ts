@@ -52,6 +52,18 @@ export interface Diagnostics {
   nightBalanceScore?: number;
   constraintViolations?: Record<string, number>; // e.g. { minRest: 2, maxConsec: 1 }
   seed?: string;
+  
+  // Pattern adherence tracking (when pattern-locked mode is enabled)
+  patternAdherence?: Array<{
+    staffId: string;
+    staffName?: string;
+    expectedDutyDays: number;      // Work days in pattern (not R)
+    matchedDutyDays: number;        // Assignments on expected work days
+    adherencePct: number;           // matchedDutyDays / expectedDutyDays * 100
+    remappedELtoD?: number;         // E/L codes remapped to D (12h framework)
+    restPreservedDays?: number;     // R days with no assignment
+    absenceDays?: number;           // Days marked as absence (A)
+  }>;
 }
 
 // Legacy format for backwards compatibility with CorrectiveResult
@@ -122,7 +134,7 @@ export interface RosterGenerationResultUI {
   };
   violations: string[];
   generatedVersionId?: string;
-  diagnostics?: RosterDiagnosticsLegacy;
+  diagnostics?: Diagnostics | RosterDiagnosticsLegacy; // Support both formats
 }
 
 // ============================================================================

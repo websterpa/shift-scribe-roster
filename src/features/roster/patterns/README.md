@@ -138,6 +138,72 @@ const overlaid = await applyAbsenceOverlay(
 
 Absences always win over pattern duties.
 
+## Pattern Adherence Tracking
+
+### Adherence Metrics
+
+Pattern adherence tracks how closely roster assignments follow staff patterns:
+
+```typescript
+interface PatternAdherenceMetrics {
+  staffId: string;
+  staffName?: string;
+  expectedDutyDays: number;      // Work days in pattern (not R)
+  matchedDutyDays: number;        // Assignments on expected work days
+  adherencePct: number;           // matchedDutyDays / expectedDutyDays * 100
+  remappedELtoD?: number;         // E/L codes remapped to D (12h)
+  restPreservedDays?: number;     // R days with no assignment
+  absenceDays?: number;           // Days blocked by absence
+}
+```
+
+### Calculating Adherence
+
+```typescript
+import { calculatePatternAdherence } from '@/features/roster/patterns';
+
+// After generation, calculate adherence
+const summary = calculatePatternAdherence(
+  expansions,       // Pattern expansions
+  assignments,      // Actual roster assignments
+  staffNames        // Optional name lookup
+);
+
+console.log(summary.overallAdherence);  // e.g., 97.5%
+console.log(summary.byStaff);           // Per-staff metrics
+```
+
+### Adherence Validation
+
+```typescript
+import { validatePatternAdherence } from '@/features/roster/patterns';
+
+const validation = validatePatternAdherence(summary, 95); // 95% minimum
+
+if (!validation.valid) {
+  console.warn('Adherence issues:', validation.violations);
+}
+```
+
+### Adherence Thresholds
+
+- **≥95%**: Excellent - Pattern closely followed
+- **85-94%**: Good - Minor deviations
+- **<85%**: Needs Review - Significant pattern overrides
+
+### What Counts as Adherence
+
+**Counted as adherent:**
+- Assignment matches pattern work day
+- E/L → D remap in 12h framework (tracked separately)
+- Rest day preserved (no assignment on R)
+- Absence day blocked (no assignment on A)
+
+**Counted as non-adherent:**
+- Missing assignment on pattern work day
+- Assignment on pattern rest day (R)
+- Assignment on absence day (A)
+
 ## Pattern-Locked Generation
 
 ### Enabling Pattern-Locked Mode

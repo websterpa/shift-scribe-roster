@@ -68,6 +68,18 @@ export {
 } from './overlayAbsence';
 
 // ============================================================================
+// ADHERENCE TRACKING EXPORTS
+// ============================================================================
+
+export {
+  calculateStaffAdherence,
+  calculatePatternAdherence,
+  validatePatternAdherence,
+  type PatternAdherenceMetrics,
+  type PatternAdherenceSummary,
+} from './adherence';
+
+// ============================================================================
 // GENERATOR EXPORTS
 // ============================================================================
 

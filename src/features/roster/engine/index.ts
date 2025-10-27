@@ -335,6 +335,13 @@ export {
   applyAbsenceOverlay,
   type AbsenceRecord,
   
+  // Adherence tracking
+  calculateStaffAdherence,
+  calculatePatternAdherence,
+  validatePatternAdherence,
+  type PatternAdherenceMetrics,
+  type PatternAdherenceSummary,
+  
   // Pattern-locked generation
   generatePatternLockedDuties,
   isPatternRestDay,

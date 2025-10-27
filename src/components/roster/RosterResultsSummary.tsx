@@ -12,10 +12,11 @@ import {
   Calendar,
   TrendingUp,
   Eye,
-  Moon
+  Moon,
+  Target
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { RosterGenerationResultUI } from '@/features/roster/types';
+import { RosterGenerationResultUI, Diagnostics } from '@/features/roster/types';
 
 interface RosterResultsSummaryProps {
   result: RosterGenerationResultUI;
@@ -315,6 +316,145 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
                       </div>
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+        {/* Pattern Adherence - NEW */}
+        {(() => {
+          // Type guard to check if diagnostics has patternAdherence
+          const diagnostics = result.diagnostics;
+          if (!diagnostics || !('patternAdherence' in diagnostics)) {
+            return null;
+          }
+
+          const adherence = diagnostics.patternAdherence;
+          if (!adherence || adherence.length === 0) {
+            return null;
+          }
+
+          const totalExpected = adherence.reduce((sum, s) => sum + s.expectedDutyDays, 0);
+          const totalMatched = adherence.reduce((sum, s) => sum + s.matchedDutyDays, 0);
+          const overallAdherence = totalExpected > 0 ? (totalMatched / totalExpected) * 100 : 100;
+          const totalRemapped = adherence.reduce((sum, s) => sum + (s.remappedELtoD || 0), 0);
+          const totalRest = adherence.reduce((sum, s) => sum + (s.restPreservedDays || 0), 0);
+          const totalAbsence = adherence.reduce((sum, s) => sum + (s.absenceDays || 0), 0);
+
+          return (
+            <Card 
+              key="pattern-adherence"
+              className={`border-2 ${
+                overallAdherence >= 95 
+                  ? 'border-green-200 bg-green-50/50' 
+                  : overallAdherence >= 85
+                  ? 'border-yellow-200 bg-yellow-50/50'
+                  : 'border-red-200 bg-red-50/50'
+              }`}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="h-5 w-5" />
+                  Pattern Adherence
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Overall Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-4 border-b">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Overall Adherence</div>
+                    <div className={`text-2xl font-bold ${
+                      overallAdherence >= 95 
+                        ? 'text-green-600' 
+                        : overallAdherence >= 85
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
+                    }`}>
+                      {overallAdherence.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Rest Days Preserved</div>
+                    <div className="text-xl font-medium">{totalRest}</div>
+                  </div>
+                  {totalRemapped > 0 && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">E/L→D Remapped</div>
+                      <div className="text-xl font-medium">{totalRemapped}</div>
+                      <Badge variant="secondary" className="text-xs mt-1">12h mode</Badge>
+                    </div>
+                  )}
+                  {totalAbsence > 0 && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Absence Days Blocked</div>
+                      <div className="text-xl font-medium">{totalAbsence}</div>
+                      <Badge variant="outline" className="text-xs mt-1">Protected</Badge>
+                    </div>
+                  )}
+                </div>
+
+                {/* Staff-level Adherence */}
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">By Staff Member</h4>
+                  <div className="grid gap-2 max-h-64 overflow-y-auto">
+                    {adherence.map((staff) => (
+                      <div 
+                        key={staff.staffId}
+                        className="flex items-center justify-between p-3 bg-background rounded-lg border"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">
+                            {staff.staffName || staff.staffId}
+                          </div>
+                          <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                            <span>{staff.matchedDutyDays}/{staff.expectedDutyDays} matched</span>
+                            {(staff.restPreservedDays || 0) > 0 && (
+                              <span>• {staff.restPreservedDays} rest</span>
+                            )}
+                            {(staff.absenceDays || 0) > 0 && (
+                              <span>• {staff.absenceDays} absence</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(staff.remappedELtoD || 0) > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {staff.remappedELtoD} remapped
+                            </Badge>
+                          )}
+                          <Badge 
+                            variant={
+                              staff.adherencePct >= 95 
+                                ? "default" 
+                                : staff.adherencePct >= 85
+                                ? "secondary"
+                                : "destructive"
+                            }
+                            className="text-xs font-mono"
+                          >
+                            {staff.adherencePct.toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-2 border-t">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span>≥95% = Excellent</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                    <span>85-94% = Good</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                    <span>&lt;85% = Needs Review</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
