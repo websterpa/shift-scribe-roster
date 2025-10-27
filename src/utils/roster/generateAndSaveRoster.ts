@@ -118,12 +118,27 @@ export async function generateAndSaveRoster(
   }
 
   // Convert deduplicated staff list to CorrectiveStaffMember format
-  const correctiveStaff: CorrectiveStaffMember[] = dedupedStaffList.map(s => ({
-    id: s.id,
-    name: s.name || `${s.first_name} ${s.last_name}`,
-    availability: {}, // All days available by default
-    isNightEligible: s.eligible_shifts?.includes('Night') ?? true,
-  }));
+  // PERMISSIVE ELIGIBILITY: Empty/null eligible_shifts means eligible for all shifts
+  const correctiveStaff: CorrectiveStaffMember[] = dedupedStaffList.map(s => {
+    const hasShiftsConfigured = s.eligible_shifts && s.eligible_shifts.length > 0;
+    const isNightEligible = hasShiftsConfigured 
+      ? s.eligible_shifts.includes('Night') || s.eligible_shifts.includes('N')
+      : true; // Default to night-eligible if no shifts configured
+    
+    return {
+      id: s.id,
+      name: s.name || `${s.first_name} ${s.last_name}`,
+      availability: {}, // All days available by default
+      isNightEligible,
+    };
+  });
+  
+  console.info("[STAFF-POOL] ✅ Final eligible staff pool:", correctiveStaff.length, "members");
+  console.info("[STAFF-POOL] Night-eligible:", correctiveStaff.filter(s => s.isNightEligible).length);
+  logger.info('Staff pool prepared for generation', {
+    total: correctiveStaff.length,
+    nightEligible: correctiveStaff.filter(s => s.isNightEligible).length
+  });
 
   // Default-open availability: all staff available for all days unless explicitly unavailable
   // This ensures newly activated staff are immediately schedulable; admins can refine later
@@ -154,8 +169,8 @@ export async function generateAndSaveRoster(
   // GUARDRAIL: Block generation if staff pool is too small
   const EXPECTED_MIN_STAFF = 11; // TODO: Move to settings
   if (correctiveStaff.length < EXPECTED_MIN_STAFF) {
-    const errorMsg = `Cannot generate roster: only ${correctiveStaff.length}/${EXPECTED_MIN_STAFF} eligible staff found. Go to Settings → Staff and ensure more team members are marked as active.`;
-    console.error("[BLOCK] Eligible staff below expected", {
+    const errorMsg = `Cannot generate roster: only ${correctiveStaff.length}/${EXPECTED_MIN_STAFF} eligible staff found. Go to Settings → Staff and ensure more team members have 'active' availability status.`;
+    console.error("[BLOCK] ❌ Eligible staff below expected threshold", {
       found: correctiveStaff.length,
       expected: EXPECTED_MIN_STAFF,
       names: correctiveStaff.map(s => s.name),
@@ -163,9 +178,12 @@ export async function generateAndSaveRoster(
     logger.error(new Error('Insufficient staff pool'), {
       found: correctiveStaff.length,
       expected: EXPECTED_MIN_STAFF,
+      availableStaff: correctiveStaff.map(s => s.name)
     });
     throw new Error(errorMsg);
   }
+  
+  console.info("[STAFF-POOL] ✅ Sufficient staff pool:", correctiveStaff.length, "≥", EXPECTED_MIN_STAFF);
 
   // Parse coverage requirements from config
   const requirements: CoverageRequirements = {};

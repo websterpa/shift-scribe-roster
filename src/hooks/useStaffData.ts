@@ -15,14 +15,14 @@ export function useStaffData() {
     try {
       console.log('📥 useStaffData: Fetching staff list...');
       setError(null);
-      // TODO(tenant): Add tenant_id filter when staff_profiles table has tenant_id column
-      // Remove the is_active filter to fetch ALL staff members
+      
+      // PERMISSIVE QUERY: Fetch all staff, ordered by availability
+      // Do NOT filter by is_active or role - let UI handle display filtering
       const { data, error } = await supabase
         .from("staff_profiles")
         .select("*")
-        // .eq('tenant_id', getTenantId()) // Uncomment when column exists
-        .order("availability_status", { ascending: true }) // Show active first, then temporarily unavailable, then inactive
-        .order("last_name", { ascending: true }); // Then order by last name
+        .order("availability_status", { ascending: true }) // Show active first
+        .order("last_name", { ascending: true });
 
       if (error) {
         console.error('❌ useStaffData: Error fetching staff:', error);
@@ -32,18 +32,19 @@ export function useStaffData() {
       }
 
       console.log('📊 useStaffData: Raw staff data from database:', data?.length || 0, 'records');
+      console.log('📊 Active staff:', data?.filter(s => s.availability_status === 'active').length);
+      console.log('📊 Temporarily unavailable:', data?.filter(s => s.availability_status === 'temporarily_unavailable').length);
+      console.log('📊 Inactive:', data?.filter(s => s.availability_status === 'inactive').length);
 
       const enriched = await Promise.all(
         data?.map(async (s) => {
           console.log('👤 Processing staff member:', s.first_name, s.last_name, 'Status:', s.availability_status);
           
           // Count monthly leave requests for this staff member
-          // TODO(tenant): Add tenant_id filter when leave_requests table has tenant_id column
           const { data: leaveData, error: leaveError } = await supabase
             .from("leave_requests")
             .select("start_date, leave_type")
             .eq("staff_id", s.id)
-            // .eq("tenant_id", getTenantId()) // Uncomment when column exists
             .eq("status", "approved");
 
           if (leaveError) {
@@ -57,6 +58,11 @@ export function useStaffData() {
           });
 
           console.log('📊 Leave counts for', s.first_name, ':', monthlyCounts);
+
+          // PERMISSIVE DEFAULT: If eligible_shifts is empty/null, assume eligible for all shifts
+          const eligibleShifts = s.eligible_shifts && s.eligible_shifts.length > 0
+            ? s.eligible_shifts
+            : ['Early', 'Late', 'Night', 'Day']; // All shift types
 
           return { 
             id: s.id,
@@ -73,7 +79,7 @@ export function useStaffData() {
             expected_return_date: s.expected_return_date,
             unavailability_notes: s.unavailability_notes,
             role: s.role || 'CCTV Operator',
-            eligible_shifts: s.eligible_shifts || ['Early', 'Late', 'Night'],
+            eligible_shifts: eligibleShifts, // Use permissive default
             is_shift_worker: s.is_shift_worker ?? true,
             min_hours_per_week: s.min_hours_per_week || 37,
             max_hours_per_week: s.max_hours_per_week || 48,
