@@ -30,6 +30,7 @@ import Wizard from '@/pages/Wizard';
 import RosterSummary from '@/pages/RosterSummary';
 import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';
 import RLSHelp from '@/pages/Admin/RLSHelp';
+import ShiftPatterns from '@/pages/Admin/ShiftPatterns';
 import ArchivedRostersReport from '@/pages/ArchivedRostersReport';
 import NotFound from '@/pages/NotFound';
 
@@ -69,6 +70,7 @@ export function AppRouter() {
               <Route path="roster/monthly" element={<MonthlyPage />} />
               <Route path="wizard" element={<Wizard />} />
               <Route path="admin/rls-setup" element={<RLSHelp />} />
+              <Route path="admin/patterns" element={<ShiftPatterns />} />
             </Route>
             
       {/* 404 route */}
