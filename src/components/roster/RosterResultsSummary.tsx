@@ -13,7 +13,8 @@ import {
   TrendingUp,
   Eye,
   Moon,
-  Target
+  Target,
+  Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { RosterGenerationResultUI, Diagnostics } from '@/features/roster/types';
@@ -267,6 +268,137 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
             </div>
           </CardContent>
         </Card>
+
+        {/* WTD Compliance - NEW */}
+        {(() => {
+          const diagnostics = result.diagnostics;
+          if (!diagnostics || !('wtdCompliance' in diagnostics)) {
+            return null;
+          }
+
+          const wtd = diagnostics.wtdCompliance;
+          if (!wtd) {
+            return null;
+          }
+
+          return (
+            <Card 
+              key="wtd-compliance"
+              className={`border-2 ${
+                wtd.overallCompliant 
+                  ? 'border-green-200 bg-green-50/50' 
+                  : 'border-yellow-200 bg-yellow-50/50'
+              }`}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Shield className="h-5 w-5" />
+                  Working Time Directive Compliance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Overall Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-4 border-b">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Status</div>
+                    <div className={`flex items-center gap-2 text-xl font-bold ${
+                      wtd.overallCompliant 
+                        ? 'text-green-600' 
+                        : 'text-yellow-600'
+                    }`}>
+                      {wtd.overallCompliant ? (
+                        <>
+                          <CheckCircle className="h-5 w-5" />
+                          Compliant
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="h-5 w-5" />
+                          Warning
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Avg Weekly Hours</div>
+                    <div className={`text-xl font-medium ${
+                      wtd.avgWeeklyHours <= 48 ? 'text-green-600' : 'text-yellow-600'
+                    }`}>
+                      {wtd.avgWeeklyHours.toFixed(1)}h
+                    </div>
+                    <Badge variant={wtd.avgWeeklyHours <= 48 ? "default" : "secondary"} className="text-xs mt-1">
+                      Limit: 48h/week
+                    </Badge>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Rest Compliance</div>
+                    <div className="text-xl font-medium">
+                      {wtd.avgRestCompliancePct.toFixed(0)}%
+                    </div>
+                    <Badge 
+                      variant={wtd.avgRestCompliancePct >= 95 ? "default" : "secondary"} 
+                      className="text-xs mt-1"
+                    >
+                      {wtd.staffViolations.length} violations
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Staff Violations */}
+                {wtd.staffViolations.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      Staff with WTD Violations
+                    </h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {wtd.staffViolations.map((staff) => (
+                        <div 
+                          key={staff.staffId}
+                          className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                        >
+                          <div className="font-medium text-sm mb-1">
+                            {staff.staffName || staff.staffId}
+                            {staff.optedOut && (
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                Opted Out
+                              </Badge>
+                            )}
+                          </div>
+                          <ul className="text-xs text-muted-foreground space-y-1">
+                            {staff.violations.map((violation, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-yellow-600">•</span>
+                                <span>{violation}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-yellow-50 p-2 rounded border border-yellow-200">
+                      <strong>Note:</strong> WTD violations are shown as warnings. Staff who have opted out of the 48-hour limit 
+                      or patterns requiring adjustments should be reviewed. Consider adjusting shift patterns or verifying opt-out status.
+                    </div>
+                  </div>
+                )}
+
+                {/* Compliant Message */}
+                {wtd.overallCompliant && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <div className="text-sm">
+                      <div className="font-medium text-green-900">All staff meet WTD requirements</div>
+                      <div className="text-green-700">
+                        11h daily rest, 24h weekly rest, and 48h weekly average limits are satisfied.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Distribution Diagnostics - NEW */}
         {(() => {

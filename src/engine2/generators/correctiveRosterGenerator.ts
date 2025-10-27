@@ -1,6 +1,6 @@
 import type { ShiftCode } from "@/utils/constraints";
 import { createLogger } from "@/utils/errorLogger";
-import { calculateRestHours, DEFAULT_SHIFT_TIMES, type ShiftTimes } from "../constraints/wtdRules";
+import { calculateRestHours, DEFAULT_SHIFT_TIMES, DEFAULT_WTD_RULES, validateStaffWTD, type ShiftTimes, type WTDRules } from "../constraints/wtdRules";
 import { loadTuning } from "@/features/roster/engine/tuning";
 import { loadSitePatterns, expandPatternOverRange, type PatternTemplate } from "@/features/roster/patterns";
 import { getTenantId } from "@/features/tenant/useTenant";
@@ -98,6 +98,17 @@ export interface CorrectiveResult {
       weekendDays: number;
       totalHours: number;
     }>;
+    wtdCompliance?: {
+      overallCompliant: boolean;
+      avgWeeklyHours: number;
+      staffViolations: Array<{
+        staffId: string;
+        staffName?: string;
+        violations: string[];
+        optedOut?: boolean;
+      }>;
+      avgRestCompliancePct: number;
+    };
   };
   unfilledShifts?: Array<{ // Diagnostic: why shifts couldn't be filled
     dateISO: string;
@@ -1115,26 +1126,93 @@ function buildResult(
     mean: totalHoursPerStaff.reduce((a, b) => a + b, 0) / totalHoursPerStaff.length,
   });
   
-  // Log distribution diagnostics
-  const nightsArray = Object.values(distributionStats).map(s => s.nights);
-  const weekendsArray = Object.values(distributionStats).map(s => s.weekendDays);
-  console.info("[DISTRIBUTION] Nights per staff:", {
-    min: Math.min(...nightsArray),
-    max: Math.max(...nightsArray),
-    avg: (nightsArray.reduce((a, b) => a + b, 0) / nightsArray.length).toFixed(1),
-  });
-  console.info("[DISTRIBUTION] Weekend days per staff:", {
-    min: Math.min(...weekendsArray),
-    max: Math.max(...weekendsArray),
-    avg: (weekendsArray.reduce((a, b) => a + b, 0) / weekendsArray.length).toFixed(1),
-  });
-  
   logger.info('Fairness metrics calculated', {
     shiftVariance: variance,
     hoursVariance,
     giniCoefficient,
     staffDistribution: staff.length,
   });
+
+  // ============================================================================
+  // WTD COMPLIANCE VALIDATION
+  // ============================================================================
+  
+  logger.info('Starting WTD compliance validation');
+  
+  const wtdStaffViolations: Array<{
+    staffId: string;
+    staffName?: string;
+    violations: string[];
+    optedOut?: boolean;
+  }> = [];
+  
+  let totalHoursForAvg = 0;
+  let staffCountForAvg = 0;
+  let compliantStaffCount = 0;
+  
+  for (const s of staff) {
+    const staffMap = currentAssignments.get(s.id)!;
+    
+    // Build sequence of shift codes for this staff member
+    const staffAssignments: string[] = days.map(d => staffMap.get(d) || 'R');
+    
+    // Validate WTD compliance for this staff member
+    const wtdResult = validateStaffWTD(
+      staffAssignments,
+      DEFAULT_WTD_RULES,
+      DEFAULT_SHIFT_TIMES,
+      false // optedOut - could be passed from staff data if available
+    );
+    
+    // Calculate weekly hours for this staff member
+    const workedShifts = staffAssignments.filter(code => code !== 'R' && code !== '').length;
+    const hoursPerShift = staffAssignments.some(c => c === 'D') ? 12 : 8; // Detect 12h mode
+    const totalHours = workedShifts * hoursPerShift;
+    const weeks = days.length / 7;
+    const avgWeeklyHours = totalHours / weeks;
+    
+    totalHoursForAvg += avgWeeklyHours;
+    staffCountForAvg++;
+    
+    if (!wtdResult.valid) {
+      wtdStaffViolations.push({
+        staffId: s.id,
+        staffName: s.name,
+        violations: wtdResult.violations,
+        optedOut: false,
+      });
+      
+      logger.warn('WTD violations detected for staff', {
+        staffId: s.id,
+        violations: wtdResult.violations,
+      });
+    } else {
+      compliantStaffCount++;
+    }
+  }
+  
+  const avgWeeklyHours = staffCountForAvg > 0 ? totalHoursForAvg / staffCountForAvg : 0;
+  const avgRestCompliancePct = staffCountForAvg > 0 
+    ? (compliantStaffCount / staffCountForAvg) * 100 
+    : 100;
+  
+  const overallWTDCompliant = wtdStaffViolations.length === 0;
+  
+  logger.info('WTD compliance validation complete', {
+    overallCompliant: overallWTDCompliant,
+    avgWeeklyHours: avgWeeklyHours.toFixed(1),
+    staffViolations: wtdStaffViolations.length,
+    compliancePct: avgRestCompliancePct.toFixed(1),
+  });
+  
+  // Show toast if non-compliant (warning, not error - to support opt-outs)
+  if (!overallWTDCompliant) {
+    toast({
+      title: '⚠️ WTD Compliance Warning',
+      description: `${wtdStaffViolations.length} staff member(s) exceed WTD limits. Review roster for opt-out status or adjust pattern.`,
+      variant: 'default', // Yellow warning
+    });
+  }
 
   return {
     assignments,
@@ -1151,6 +1229,12 @@ function buildResult(
       staffPoolCount: staff.length,
       staffUsedCount,
       distributionStats,
+      wtdCompliance: {
+        overallCompliant: overallWTDCompliant,
+        avgWeeklyHours,
+        staffViolations: wtdStaffViolations,
+        avgRestCompliancePct,
+      },
     },
     unfilledShifts: unfilledShifts.length > 0 ? unfilledShifts : undefined,
   };

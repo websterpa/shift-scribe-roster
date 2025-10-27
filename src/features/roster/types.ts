@@ -53,6 +53,19 @@ export interface Diagnostics {
   constraintViolations?: Record<string, number>; // e.g. { minRest: 2, maxConsec: 1 }
   seed?: string;
   
+  // WTD Compliance tracking
+  wtdCompliance?: {
+    overallCompliant: boolean;
+    avgWeeklyHours: number;
+    staffViolations: Array<{
+      staffId: string;
+      staffName?: string;
+      violations: string[];
+      optedOut?: boolean;
+    }>;
+    avgRestCompliancePct: number; // % of staff meeting rest requirements
+  };
+  
   // Pattern adherence tracking (when pattern-locked mode is enabled)
   patternAdherence?: Array<{
     staffId: string;
