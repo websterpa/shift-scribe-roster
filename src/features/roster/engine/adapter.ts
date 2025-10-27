@@ -9,6 +9,8 @@ import type {
   Assignment,
   EligibilityReason
 } from '../types';
+import { generatePatternLockedDuties, type PatternLockedInput } from '../patterns/generator';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Adapter functions to transform between engine types and application types
@@ -50,6 +52,80 @@ export function adaptPatternAssignments(
     shift_code: p.shiftCode as 'E' | 'L' | 'N' | 'D',
     site_id: siteId,
   }));
+}
+
+/**
+ * Generate and save pattern-locked roster
+ * 
+ * Orchestrates the full pattern-locked roster generation flow:
+ * 1. Expands staff patterns over the date range
+ * 2. Converts to assignment format
+ * 3. Inserts into roster_assignments table
+ * 
+ * @param input - Pattern-locked generation parameters
+ * @param versionId - Roster version ID for assignments
+ * @param siteId - Site identifier
+ * @param tenantId - Tenant identifier
+ * @returns Generation result with assignments and warnings
+ */
+export async function generateAndSavePatternLockedRoster(
+  input: PatternLockedInput,
+  versionId: string,
+  siteId: string,
+  tenantId: string
+): Promise<{ success: boolean; warnings: string[]; assignmentCount: number }> {
+  console.log('🔒 Starting pattern-locked roster generation and save', {
+    versionId,
+    siteId,
+    tenantId,
+    staffCount: input.staffIds.length,
+  });
+
+  // Generate pattern duties
+  const patternResult = await generatePatternLockedDuties(input);
+
+  // Check for blocking errors
+  if (patternResult.staffWithoutPatterns.length > 0) {
+    console.error('❌ Generation blocked: Staff without patterns');
+    return {
+      success: false,
+      warnings: patternResult.warnings,
+      assignmentCount: 0,
+    };
+  }
+
+  // Convert to assignments
+  const assignments = adaptPatternAssignments(
+    patternResult.duties,
+    siteId,
+    tenantId
+  );
+
+  // Add version_id to each assignment
+  const assignmentsWithVersion = assignments.map(a => ({
+    ...a,
+    version_id: versionId,
+  }));
+
+  console.log(`💾 Inserting ${assignmentsWithVersion.length} assignments into roster_assignments`);
+
+  // Insert into database
+  const { error } = await supabase
+    .from('roster_assignments')
+    .insert(assignmentsWithVersion);
+
+  if (error) {
+    console.error('❌ Failed to insert roster assignments:', error);
+    throw new Error(`Failed to save roster assignments: ${error.message}`);
+  }
+
+  console.log('✅ Pattern-locked roster saved successfully');
+
+  return {
+    success: true,
+    warnings: patternResult.warnings,
+    assignmentCount: assignmentsWithVersion.length,
+  };
 }
 
 /**
