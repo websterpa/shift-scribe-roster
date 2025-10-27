@@ -15,7 +15,7 @@ import {
   Moon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { RosterGenerationResult } from './ManagerRosterGenerator';
+import { RosterGenerationResult } from '@/features/roster/types';
 
 interface RosterResultsSummaryProps {
   result: RosterGenerationResult;

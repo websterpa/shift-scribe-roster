@@ -11,51 +11,13 @@ import { Settings, Calendar, DollarSign, Clock, Users, Shield } from 'lucide-rea
 import { RosterProgressTracker } from './RosterProgressTracker';
 import { RosterResultsSummary } from './RosterResultsSummary';
 import { toast } from '@/hooks/use-toast';
+import { 
+  ManagerRosterConfig, 
+  RosterGenerationResult 
+} from '@/features/roster/types';
 
-export interface ManagerRosterConfig {
-  // Basic settings
-  shiftSystem: '8h' | '12h';
-  siteStartTime: string;
-  timezone: string;
-  weeks: number;
-  
-  // OT defaults
-  defaultOtHours: number;
-  defaultOtStartTime: string;
-  
-  // Optional constraints
-  budget?: number;
-  publicHolidayCap?: number;
-  allowSupervisorNights: boolean;
-  
-  // Coverage targets
-  coverageTargets: string; // JSON string
-}
-
-export interface RosterGenerationResult {
-  coverageAchieved: {
-    total: number;
-    byShift: Record<string, number>;
-  };
-  fairnessStats: {
-    nights: { min: number; avg: number; max: number };
-    weekends: { min: number; avg: number; max: number };
-    publicHolidays: { min: number; avg: number; max: number };
-  };
-  cost: {
-    total: number;
-    budgetVariance?: number;
-  };
-  violations: string[];
-  generatedVersionId?: string;
-  diagnostics?: {
-    distributionStats?: Record<string, {
-      nights: number;
-      weekendDays: number;
-      totalHours: number;
-    }>;
-  };
-}
+// Re-export types for backwards compatibility
+export type { ManagerRosterConfig, RosterGenerationResult };
 
 interface ManagerRosterGeneratorProps {
   onGenerateRoster: (config: ManagerRosterConfig) => Promise<RosterGenerationResult>;
