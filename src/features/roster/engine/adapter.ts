@@ -30,6 +30,28 @@ export function transformCorrectiveResult(
 ): RosterGenerationResult {
   console.log('✓ Adapter: Transforming CorrectiveResult to RosterGenerationResult');
   
+  // Default diagnostics in case engine result is missing them
+  const defaultDiagnostics: Diagnostics = {
+    distributionStats: { byStaff: [], byShiftCode: {} }
+  };
+
+  // If no diagnostics from engine, return defaults
+  if (!engineResult.diagnostics || !engineResult.diagnostics.distributionStats) {
+    console.warn('⚠️ Adapter: Engine result missing diagnostics, using defaults');
+    const assignments: Assignment[] = engineResult.assignments.map(a => ({
+      id: undefined,
+      date: a.dateISO,
+      shift_code: a.shiftType as 'E' | 'L' | 'N' | 'D',
+      staff_id: a.staffId,
+    }));
+    
+    return {
+      assignments,
+      warnings: warnings || engineResult.violations,
+      diagnostics: defaultDiagnostics,
+    };
+  }
+  
   // Transform engine assignments to standard format
   const assignments: Assignment[] = engineResult.assignments.map(a => ({
     id: undefined,
