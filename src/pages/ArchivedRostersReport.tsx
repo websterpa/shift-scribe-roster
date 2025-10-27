@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { createLogger } from '@/utils/errorLogger';
 import { toast } from '@/hooks/use-toast';
+import { utils, writeFile } from 'xlsx';
 
 const logger = createLogger('ArchivedRostersReport');
 
@@ -126,33 +127,14 @@ const ArchivedRostersReport = () => {
   const handleExportCSV = () => {
     if (!selectedRoster || assignments.length === 0) return;
 
-    const headers = ['Date', 'Staff ID', 'Shift Code', 'Shift Start', 'Shift End', 'Hours', 'Cost'];
-    const rows = assignments.map(a => [
-      a.date,
-      a.staff_id,
-      a.shift_code,
-      a.shift_start || '',
-      a.shift_end || '',
-      a.hours?.toString() || '',
-      a.cost?.toString() || ''
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `archived-roster-${selectedRoster.month}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const ws = utils.json_to_sheet(assignments);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Roster');
+    writeFile(wb, `Archived_Roster_${selectedRoster.month}.xlsx`);
 
     toast({
-      title: "Export complete",
-      description: `Exported ${assignments.length} assignments to CSV`
+      title: "Roster exported successfully",
+      description: `Exported ${assignments.length} assignments to Excel file`
     });
   };
 
