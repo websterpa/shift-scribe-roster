@@ -8,6 +8,7 @@
  * 4. Matching duties to coverage requirements
  */
 
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import type { ShiftCode } from './types';
 import { resolvePatternsBatch } from './resolve';
@@ -127,8 +128,6 @@ export async function generatePatternLockedDuties(
 
   const warnings: string[] = [];
   const duties: PatternDuty[] = [];
-  const staffWithPatterns: string[] = [];
-  const staffWithoutPatterns: string[] = [];
 
   // Step 1: Resolve patterns for all staff
   console.log('🎯 Step 1: Resolving patterns for staff members');
@@ -138,32 +137,59 @@ export async function generatePatternLockedDuties(
     input.siteId
   );
 
-  if (resolutions.size === 0) {
-    console.error('❌ No patterns resolved for any staff members');
-    toast({
-      title: "No Patterns Available",
-      description: "Unable to resolve patterns for any staff members. Please assign patterns in Pattern Management.",
-      variant: "destructive",
-    });
-    return {
-      duties: [],
-      staffWithPatterns: [],
-      staffWithoutPatterns: input.staffIds,
-      warnings: ['No patterns resolved for any staff members'],
-    };
-  }
-
-  // Track which staff have patterns
+  // GUARDRAIL: Block generation if any staff lack patterns
+  const staffWithoutPatterns: string[] = [];
+  const staffWithPatterns: string[] = [];
+  
   for (const staffId of input.staffIds) {
     if (resolutions.has(staffId)) {
       staffWithPatterns.push(staffId);
     } else {
       staffWithoutPatterns.push(staffId);
-      warnings.push(`Staff ${staffId} has no pattern assigned`);
     }
   }
 
-  console.log(`✓ Resolved patterns for ${resolutions.size}/${input.staffIds.length} staff`);
+  if (staffWithoutPatterns.length > 0) {
+    console.error('❌ GUARDRAIL: Staff without patterns detected in pattern-locked mode');
+    
+    // Get staff names for better error messages
+    const { data: staffProfiles } = await supabase
+      .from('staff_profiles')
+      .select('id, first_name, last_name, name')
+      .in('id', staffWithoutPatterns.slice(0, 5)); // Limit to 5 for toast
+
+    const missingStaffNames = (staffProfiles || []).map(s => 
+      s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.id
+    );
+
+    const displayNames = missingStaffNames.length > 0 
+      ? missingStaffNames.join(', ')
+      : staffWithoutPatterns.slice(0, 5).join(', ');
+
+    const totalMissing = staffWithoutPatterns.length;
+    const additionalCount = totalMissing > 5 ? ` (+${totalMissing - 5} more)` : '';
+
+    toast({
+      title: "❌ Generation Blocked: Missing Patterns",
+      description: `Pattern-locked mode requires all staff to have assigned patterns. Missing for: ${displayNames}${additionalCount}. Click to manage patterns.`,
+      variant: "destructive",
+    });
+
+    // Provide link in console for now (toast actions have limited API)
+    console.error('🔗 Fix this by assigning patterns at: /patterns');
+
+    return {
+      duties: [],
+      staffWithPatterns,
+      staffWithoutPatterns,
+      warnings: [
+        'Generation aborted: Pattern-locked mode requires all staff to have patterns',
+        ...staffWithoutPatterns.map(id => `Staff ${id} has no pattern assigned`)
+      ],
+    };
+  }
+
+  console.log(`✓ All ${staffWithPatterns.length} staff have patterns - proceeding with generation`);
 
   // Step 2: Expand patterns over date range
   console.log('📅 Step 2: Expanding patterns over roster horizon');

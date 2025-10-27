@@ -275,6 +275,28 @@ const result = await generateCorrectiveRoster({
 - Generator excludes absence days from duty creation
 - Absence type stored for UI display (annual, sick, etc.)
 
+**Pattern Guardrails (Pattern-Locked Mode):**
+- **ALL** staff must have resolvable patterns
+- Generation aborts if any staff lack patterns
+- Destructive toast shows missing staff names (up to 5)
+- Console provides navigation hint to `/patterns`
+- Prevents silent fallback to ad-hoc assignment
+
+**Example guardrail behavior:**
+```typescript
+// Attempt generation with staff missing patterns
+const result = await generatePatternLockedDuties({
+  staffIds: ['staff-1', 'staff-2', 'staff-3'],
+  // ... other params
+});
+
+// If staff-2 and staff-3 lack patterns:
+// ❌ Toast: "Generation Blocked: Missing Patterns"
+// Description: "Missing for: Jane Doe, John Smith"
+// Console: "Fix this by assigning patterns at: /patterns"
+// Result: { duties: [], staffWithoutPatterns: ['staff-2', 'staff-3'], warnings: [...] }
+```
+
 **Pattern Integrity:**
 - Each staff member follows their own pattern cycle
 - Patterns repeat automatically based on `pattern_length`
