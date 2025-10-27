@@ -1,12 +1,5 @@
-/**
- * Adapter functions to transform between engine types and application types
- * 
- * Bridges the gap between:
- * - Engine's CorrectiveResult (internal format)
- * - Application's RosterGenerationResult (UI-facing format)
- */
-
 import type { CorrectiveResult } from '@/engine2/generators/correctiveRosterGenerator';
+import type { PatternDuty } from '../patterns/generator';
 import type { 
   RosterGenerationResult, 
   RosterGenerationResultUI,
@@ -16,6 +9,48 @@ import type {
   Assignment,
   EligibilityReason
 } from '../types';
+
+/**
+ * Adapter functions to transform between engine types and application types
+ * 
+ * Bridges the gap between:
+ * - Engine's CorrectiveResult (internal format)
+ * - Application's RosterGenerationResult (UI-facing format)
+ * - Pattern expansion results to roster assignments
+ */
+
+/**
+ * Convert pattern expansion results to roster assignment format
+ * 
+ * @param patternExpansion - Array of pattern duties from pattern generator
+ * @param siteId - Site identifier
+ * @param tenantId - Tenant identifier
+ * @returns Array of assignments ready for roster storage
+ */
+export function adaptPatternAssignments(
+  patternExpansion: PatternDuty[],
+  siteId: string,
+  tenantId: string
+): Assignment[] {
+  console.log('✓ Adapter: Converting pattern expansion to assignments', {
+    dutyCount: patternExpansion.length,
+    siteId,
+    tenantId
+  });
+
+  // Filter to only work shifts (E, L, N, D) and exclude rest/leave codes
+  const workShifts = patternExpansion.filter(p => 
+    ['E', 'L', 'N', 'D'].includes(p.shiftCode)
+  );
+
+  return workShifts.map(p => ({
+    id: undefined,
+    staff_id: p.staffId,
+    date: p.date,
+    shift_code: p.shiftCode as 'E' | 'L' | 'N' | 'D',
+    site_id: siteId,
+  }));
+}
 
 /**
  * Transform CorrectiveResult into the canonical RosterGenerationResult format
