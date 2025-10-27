@@ -132,7 +132,10 @@ export {
 } from '@/engine2/generators/correctiveRosterGenerator';
 
 /**
- * Generate a roster using the corrective algorithm
+ * Primary roster generator replacing deprecated `generateRosterEnhanced`
+ * 
+ * Generate a roster using the corrective algorithm with constraint-based optimization.
+ * This is the canonical roster generation function for all new code.
  * 
  * This generator uses constraint-based optimization to create rosters that:
  * - Fill all coverage requirements (E/L/N shifts)
