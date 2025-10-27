@@ -71,6 +71,7 @@ export interface RosterDiagnosticsLegacy {
     filled: number;
     rejectionReasons: string[];
   }>;
+  constraintViolations?: Record<string, number>;
 }
 
 // ============================================================================

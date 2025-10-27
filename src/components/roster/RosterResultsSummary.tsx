@@ -268,41 +268,91 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
         </Card>
 
         {/* Distribution Diagnostics - NEW */}
-        {result.diagnostics?.distributionStats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Moon className="h-5 w-5" />
-                Distribution Balance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground">Nights Range</div>
-                  <div className="font-medium">
-                    {Math.min(...Object.values(result.diagnostics.distributionStats).map(s => s.nights))} - 
-                    {Math.max(...Object.values(result.diagnostics.distributionStats).map(s => s.nights))}
-                  </div>
+        {(() => {
+          const dist = result.diagnostics?.distributionStats;
+          const byStaff = Array.isArray(dist?.byStaff) ? dist.byStaff : [];
+          const byShiftCode = dist?.byShiftCode ?? {};
+          
+          if (byStaff.length === 0 && Object.keys(byShiftCode).length === 0) {
+            return null;
+          }
+
+          const nightValues = byStaff.map(s => s.nights).filter((n): n is number => n !== undefined);
+          const weekendValues = byStaff.map(s => s.weekendDays).filter((n): n is number => n !== undefined);
+          const hoursValues = byStaff.map(s => s.totalHours).filter((n): n is number => n !== undefined);
+
+          return (
+            <Card key="distribution-balance">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Moon className="h-5 w-5" />
+                  Distribution Balance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  {nightValues.length > 0 && (
+                    <div>
+                      <div className="text-muted-foreground">Nights Range</div>
+                      <div className="font-medium">
+                        {Math.min(...nightValues)} - {Math.max(...nightValues)}
+                      </div>
+                    </div>
+                  )}
+                  {weekendValues.length > 0 && (
+                    <div>
+                      <div className="text-muted-foreground">Weekend Days Range</div>
+                      <div className="font-medium">
+                        {Math.min(...weekendValues)} - {Math.max(...weekendValues)}
+                      </div>
+                    </div>
+                  )}
+                  {hoursValues.length > 0 && (
+                    <div>
+                      <div className="text-muted-foreground">Hours Range</div>
+                      <div className="font-medium">
+                        {Math.min(...hoursValues)}h - {Math.max(...hoursValues)}h
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <div className="text-muted-foreground">Weekend Days Range</div>
-                  <div className="font-medium">
-                    {Math.min(...Object.values(result.diagnostics.distributionStats).map(s => s.weekendDays))} - 
-                    {Math.max(...Object.values(result.diagnostics.distributionStats).map(s => s.weekendDays))}
-                  </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+        {/* Constraint Violations */}
+        {(() => {
+          const violations = result.diagnostics?.constraintViolations;
+          if (!violations || Object.keys(violations).length === 0) {
+            return null;
+          }
+          
+          return (
+            <Card className="border-yellow-200 bg-yellow-50/50" key="constraint-violations">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                  Constraint Violations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(violations).map(([constraint, count]) => (
+                    <div key={constraint} className="flex items-center justify-between p-2 bg-yellow-100 rounded">
+                      <span className="text-sm text-yellow-700 capitalize">
+                        {constraint.replace(/([A-Z])/g, ' $1').trim()}
+                      </span>
+                      <Badge variant="outline" className="text-yellow-700 border-yellow-300">
+                        {count} occurrence{count !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <div className="text-muted-foreground">Hours Range</div>
-                  <div className="font-medium">
-                    {Math.min(...Object.values(result.diagnostics.distributionStats).map(s => s.totalHours))}h - 
-                    {Math.max(...Object.values(result.diagnostics.distributionStats).map(s => s.totalHours))}h
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Violations */}
         {result.violations.length > 0 && (
