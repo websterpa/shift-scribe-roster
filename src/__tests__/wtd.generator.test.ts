@@ -7,7 +7,7 @@ import {
   generateWTDRoster,
   type WTDStaffMember,
   type CoverageRequirement,
-} from '@/engine2/generators/wtdRosterGenerator';
+} from '@/features/roster/engine';
 
 describe('WTD Roster Generator @wtd-generator', () => {
   const createStaff = (count: number): WTDStaffMember[] => {

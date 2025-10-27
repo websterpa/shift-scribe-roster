@@ -8,7 +8,7 @@ import {
   type CorrectiveStaffMember,
   type CoverageRequirements,
   DEFAULT_CORRECTIVE_POLICY,
-} from '@/engine2/generators/correctiveRosterGenerator';
+} from '@/features/roster/engine';
 
 describe('Corrective Roster Generator @corrective-generator', () => {
   const createStaff = (count: number): CorrectiveStaffMember[] => {
