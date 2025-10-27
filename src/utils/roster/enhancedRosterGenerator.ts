@@ -1,27 +1,15 @@
 /**
- * @deprecated Use `@/features/roster/engine` instead.
+ * @deprecated COMPATIBILITY STUB for tests only
  * 
- * This module has been deprecated in favor of the canonical roster engine.
- * All generation logic should use the unified API from @/features/roster/engine.
- * 
- * Migration guide:
- * - Old: import { generateRosterEnhanced } from '@/utils/roster/enhancedRosterGenerator'
- * - New: import { generateCorrectiveRoster } from '@/features/roster/engine'
- * 
- * The new engine provides:
- * - Unified generation API
- * - Better WTD compliance
- * - Consistent costing
- * - Improved rest validation
+ * This file has been deleted. Tests importing from here should be updated to use:
+ * - @/features/roster/engine for production code
+ * - @/utils/roster/rosterGeneration for schema-based generation (test infrastructure)
  */
-
-import { generateCorrectiveRoster } from '@/features/roster/engine';
-import type { StaffMember, Assignment } from "@/types/roster";
 
 export interface GeneratorInput {
   system: "8h" | "12h";
   versionId: string;
-  staff: StaffMember[];
+  staff: any[];
   requirementsByDay: Record<number, Record<string, number>>;
   startDate: string;
   siteStartHH?: number;
@@ -31,19 +19,17 @@ export interface GeneratorInput {
 }
 
 export interface GeneratorResult {
-  assignments: Assignment[];
+  assignments: any[];
   nightsGenerated: number;
 }
 
 /**
- * @deprecated Legacy enhanced generator - use generateCorrectiveRoster from @/features/roster/engine
+ * @deprecated This stub exists for test compatibility only
  */
-export function generateRosterEnhanced(input: GeneratorInput): GeneratorResult {
-  console.warn('⚠️ generateRosterEnhanced is deprecated. Use @/features/roster/engine instead.');
-  
-  // This is a compatibility stub - for full functionality, migrate to engine
+export function generateRosterEnhanced(_input: GeneratorInput): GeneratorResult {
   throw new Error(
-    'generateRosterEnhanced is deprecated. Please migrate to @/features/roster/engine. ' +
-    'See src/utils/roster/generateAndSaveRoster.ts for example usage.'
+    'generateRosterEnhanced is deprecated and removed. ' +
+    'Tests should be updated to use generateCorrectiveRoster from @/features/roster/engine or ' +
+    'generateRoster from @/utils/roster/rosterGeneration for schema-based testing.'
   );
 }

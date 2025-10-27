@@ -1,39 +1,18 @@
 /**
- * @deprecated Use `@/features/roster/engine` instead.
+ * @deprecated COMPATIBILITY STUB for tests only
  * 
- * This module has been deprecated in favor of the canonical roster engine.
- * All generation logic should use the unified API from @/features/roster/engine.
- * 
- * Migration guide:
- * - Old: import { generateAssignments } from '@/utils/roster/assignmentGenerator'
- * - New: import { generateCorrectiveRoster } from '@/features/roster/engine'
- * 
- * The new engine provides:
- * - Unified generation API
- * - Better WTD compliance
- * - Consistent costing
- * - Improved rest validation
+ * This file has been deleted. Tests importing from here should be updated to use:
+ * - @/features/roster/engine for production code  
+ * - @/utils/roster/rosterGeneration for schema-based generation (test infrastructure)
  */
-
-import { generateCorrectiveRoster } from '@/features/roster/engine';
-import type { StaffMember, Assignment } from "@/types/roster";
 
 /**
- * @deprecated Legacy assignment generator - use generateCorrectiveRoster from @/features/roster/engine
+ * @deprecated This stub exists for test compatibility only
  */
-export function generateAssignments(
-  staffList: StaffMember[],
-  cycle: Array<{ day: number; staffId: string; shiftCode: string; date: string; otOptions?: any }>,
-  config: any,
-  leaveMap: any,
-  pastWeeksMap: Record<string, number[]>,
-  restValidationFn?: any
-): Assignment[] {
-  console.warn('⚠️ generateAssignments is deprecated. Use @/features/roster/engine instead.');
-  
-  // This is a compatibility stub - for full functionality, migrate to engine
+export function generateAssignments(..._args: any[]): any[] {
   throw new Error(
-    'generateAssignments is deprecated. Please migrate to @/features/roster/engine. ' +
-    'See src/utils/roster/generateAndSaveRoster.ts for example usage.'
+    'generateAssignments is deprecated and removed. ' +
+    'Tests should be updated to use generateCorrectiveRoster from @/features/roster/engine or ' +
+    'generateRoster from @/utils/roster/rosterGeneration for schema-based testing.'
   );
 }

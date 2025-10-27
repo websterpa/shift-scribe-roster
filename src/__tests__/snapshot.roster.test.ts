@@ -116,12 +116,12 @@ describe('Roster Generation Snapshot Tests', () => {
       acc[a.date] = acc[a.date] || [];
       acc[a.date].push(a);
       return acc;
-    }, {} as Record<string, typeof result.assignments>);
+    }, {} as Record<string, any[]>);
 
     // Snapshot: coverage per day should be consistent
     const coverageSnapshot = Object.entries(byDate).map(([date, assigns]) => {
-      const dCount = assigns.filter(a => a.shift_code === 'D').length;
-      const nCount = assigns.filter(a => a.shift_code === 'N').length;
+      const dCount = (assigns as any[]).filter(a => a.shift_code === 'D').length;
+      const nCount = (assigns as any[]).filter(a => a.shift_code === 'N').length;
       return { date, D: dCount, N: nCount };
     });
 
@@ -138,7 +138,7 @@ describe('Roster Generation Snapshot Tests', () => {
 
     // No duplicates per staff per day
     Object.entries(byDate).forEach(([date, assigns]) => {
-      const staffIds = assigns.map(a => a.staff_id);
+      const staffIds = (assigns as any[]).map(a => a.staff_id);
       const unique = new Set(staffIds);
       expect(staffIds.length).toBe(unique.size);
     });
@@ -170,13 +170,13 @@ describe('Roster Generation Snapshot Tests', () => {
       acc[a.date] = acc[a.date] || [];
       acc[a.date].push(a);
       return acc;
-    }, {} as Record<string, typeof result.assignments>);
+    }, {} as Record<string, any[]>);
 
     // Each day should have E, L, N shifts
     Object.entries(byDate).forEach(([date, assigns]) => {
-      const e = assigns.filter(a => a.shift_code === 'E').length;
-      const l = assigns.filter(a => a.shift_code === 'L').length;
-      const n = assigns.filter(a => a.shift_code === 'N').length;
+      const e = (assigns as any[]).filter(a => a.shift_code === 'E').length;
+      const l = (assigns as any[]).filter(a => a.shift_code === 'L').length;
+      const n = (assigns as any[]).filter(a => a.shift_code === 'N').length;
       
       expect(e).toBeGreaterThanOrEqual(0);
       expect(l).toBeGreaterThanOrEqual(0);
@@ -185,7 +185,7 @@ describe('Roster Generation Snapshot Tests', () => {
 
     // No staff overlap on same day
     Object.values(byDate).forEach(assigns => {
-      const ids = assigns.map(a => a.staff_id);
+      const ids = (assigns as any[]).map(a => a.staff_id);
       expect(ids.length).toBe(new Set(ids).size);
     });
   });
