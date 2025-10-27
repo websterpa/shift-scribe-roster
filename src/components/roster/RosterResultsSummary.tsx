@@ -24,6 +24,9 @@ interface RosterResultsSummaryProps {
 export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ result }) => {
   const navigate = useNavigate();
 
+  // Temporary diagnostic logging
+  console.log('✓ RosterResultsSummary received diagnostics:', result.diagnostics);
+
   const handleViewRoster = () => {
     if (result.generatedVersionId) {
       navigate(`/roster/${result.generatedVersionId}`);

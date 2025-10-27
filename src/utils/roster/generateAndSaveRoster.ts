@@ -1,6 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember } from "@/types/roster";
-import { generateCorrectiveRoster, type CorrectiveStaffMember, type CoverageRequirements, type CorrectiveResult, DEFAULT_CORRECTIVE_POLICY } from "@/features/roster/engine";
+import { 
+  generateCorrectiveRoster, 
+  type CorrectiveStaffMember, 
+  type CoverageRequirements, 
+  type CorrectiveResult, 
+  DEFAULT_CORRECTIVE_POLICY,
+  transformToUIResult
+} from "@/features/roster/engine";
 import { remapToFramework } from "@/features/roster/shiftMap";
 import { toast } from "@/hooks/use-toast";
 import { createLogger } from "../errorLogger";
@@ -377,8 +384,11 @@ export async function generateAndSaveRoster(
   logger.info('Roster generation complete', { 
     versionId: versionData.id, 
     assignments: assignmentsToInsert.length,
-    fairness: result.fairness
+    fairness: result.fairness,
+    diagnostics: result.diagnostics
   });
+
+  console.log('✓ Diagnostics from engine:', result.diagnostics);
 
   // Calculate total variance as sum of E, L, N variances
   const totalVariance = result.fairness.variance.E + result.fairness.variance.L + result.fairness.variance.N;
@@ -389,7 +399,7 @@ export async function generateAndSaveRoster(
     optimizationResult: { score: Math.max(0, 100 - totalVariance) },
     wtrResult: { violations: result.violations },
     costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
-    generatorResult: result,
+    generatorResult: result, // Pass through full engine result with diagnostics
   };
 }
 

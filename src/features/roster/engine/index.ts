@@ -118,6 +118,26 @@ export { validateRest } from '@/engine2/rules/validateRest';
  */
 
 // ============================================================================
+// RE-EXPORTS: ADAPTERS
+// ============================================================================
+
+export { transformCorrectiveResult, transformToUIResult } from './adapter';
+
+/**
+ * Transform engine results into application-facing formats
+ * 
+ * - transformCorrectiveResult: CorrectiveResult → RosterGenerationResult (canonical)
+ * - transformToUIResult: CorrectiveResult → RosterGenerationResultUI (UI components)
+ * 
+ * @example
+ * ```ts
+ * const engineResult = generateCorrectiveRoster(input);
+ * const appResult = transformCorrectiveResult(engineResult);
+ * const uiResult = transformToUIResult(engineResult, versionId, budget);
+ * ```
+ */
+
+// ============================================================================
 // RE-EXPORTS: CORRECTIVE ROSTER GENERATOR
 // ============================================================================
 
