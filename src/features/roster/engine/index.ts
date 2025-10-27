@@ -134,27 +134,32 @@ export {
 /**
  * Primary roster generator replacing deprecated `generateRosterEnhanced`
  * 
- * Generate a roster using the corrective algorithm with constraint-based optimization.
- * This is the canonical roster generation function for all new code.
+ * Generate a roster using the corrective algorithm with hard constraint enforcement
+ * and fairness-based optimization. This is the canonical roster generation function.
  * 
- * This generator uses constraint-based optimization to create rosters that:
- * - Fill all coverage requirements (E/L/N shifts)
- * - Enforce rest rules and turnaround constraints
- * - Balance workload fairly across staff (with tunable weights)
- * - Minimize variance in assigned hours
- * - Encourage rotation (avoid reusing same staff consecutively)
- * - Respect staff availability
+ * HARD CONSTRAINTS (enforced before accepting assignments):
+ * - Minimum rest hours: Default 11h between consecutive shifts (configurable)
+ * - Maximum consecutive days: Default 6 working days before forced rest
+ * - Maximum consecutive nights: Default 3 night shifts before forced rest
+ * - Corrective pass: Automatically inserts REST days where constraints violated
  * 
- * FAIRNESS TUNING:
+ * SOFT FAIRNESS PREFERENCES:
+ * - Variance minimization: Spreads hours evenly across all staff
+ * - Rotation preference: Avoids reusing same staff consecutively
+ * - Night balance: Additional fairness weight for night shifts
+ * - Deterministic tie-breaking: Seeded RNG for reproducible results
+ * 
+ * FAIRNESS TUNING PARAMETERS:
  * - fairnessWeight (0.2-0.4): Penalty for variance in total hours
  * - nightBalanceWeight (0.2-0.4): Additional weight for night shift balance
  * - rotationPreference (0-1): Bonus for not using same staff consecutively
  * - variancePenaltyStrength (default 1.0): Multiplier for variance penalty
  * 
- * The generator logs comprehensive fairness metrics including:
+ * METRICS LOGGED:
  * - Gini coefficient (0=perfect equality, 1=perfect inequality)
  * - Hours variance across all staff
  * - Min/max/mean hours distribution
+ * - REST days enforced during corrective pass
  * 
  * @param input - Generation parameters (staff, requirements, policy)
  * @returns Complete roster with assignments, fairness metrics, and diagnostics
@@ -165,7 +170,12 @@ export {
  *   days: ['2025-01-10', '2025-01-11', '2025-01-12'],
  *   staff: [{ id: '1', name: 'John', availability: {}, isNightEligible: true }],
  *   requirements: { '2025-01-10': { E: 2, L: 2, N: 1 } },
- *   policy: { ...DEFAULT_CORRECTIVE_POLICY, fairnessWeight: 0.3 }
+ *   policy: { 
+ *     ...DEFAULT_CORRECTIVE_POLICY, 
+ *     minGapHoursBetweenShifts: 11,
+ *     maxConsecDays: 6,
+ *     fairnessWeight: 0.3 
+ *   }
  * });
  * ```
  */

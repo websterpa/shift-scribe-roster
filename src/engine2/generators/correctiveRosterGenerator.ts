@@ -1,5 +1,6 @@
 import type { ShiftCode } from "@/utils/constraints";
 import { createLogger } from "@/utils/errorLogger";
+import { calculateRestHours, DEFAULT_SHIFT_TIMES, type ShiftTimes } from "../constraints/wtdRules";
 
 const logger = createLogger('CorrectiveRosterGenerator');
 
@@ -37,6 +38,9 @@ export interface CorrectivePolicy {
   nightBalanceWeight: number;       // Additional weight for night shift balance (0.2-0.4 recommended)
   rotationPreference: number;       // Bonus for not using same staff consecutively (0-1, default 0.3)
   variancePenaltyStrength: number;  // Multiplier for variance penalty (default 1.0)
+  
+  // SHIFT TIMING CONFIGURATION
+  shiftTimes?: ShiftTimes;         // Optional shift times (defaults to standard 8h shifts)
 }
 
 export interface CorrectiveInput {
@@ -96,20 +100,34 @@ export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = {
   nightBalanceWeight: 0.4,       // Slightly higher for night shift fairness
   rotationPreference: 0.3,       // Moderate preference for rotation
   variancePenaltyStrength: 1.0,  // Standard variance penalty
+  
+  // SHIFT TIMING (defaults to standard 8h shifts)
+  shiftTimes: DEFAULT_SHIFT_TIMES,
 };
 
 // ============================================================================
-// HELPER: ILLEGAL TURNAROUNDS (11h gap enforcement)
+// HELPER: REST HOURS CALCULATION (11h gap enforcement)
 // ============================================================================
 
-const ILLEGAL_TRANSITIONS: Record<string, string[]> = {
-  'N': ['E', 'L'], // Night -> Early/Late violates 11h (N ends 06:00, E starts 06:00)
-  'L': ['E'],      // Late -> Early violates 11h (L ends 22:00, E starts 06:00 = 8h)
-};
-
-function isIllegalTurnaround(prevShift: ShiftCode | null, nextShift: 'E' | 'L' | 'N'): boolean {
-  if (!prevShift || prevShift === 'R') return false;
-  return ILLEGAL_TRANSITIONS[prevShift]?.includes(nextShift) || false;
+/**
+ * Check if there's sufficient rest between two consecutive shifts
+ * Uses actual shift times to calculate rest hours
+ */
+function hasMinimumRest(
+  prevShift: ShiftCode | null, 
+  nextShift: 'E' | 'L' | 'N',
+  shiftTimes: ShiftTimes,
+  minRestHours: number
+): boolean {
+  if (!prevShift || prevShift === 'R') return true;
+  if (prevShift !== 'E' && prevShift !== 'L' && prevShift !== 'N') return true;
+  
+  const restHours = calculateRestHours(
+    shiftTimes[prevShift as 'E' | 'L' | 'N'].end,
+    shiftTimes[nextShift].start
+  );
+  
+  return restHours >= minRestHours;
 }
 
 // ============================================================================
@@ -140,12 +158,16 @@ function isEligible(ctx: EligibilityContext): boolean {
   // 3. Already assigned on this day
   if (staffAssignments.has(dateISO)) return false;
 
-  // 4. Illegal turnaround (previous day)
+  const shiftTimes = policy.shiftTimes || DEFAULT_SHIFT_TIMES;
   const dayIndex = days.indexOf(dateISO);
+
+  // 4. Minimum rest hours enforcement (previous day)
   if (dayIndex > 0) {
     const prevDate = days[dayIndex - 1];
     const prevShift = staffAssignments.get(prevDate);
-    if (isIllegalTurnaround(prevShift || null, shiftType)) return false;
+    if (!hasMinimumRest(prevShift || null, shiftType, shiftTimes, policy.minGapHoursBetweenShifts)) {
+      return false;
+    }
   }
 
   // 5. Consecutive days limit
@@ -186,13 +208,15 @@ function checkEligibilityWithReasons(ctx: EligibilityContext): { eligible: boole
     return { eligible: false, reasons };
   }
 
-  // 4. Illegal turnaround (previous day)
+  const shiftTimes = policy.shiftTimes || DEFAULT_SHIFT_TIMES;
   const dayIndex = days.indexOf(dateISO);
+
+  // 4. Minimum rest hours enforcement (previous day)
   if (dayIndex > 0) {
     const prevDate = days[dayIndex - 1];
     const prevShift = staffAssignments.get(prevDate);
-    if (isIllegalTurnaround(prevShift || null, shiftType)) {
-      reasons.push('illegal-turnaround');
+    if (!hasMinimumRest(prevShift || null, shiftType, shiftTimes, policy.minGapHoursBetweenShifts)) {
+      reasons.push('insufficient-rest-hours');
       return { eligible: false, reasons };
     }
   }
@@ -505,7 +529,10 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
   // STEP 3: Ensure all staff utilized (repair pass)
   ensureAllStaffUtilized(staff, days, currentAssignments, assigned, targets, policy, requirements);
 
-  // STEP 4: Build result
+  // STEP 4: Corrective pass - insert mandatory REST days where constraints violated
+  insertMandatoryRestDays(staff, days, currentAssignments, policy);
+
+  // STEP 5: Build result
   const result = buildResult(staff, days, currentAssignments, assigned, targets, requirements, unfilledShifts);
 
   logger.info('Corrective roster generation complete', {
@@ -535,6 +562,90 @@ function calculateTargets(requirements: CoverageRequirements, staffCount: number
     L: Math.round(totalL / staffCount),
     N: Math.round(totalN / staffCount),
   };
+}
+
+// ============================================================================
+// INSERT MANDATORY REST DAYS (CORRECTIVE PASS)
+// ============================================================================
+
+/**
+ * Corrective pass to enforce rest constraints after initial roster construction
+ * Inserts explicit REST days where:
+ * 1. MAX_CONSECUTIVE_DAYS would be violated
+ * 2. MAX_CONSECUTIVE_NIGHTS would be violated  
+ * 3. MIN_REST_HOURS would be violated by next shift
+ */
+function insertMandatoryRestDays(
+  staff: CorrectiveStaffMember[],
+  days: string[],
+  currentAssignments: Map<string, Map<string, ShiftCode>>,
+  policy: CorrectivePolicy
+) {
+  const shiftTimes = policy.shiftTimes || DEFAULT_SHIFT_TIMES;
+  let restDaysInserted = 0;
+
+  for (const s of staff) {
+    const staffMap = currentAssignments.get(s.id)!;
+    
+    for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+      const dateISO = days[dayIndex];
+      const currentShift = staffMap.get(dateISO);
+      
+      // Only check working days
+      if (!currentShift || currentShift === 'R') continue;
+      
+      // Check 1: Enforce rest after MAX_CONSECUTIVE_DAYS
+      const consecDays = countConsecutiveDaysBackward(s.id, dayIndex, days, staffMap);
+      if (consecDays >= policy.maxConsecDays - 1) {
+        // Force rest on next day(s)
+        for (let i = 1; i <= policy.minDaysOffAfterBlock && dayIndex + i < days.length; i++) {
+          const nextDate = days[dayIndex + i];
+          const nextShift = staffMap.get(nextDate);
+          if (nextShift && nextShift !== 'R') {
+            logger.info(`[REST-ENFORCE] Inserting REST for ${s.name} on ${nextDate} (consecutive days limit)`);
+            staffMap.set(nextDate, 'R');
+            restDaysInserted++;
+          }
+        }
+      }
+      
+      // Check 2: Enforce rest after MAX_CONSECUTIVE_NIGHTS
+      if (currentShift === 'N') {
+        const consecNights = countConsecutiveNightsBackward(s.id, dayIndex, days, staffMap);
+        if (consecNights >= policy.maxConsecNights - 1 && policy.preferRestAfterNights) {
+          // Force rest on next day
+          if (dayIndex + 1 < days.length) {
+            const nextDate = days[dayIndex + 1];
+            const nextShift = staffMap.get(nextDate);
+            if (nextShift && nextShift !== 'R') {
+              logger.info(`[REST-ENFORCE] Inserting REST for ${s.name} on ${nextDate} (consecutive nights limit)`);
+              staffMap.set(nextDate, 'R');
+              restDaysInserted++;
+            }
+          }
+        }
+      }
+      
+      // Check 3: Enforce minimum rest hours before next shift
+      if (dayIndex + 1 < days.length) {
+        const nextDate = days[dayIndex + 1];
+        const nextShift = staffMap.get(nextDate);
+        
+        if (nextShift && nextShift !== 'R' && 
+            (currentShift === 'E' || currentShift === 'L' || currentShift === 'N') &&
+            (nextShift === 'E' || nextShift === 'L' || nextShift === 'N')) {
+          
+          if (!hasMinimumRest(currentShift, nextShift, shiftTimes, policy.minGapHoursBetweenShifts)) {
+            logger.info(`[REST-ENFORCE] Inserting REST for ${s.name} on ${nextDate} (insufficient rest hours)`);
+            staffMap.set(nextDate, 'R');
+            restDaysInserted++;
+          }
+        }
+      }
+    }
+  }
+
+  logger.info(`[REST-ENFORCE] Corrective pass complete: ${restDaysInserted} REST days inserted`);
 }
 
 // ============================================================================

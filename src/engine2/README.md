@@ -16,17 +16,54 @@ Pure, deterministic primitives for:
 
 ## Roster Generation: Fairness & Rotation
 
-The corrective roster generator includes advanced fairness mechanisms to prevent the "same 5 staff" problem:
+The corrective roster generator includes advanced fairness mechanisms and **hard rest constraints** to prevent both the "same 5 staff" problem and WTD compliance violations:
 
-### Tunable Fairness Parameters
+### Hard Rest Constraints (Always Enforced)
+
+Before accepting any shift assignment, the generator validates:
+
+1. **Minimum Rest Hours**: Default 11h between consecutive shifts (configurable via `minGapHoursBetweenShifts`)
+   - Calculates actual rest hours using shift times (e.g., L ends 22:00, E starts 06:00 = 8h → blocked)
+   - Uses custom shift times if provided via `policy.shiftTimes`
+
+2. **Maximum Consecutive Days**: Default 6 working days (configurable via `maxConsecDays`)
+   - Forces REST days after hitting the limit
+   - Inserts `minDaysOffAfterBlock` rest days (default 2)
+
+3. **Maximum Consecutive Nights**: Default 3 night shifts (configurable via `maxConsecNights`)
+   - Automatically inserts REST day after night block when `preferRestAfterNights` enabled
+   - Night-specific constraint to reduce fatigue risk
+
+4. **Corrective Pass**: After initial roster construction, runs a second pass to:
+   - Insert explicit REST assignments where constraints violated
+   - Ensure no illegal turnarounds slipped through
+   - Log all enforced rest insertions for transparency
+
+### Tunable Fairness Parameters (Soft Preferences)
 
 ```typescript
 const policy = {
   ...DEFAULT_CORRECTIVE_POLICY,
-  fairnessWeight: 0.3,          // Variance penalty (0.2-0.4 recommended)
-  nightBalanceWeight: 0.4,      // Night shift fairness (0.2-0.4 recommended)
-  rotationPreference: 0.3,      // Rotation bonus (0-1, default 0.3)
-  variancePenaltyStrength: 1.0, // Multiplier for variance penalty
+  
+  // HARD CONSTRAINTS (enforced before accepting assignments)
+  maxConsecDays: 6,              // Max consecutive working days
+  minDaysOffAfterBlock: 2,       // Min rest days after work block
+  maxConsecNights: 3,             // Max consecutive night shifts
+  minGapHoursBetweenShifts: 11,  // Min rest hours between shifts
+  preferRestAfterNights: true,   // Insert rest after night blocks
+  
+  // SOFT FAIRNESS TUNING (preferences, coverage still dominates)
+  fairnessWeight: 0.3,           // Variance penalty (0.2-0.4 recommended)
+  nightBalanceWeight: 0.4,       // Night shift fairness (0.2-0.4 recommended)
+  rotationPreference: 0.3,       // Rotation bonus (0-1, default 0.3)
+  variancePenaltyStrength: 1.0,  // Multiplier for variance penalty
+  
+  // SHIFT TIMING (for rest calculations)
+  shiftTimes: {                  // Optional custom shift times
+    E: { start: '06:00', end: '14:00' },
+    L: { start: '14:00', end: '22:00' },
+    N: { start: '22:00', end: '06:00' }
+  }
 };
 ```
 
@@ -46,6 +83,8 @@ Uses seeded RNG based on roster start date for stable, reproducible results acro
 - Costs are reproducible and invariant to segment granularity.
 - Night/weekend/holiday tags are deterministic.
 - Fairness scoring is deterministic (seeded by roster start date).
+- **Rest constraints enforced**: No assignment violates min rest hours, max consecutive days, or max consecutive nights.
+- **Corrective pass completes**: All constraint violations are resolved with explicit REST assignments.
 
 ## Notes
 
