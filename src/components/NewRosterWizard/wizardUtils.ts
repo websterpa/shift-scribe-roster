@@ -60,7 +60,7 @@ export const isStepValid = (currentStep: number, config: RosterConfig): boolean 
     case 1:
       return Boolean(config.shiftType) && Boolean(config.operationalWindow);
     case 2:
-      return config.staffCount > 0 && config.cycleLength > 0;
+      return config.cycleLength > 0 && config.startDate !== '';
     case 3:
       return Boolean(config.template) && Boolean(config.rosterName.trim());
     default:

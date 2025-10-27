@@ -27,19 +27,15 @@ export function WizardStep2({ config, setConfig, staffList }: WizardStepProps) {
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="staffCount" className="text-base font-medium">Number of Staff</Label>
-              <Input
-                id="staffCount"
-                type="number"
-                min="1"
-                max={staffList.length}
-                value={config.staffCount}
-                onChange={(e) => setConfig(prev => ({ ...prev, staffCount: parseInt(e.target.value) || 0 }))}
-                className="mt-1"
-              />
-              <p className="text-sm text-muted-foreground mt-1">
-                Available: {staffList.length} staff members
-              </p>
+              <Label className="text-base font-medium">Staff Availability</Label>
+              <div className="mt-2 p-3 bg-muted rounded-md">
+                <p className="text-sm font-medium">
+                  {staffList.length} staff members will be considered
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  All active staff are eligible for assignment
+                </p>
+              </div>
             </div>
 
             <div>

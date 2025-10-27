@@ -14,7 +14,6 @@ export interface RosterConfig {
   operationalWindow: '16h' | '24h' | 'custom';
   customHours?: number;
   template: string;
-  staffCount: number;
   cycleLength: number;
   startDate: string;
   rosterName: string;

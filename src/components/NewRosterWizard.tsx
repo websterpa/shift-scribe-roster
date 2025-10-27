@@ -26,7 +26,6 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
     shiftType: '8h',
     operationalWindow: '24h',
     template: '',
-    staffCount: staffList.length,
     cycleLength: 7,
     startDate: new Date().toISOString().split('T')[0],
     rosterName: '',
@@ -50,7 +49,6 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
       setCurrentStep(1);
       setConfig(prev => ({
         ...prev,
-        staffCount: staffList.length,
         rosterName: `Roster - ${new Date().toLocaleDateString()}`
       }));
       
@@ -172,8 +170,10 @@ export function NewRosterWizard({ isOpen, onClose, onRosterGenerated, staffList 
 
       console.log('📊 NewRosterWizard: Generation config:', generationConfig);
 
+      console.log(`📊 NewRosterWizard: Using ${staffList.length} staff members for generation`);
+      
       await generateAndSaveRoster(
-        staffList.slice(0, config.staffCount), // Use only the specified number of staff
+        staffList, // Use all eligible staff members
         generationConfig,
         config.rosterName
       );
