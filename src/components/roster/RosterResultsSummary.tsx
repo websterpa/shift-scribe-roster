@@ -15,10 +15,10 @@ import {
   Moon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { RosterGenerationResult } from '@/features/roster/types';
+import { RosterGenerationResultUI } from '@/features/roster/types';
 
 interface RosterResultsSummaryProps {
-  result: RosterGenerationResult;
+  result: RosterGenerationResultUI;
 }
 
 export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ result }) => {

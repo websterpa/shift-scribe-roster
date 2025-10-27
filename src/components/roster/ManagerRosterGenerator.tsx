@@ -13,16 +13,17 @@ import { RosterResultsSummary } from './RosterResultsSummary';
 import { toast } from '@/hooks/use-toast';
 import { 
   ManagerRosterConfig, 
-  RosterGenerationResult 
+  RosterGenerationResultUI 
 } from '@/features/roster/types';
 
 // Re-export types for backwards compatibility
-export type { ManagerRosterConfig, RosterGenerationResult };
+export type { ManagerRosterConfig };
+export type RosterGenerationResult = RosterGenerationResultUI;
 
 interface ManagerRosterGeneratorProps {
-  onGenerateRoster: (config: ManagerRosterConfig) => Promise<RosterGenerationResult>;
+  onGenerateRoster: (config: ManagerRosterConfig) => Promise<RosterGenerationResultUI>;
   isGenerating?: boolean;
-  lastResult?: RosterGenerationResult | null;
+  lastResult?: RosterGenerationResultUI | null;
 }
 
 export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({

@@ -5,7 +5,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import { RosterResultsSummary } from '@/components/roster/RosterResultsSummary';
-import { RosterGenerationResult } from '@/features/roster/types';
+import { RosterGenerationResultUI } from '@/features/roster/types';
+type RosterGenerationResult = RosterGenerationResultUI;
 
 // Mock react-router-dom
 const mockNavigate = vi.fn();

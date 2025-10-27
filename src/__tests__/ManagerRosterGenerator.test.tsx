@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import { ManagerRosterGenerator } from '@/components/roster/ManagerRosterGenerator';
-import { ManagerRosterConfig, RosterGenerationResult } from '@/features/roster/types';
+import { ManagerRosterConfig, RosterGenerationResultUI } from '@/features/roster/types';
+type RosterGenerationResult = RosterGenerationResultUI;
 
 // Mock dependencies
 const mockToast = vi.fn();

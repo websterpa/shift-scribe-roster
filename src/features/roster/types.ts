@@ -1,6 +1,26 @@
 /**
  * Shared types for roster generation and results
+ * 
+ * This is the CANONICAL type definition file for all roster-related types.
+ * All imports should reference: @/features/roster/types
  */
+
+// ============================================================================
+// ELIGIBILITY & EXCLUSION TRACKING
+// ============================================================================
+
+export interface EligibilityReason {
+  code:
+    | 'inactive'
+    | 'wrongTenant'
+    | 'roleMismatch'
+    | 'unavailable'
+    | 'skillMissing'
+    | 'restViolationIfScheduled'
+    | 'siteMismatch'
+    | 'other';
+  detail?: string;
+}
 
 // ============================================================================
 // DIAGNOSTICS & DISTRIBUTION STATS
@@ -21,7 +41,21 @@ export interface DistributionStats {
   byShiftCode: Record<string, { count: number; hours?: number }>;
 }
 
-export interface RosterDiagnostics {
+export interface Diagnostics {
+  distributionStats: DistributionStats;
+  excludedStaff?: Array<{ 
+    staffId: string; 
+    name?: string; 
+    reasons: EligibilityReason[] 
+  }>;
+  fairnessScore?: number;
+  nightBalanceScore?: number;
+  constraintViolations?: Record<string, number>; // e.g. { minRest: 2, maxConsec: 1 }
+  seed?: string;
+}
+
+// Legacy format for backwards compatibility with CorrectiveResult
+export interface RosterDiagnosticsLegacy {
   staffPoolCount?: number;
   staffUsedCount?: number;
   distributionStats?: Record<string, {
@@ -40,10 +74,38 @@ export interface RosterDiagnostics {
 }
 
 // ============================================================================
+// ASSIGNMENTS
+// ============================================================================
+
+export interface Assignment {
+  id?: string;
+  date: string;
+  shift_code: 'E' | 'L' | 'N' | 'D';
+  staff_id: string;
+  site_id?: string;
+  role_id?: string;
+  start?: string;
+  end?: string;
+}
+
+// ============================================================================
 // ROSTER GENERATION RESULT
 // ============================================================================
 
+/**
+ * Primary roster generation result (modern format)
+ */
 export interface RosterGenerationResult {
+  assignments: Assignment[];
+  warnings?: string[];
+  diagnostics: Diagnostics;
+}
+
+/**
+ * UI/Manager-facing roster generation result
+ * (for components like ManagerRosterGenerator and RosterResultsSummary)
+ */
+export interface RosterGenerationResultUI {
   coverageAchieved: {
     total: number;
     byShift: Record<string, number>;
@@ -59,7 +121,7 @@ export interface RosterGenerationResult {
   };
   violations: string[];
   generatedVersionId?: string;
-  diagnostics?: RosterDiagnostics;
+  diagnostics?: RosterDiagnosticsLegacy;
 }
 
 // ============================================================================
