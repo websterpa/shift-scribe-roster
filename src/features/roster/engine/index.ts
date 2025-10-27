@@ -154,12 +154,17 @@ export {
  * - Rotation preference: Avoids reusing same staff consecutively
  * - Night balance: Additional fairness weight for night shifts
  * - Deterministic tie-breaking: Seeded RNG for reproducible results
+ * - Soft preferences: Distinguishes hard unavailability (leave) from preferences
+ *   - Hard: Strict filter (leave, contract limits, medical restrictions)
+ *   - Soft: Penalty-based (avoid days/shifts, expands usable pool beyond ~5)
+ *   - Tunable via preferencePenalty (default 0.15)
  * 
  * FAIRNESS TUNING PARAMETERS:
  * - fairnessWeight (0.2-0.4): Penalty for variance in total hours
  * - nightBalanceWeight (0.2-0.4): Additional weight for night shift balance
  * - rotationPreference (0-1): Bonus for not using same staff consecutively
  * - variancePenaltyStrength (default 1.0): Multiplier for variance penalty
+ * - preferencePenalty (0.1-0.2): Penalty for soft preference violations
  * 
  * METRICS LOGGED:
  * - Gini coefficient (0=perfect equality, 1=perfect inequality)

@@ -11,7 +11,11 @@ const logger = createLogger('CorrectiveRosterGenerator');
 export interface CorrectiveStaffMember {
   id: string;
   name: string;
-  availability: Record<string, boolean>; // dateISO -> available
+  availability: Record<string, boolean>; // dateISO -> hard availability (leave, contract limits)
+  softPreferences?: {
+    avoidDays?: string[];  // ISO dates they prefer not to work
+    avoidShifts?: Array<'E' | 'L' | 'N' | 'D'>;  // Shift types they prefer not to work
+  };
   isNightEligible?: boolean;
 }
 
@@ -42,6 +46,9 @@ export interface CorrectivePolicy {
   
   // SHIFT TIMING CONFIGURATION
   shiftTimes?: ShiftTimes;         // Optional shift times (defaults to standard 8h shifts)
+  
+  // SOFT PREFERENCE HANDLING
+  preferencePenalty: number;       // Penalty for violating soft preferences (0.1-0.2 recommended)
 }
 
 export interface CorrectiveInput {
@@ -105,6 +112,9 @@ export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = {
   
   // SHIFT TIMING (defaults to standard 8h shifts)
   shiftTimes: DEFAULT_SHIFT_TIMES,
+  
+  // SOFT PREFERENCE HANDLING (small penalty - coverage still dominates)
+  preferencePenalty: 0.15,
 };
 
 // ============================================================================
@@ -153,8 +163,11 @@ interface EligibilityContext {
 function isEligible(ctx: EligibilityContext): boolean {
   const { staffId, dateISO, shiftType, currentAssignments, staff, policy, days } = ctx;
 
-  // 1. Availability
+  // 1. HARD Availability (leave, contract limits) - must be respected
   if (!staff.availability[dateISO]) return false;
+  
+  // Note: Soft preferences (avoid days/shifts) are NOT checked here
+  // They are handled as penalties in the scoring function
 
   // 2. Night eligibility
   if (shiftType === 'N' && !staff.isNightEligible) return false;
@@ -194,11 +207,13 @@ function checkEligibilityWithReasons(ctx: EligibilityContext): { eligible: boole
   const { staffId, dateISO, shiftType, currentAssignments, staff, policy, days } = ctx;
   const reasons: string[] = [];
 
-  // 1. Availability
+  // 1. HARD Availability (leave, contract limits)
   if (!staff.availability[dateISO]) {
-    reasons.push('unavailable');
+    reasons.push('hard-unavailable');
     return { eligible: false, reasons };
   }
+  
+  // Note: Soft preferences are not rejection reasons - they add penalties instead
 
   // 2. Night eligibility
   if (shiftType === 'N' && !staff.isNightEligible) {
@@ -357,6 +372,37 @@ function calculatePriority(ctx: PriorityContext): number {
 }
 
 // ============================================================================
+// SOFT PREFERENCE PENALTY CALCULATION
+// ============================================================================
+
+/**
+ * Calculate penalty for violating soft preferences
+ * Returns 0 if no violation, preferencePenalty value if violated
+ */
+function calculatePreferencePenalty(
+  staff: CorrectiveStaffMember,
+  dateISO: string,
+  shiftType: 'E' | 'L' | 'N' | 'D',
+  policy: CorrectivePolicy
+): number {
+  if (!staff.softPreferences) return 0;
+  
+  let penalty = 0;
+  
+  // Check if this date is in avoid days
+  if (staff.softPreferences.avoidDays?.includes(dateISO)) {
+    penalty += policy.preferencePenalty;
+  }
+  
+  // Check if this shift type is in avoid shifts
+  if (staff.softPreferences.avoidShifts?.includes(shiftType)) {
+    penalty += policy.preferencePenalty;
+  }
+  
+  return penalty;
+}
+
+// ============================================================================
 // MAIN GENERATOR
 // ============================================================================
 
@@ -474,6 +520,13 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
           // Calculate hours (8h per shift)
           const aHours = (aStats.E * 8) + (aStats.L * 8) + (aStats.N * 8);
           const bHours = (bStats.E * 8) + (bStats.L * 8) + (bStats.N * 8);
+          
+          // 0. SOFT PREFERENCE PENALTY: Penalize (but don't exclude) preference violations
+          //    This allows wider staff pool while respecting preferences when possible
+          const aPrefPenalty = calculatePreferencePenalty(a, dateISO, shiftType, policy);
+          const bPrefPenalty = calculatePreferencePenalty(b, dateISO, shiftType, policy);
+          const prefDiff = aPrefPenalty - bPrefPenalty;
+          if (Math.abs(prefDiff) > 0.01) return prefDiff;
           
           // 1. FAIRNESS: Prioritize staff with lower total hours (reduces variance)
           //    Weight: Use fairnessWeight from policy (default 0.3)

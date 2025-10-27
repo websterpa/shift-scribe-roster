@@ -57,6 +57,7 @@ const policy = {
   nightBalanceWeight: 0.4,       // Night shift fairness (0.2-0.4 recommended)
   rotationPreference: 0.3,       // Rotation bonus (0-1, default 0.3)
   variancePenaltyStrength: 1.0,  // Multiplier for variance penalty
+  preferencePenalty: 0.15,       // Soft preference penalty (0.1-0.2 recommended)
   
   // SHIFT TIMING (for rest calculations)
   shiftTimes: {                  // Optional custom shift times
@@ -66,6 +67,38 @@ const policy = {
   }
 };
 ```
+
+### Availability: Hard vs Soft Constraints
+
+The generator distinguishes between **hard unavailability** (must respect) and **soft preferences** (try to avoid):
+
+**Hard Unavailability** (always enforced as eligibility filter):
+- Approved leave
+- Contract limitations
+- Medical restrictions
+- Staff set via `availability: { [dateISO]: false }`
+
+**Soft Preferences** (kept as candidates but penalized in scoring):
+- Preferred days off
+- Shift type preferences
+- Non-critical scheduling preferences
+- Staff set via `softPreferences: { avoidDays: [...], avoidShifts: [...] }`
+
+**Example:**
+```typescript
+const staff = [
+  {
+    id: 's1',
+    availability: { '2025-01-15': false },  // HARD: on leave, cannot work
+    softPreferences: {
+      avoidDays: ['2025-01-20'],             // SOFT: prefers not to work
+      avoidShifts: ['N']                     // SOFT: prefers to avoid nights
+    }
+  }
+];
+```
+
+This expands the usable staff pool beyond ~5 by keeping preference-violating candidates as fallback options, balanced via `preferencePenalty`.
 
 ### Fairness Metrics Logged
 
