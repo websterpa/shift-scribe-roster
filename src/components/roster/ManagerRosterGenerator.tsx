@@ -123,7 +123,7 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
         }
         
         // Archive existing assignments if any exist
-        if (existingAssignments && existingAssignments.length > 0) {
+        if (existingAssignments?.length) {
           const { data: { user } } = await supabase.auth.getUser();
           
           const { error: archiveError } = await supabase
@@ -133,7 +133,7 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
               month: selectedMonth,
               assignments: existingAssignments,
               archived_by: user?.id || null,
-              reason: 'Regeneration',
+              reason: 'Auto-archive before regeneration',
               version_id: existingAssignments[0]?.version_id || null
             });
           
@@ -146,6 +146,11 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
             logger.info('Archived existing assignments', { 
               selectedMonth, 
               count: existingAssignments.length 
+            });
+            
+            toast({
+              title: "Roster archived",
+              description: `Archived ${existingAssignments.length} assignments before regeneration`,
             });
           }
         }
@@ -175,9 +180,9 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
           archived: existingAssignments?.length || 0
         });
         
-        toast({
-          title: "Ready to generate",
-          description: `Archived ${existingAssignments?.length || 0} existing assignments for ${selectedMonth}`,
+        logger.info('Ready to generate new roster', { 
+          selectedMonth, 
+          archived: existingAssignments?.length || 0 
         });
       } catch (error) {
         logger.error(new Error('Archive/delete operation failed'), { error, selectedMonth, tenantId });
