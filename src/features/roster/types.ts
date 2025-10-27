@@ -159,4 +159,7 @@ export interface ManagerRosterConfig {
   
   // Coverage targets
   coverageTargets: string; // JSON string
+  
+  // Pattern mode
+  patternLocked?: boolean; // Enable pattern-based duty assignment
 }

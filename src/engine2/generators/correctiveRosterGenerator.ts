@@ -2,6 +2,9 @@ import type { ShiftCode } from "@/utils/constraints";
 import { createLogger } from "@/utils/errorLogger";
 import { calculateRestHours, DEFAULT_SHIFT_TIMES, type ShiftTimes } from "../constraints/wtdRules";
 import { loadTuning } from "@/features/roster/engine/tuning";
+import { loadSitePatterns, expandPatternOverRange, type PatternTemplate } from "@/features/roster/patterns";
+import { getTenantId } from "@/features/tenant/useTenant";
+import { toast } from "@/hooks/use-toast";
 
 const logger = createLogger('CorrectiveRosterGenerator');
 
@@ -442,10 +445,18 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
   logger.info('Starting corrective roster generation', { 
     staffCount: input.staff.length, 
     dayCount: input.days.length,
-    framework 
+    framework,
+    patternLocked: input.patternLocked || false,
   });
 
   const { days, staff, requirements, policy } = input;
+  
+  // Note: Pattern-locked mode requires async pattern loading
+  // It should be handled at a higher level (in the UI/adapter layer)
+  // before calling this generator
+  if (input.patternLocked) {
+    logger.warn('Pattern-locked mode requested but not yet implemented in generator. Use adapter layer for pattern expansion.');
+  }
   
   // Framework-aware shift types: 12h uses D/N only, 8h uses E/L/N
   const validShiftTypes = framework === '12h' ? ['D' as const, 'N' as const] : ['E' as const, 'L' as const, 'N' as const];

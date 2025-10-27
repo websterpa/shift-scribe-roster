@@ -49,6 +49,7 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
     budget: undefined,
     publicHolidayCap: undefined,
     allowSupervisorNights: false,
+    patternLocked: false,
     coverageTargets: JSON.stringify({
       "day_shift_staff": 2,
       "night_shift_staff": 2,
@@ -412,6 +413,15 @@ export const ManagerRosterGenerator: React.FC<ManagerRosterGeneratorProps> = ({
                   onCheckedChange={(checked) => handleConfigChange('allowSupervisorNights', checked)}
                 />
                 <Label htmlFor="allowSupervisorNights">Allow Supervisor Nights</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="patternLocked"
+                  checked={config.patternLocked || false}
+                  onCheckedChange={(checked) => handleConfigChange('patternLocked', checked)}
+                />
+                <Label htmlFor="patternLocked">Pattern-Locked Mode</Label>
               </div>
             </div>
           </div>
