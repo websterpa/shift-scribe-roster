@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { X, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndIS
   const [dismissed, setDismissed] = useState(false);
   const [hasEverShownWarning, setHasEverShownWarning] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const isInitialLoadRef = useRef(true);
 
   useEffect(() => {
     let cancel = false;
@@ -37,21 +38,32 @@ export default function DiagnosticsBanner({ versionId, monthStartISO, monthEndIS
       });
       setMissing(miss.sort());
       
-      // Persist warning once it appears
-      if (miss.length > 0 || (summary?.misses && summary.misses.length > 0)) {
-        setHasEverShownWarning(true);
+      // Track if we have any assignments at all
+      const hasAnyAssignments = assignments.length > 0;
+      
+      // Only show warning after initial load is complete AND we have assignments
+      // This prevents showing warnings on empty/new rosters before generation
+      if (!isInitialLoadRef.current && hasAnyAssignments) {
+        if (miss.length > 0 || (summary?.misses && summary.misses.length > 0)) {
+          setHasEverShownWarning(true);
+        }
       }
+      
+      // Mark initial load complete after first data fetch
+      isInitialLoadRef.current = false;
     })();
     return () => { cancel = true; };
   }, [versionId, monthStartISO, monthEndISO, assignments, summary]);
 
-  // Reset dismissed state when version changes
+  // Reset dismissed state and initial load tracking when version changes
   useEffect(() => {
     setDismissed(false);
     setHasEverShownWarning(false);
+    isInitialLoadRef.current = true;
   }, [versionId]);
 
-  if (!hasEverShownWarning || dismissed) return null;
+  // Don't show banner during initial load or if never shown warning or if dismissed
+  if (isInitialLoadRef.current || !hasEverShownWarning || dismissed) return null;
 
   const formatReason = (reason: string) => {
     const labels: Record<string, string> = {
