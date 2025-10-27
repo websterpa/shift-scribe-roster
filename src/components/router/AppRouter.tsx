@@ -30,6 +30,7 @@ import Wizard from '@/pages/Wizard';
 import RosterSummary from '@/pages/RosterSummary';
 import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';
 import RLSHelp from '@/pages/Admin/RLSHelp';
+import ArchivedRostersReport from '@/pages/ArchivedRostersReport';
 import NotFound from '@/pages/NotFound';
 
 export function AppRouter() {
@@ -56,6 +57,7 @@ export function AppRouter() {
               <Route path="manage-leave" element={<ManageLeave />} />
               <Route path="leave-requests" element={<LeaveRequests />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="reports/archived-rosters" element={<ArchivedRostersReport />} />
               <Route path="staffing-analysis" element={<StaffingAnalysis />} />
               <Route path="roster-testing" element={<RosterTesting />} />
               <Route path="test-pro" element={<TestPro />} />

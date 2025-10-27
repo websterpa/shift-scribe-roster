@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, DollarSign, TrendingUp, Users, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, DollarSign, TrendingUp, Users, Clock, AlertTriangle, CheckCircle, Archive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardStats } from '@/components/roster/DashboardStats';
 import { RosterHeatmap } from '@/components/roster/RosterHeatmap';
@@ -42,20 +42,30 @@ const ReportsPage = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/dashboard')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
+            <p className="text-muted-foreground">
+              Comprehensive insights into your roster performance and compliance
+            </p>
+          </div>
+        </div>
         <Button
           variant="outline"
-          size="icon"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/reports/archived-rosters')}
+          className="flex items-center gap-2"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <Archive className="h-4 w-4" />
+          Archived Rosters
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-muted-foreground">
-            Comprehensive insights into your roster performance and compliance
-          </p>
-        </div>
       </div>
 
       {/* Quick Stats Overview */}
