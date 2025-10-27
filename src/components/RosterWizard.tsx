@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import WizardHelp from "./WizardHelp";
 import InlineTip from "./InlineTip";
 import GettingStartedCard from "./GettingStartedCard";
+import { TuningDrawer } from "./roster/TuningDrawer";
 import { MANAGER_PAGE_PATH } from "@/config/app";
 
 type ShiftSystem = "8h" | "12h";
@@ -611,6 +612,8 @@ export default function RosterWizard() {
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold">Roster Wizard</h1>
         <div className="flex items-center gap-2">
+          <TuningDrawer />
+          
           <button 
             className="px-3 py-2 rounded-lg border bg-background hover:bg-muted transition-colors" 
             onClick={()=>setShowHelp(s=>!s)} 

@@ -1,6 +1,7 @@
 import type { ShiftCode } from "@/utils/constraints";
 import { createLogger } from "@/utils/errorLogger";
 import { calculateRestHours, DEFAULT_SHIFT_TIMES, type ShiftTimes } from "../constraints/wtdRules";
+import { loadTuning } from "@/features/roster/engine/tuning";
 
 const logger = createLogger('CorrectiveRosterGenerator');
 
@@ -104,33 +105,42 @@ export interface CorrectiveResult {
 // DEFAULT POLICY
 // ============================================================================
 
-export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = {
-  maxConsecDays: 6,
-  minDaysOffAfterBlock: 2,
-  maxConsecNights: 3,
-  minGapHoursBetweenShifts: 11,
-  weeklyHoursCap: 48,
-  fairShareWeight: 50,
-  nightFairnessWeight: 50,
-  preferRestAfterNights: true,
+/**
+ * Get default policy with latest tuning values from localStorage
+ */
+export function getDefaultPolicy(): CorrectivePolicy {
+  const tuning = loadTuning();
   
-  // ENHANCED FAIRNESS PARAMETERS
-  fairnessWeight: 0.3,           // Moderate variance penalty (coverage still dominates)
-  nightBalanceWeight: 0.4,       // Slightly higher for night shift fairness
-  rotationPreference: 0.3,       // Moderate preference for rotation
-  variancePenaltyStrength: 1.0,  // Standard variance penalty
-  
-  // SHIFT TIMING (defaults to standard 8h shifts)
-  shiftTimes: DEFAULT_SHIFT_TIMES,
-  
-  // SOFT PREFERENCE HANDLING (small penalty - coverage still dominates)
-  preferencePenalty: 0.15,
-  
-  // DISTRIBUTION TARGETS (caps to ensure fair distribution)
-  maxNightsPerCycle: 8,          // Maximum nights per staff per roster period
-  maxWeekendsPerCycle: 6,        // Maximum weekend days per staff per roster period
-  distributionPenalty: 0.5,      // Penalty multiplier when approaching caps
-};
+  return {
+    maxConsecDays: tuning.MAX_CONSECUTIVE_DAYS,
+    minDaysOffAfterBlock: 2,
+    maxConsecNights: tuning.MAX_CONSECUTIVE_NIGHTS,
+    minGapHoursBetweenShifts: tuning.MIN_REST_HOURS,
+    weeklyHoursCap: 48,
+    fairShareWeight: 50,
+    nightFairnessWeight: 50,
+    preferRestAfterNights: true,
+    
+    // ENHANCED FAIRNESS PARAMETERS (from tuning)
+    fairnessWeight: tuning.FAIRNESS_WEIGHT,
+    nightBalanceWeight: tuning.NIGHT_BALANCE_WEIGHT,
+    rotationPreference: 0.3,
+    variancePenaltyStrength: 1.0,
+    
+    // SHIFT TIMING (defaults to standard 8h shifts)
+    shiftTimes: DEFAULT_SHIFT_TIMES,
+    
+    // SOFT PREFERENCE HANDLING (from tuning)
+    preferencePenalty: tuning.PREFERENCE_PENALTY,
+    
+    // DISTRIBUTION TARGETS (from tuning)
+    maxNightsPerCycle: tuning.MAX_NIGHTS_PER_CYCLE,
+    maxWeekendsPerCycle: tuning.MAX_WEEKENDS_PER_CYCLE,
+    distributionPenalty: tuning.DISTRIBUTION_PENALTY,
+  };
+}
+
+export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = getDefaultPolicy();
 
 // ============================================================================
 // HELPER: REST HOURS CALCULATION (11h gap enforcement)
