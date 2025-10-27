@@ -157,6 +157,14 @@ export {
  * Generate a roster using the corrective algorithm with hard constraint enforcement
  * and fairness-based optimization. This is the canonical roster generation function.
  * 
+ * PATTERN-LOCKED MODE (NEW):
+ * - Set `patternLocked: true` in CorrectiveInput
+ * - Requires `tenantId` and optionally `siteId`
+ * - Uses staff patterns as primary source of duty assignments
+ * - Rest days (R) in patterns are NEVER overridden
+ * - Automatically remaps E/L → D for 12h framework
+ * - Generates duties only on pattern work days
+ * 
  * FRAMEWORK SUPPORT:
  * - 8h mode: Uses E (Early), L (Late), N (Night) shifts
  * - 12h mode: Uses D (Day), N (Night) shifts only
@@ -192,30 +200,34 @@ export {
  * - Min/max/mean hours distribution
  * - REST days enforced during corrective pass
  * 
- * @param input - Generation parameters (staff, requirements, policy, framework)
+ * @param input - Generation parameters (staff, requirements, policy, framework, patternLocked)
  * @returns Complete roster with assignments, fairness metrics, and diagnostics
  * 
  * @example
  * ```ts
- * // 8h framework (E/L/N shifts)
- * const result8h = generateCorrectiveRoster({
+ * // Standard mode (free assignment)
+ * const result = generateCorrectiveRoster({
  *   days: ['2025-01-10', '2025-01-11', '2025-01-12'],
  *   staff: [{ id: '1', name: 'John', availability: {}, isNightEligible: true }],
- *   requirements: { '2025-01-10': { E: 2, L: 2, N: 1 } },
- *   policy: { ...DEFAULT_CORRECTIVE_POLICY, fairnessWeight: 0.3 },
- *   framework: '8h'
+ *   requirements: { '2025-01-10': { D: 2, N: 1 } },
+ *   policy: DEFAULT_CORRECTIVE_POLICY,
+ *   framework: '12h'
  * });
  * 
- * // 12h framework (D/N shifts only)
- * const result12h = generateCorrectiveRoster({
+ * // Pattern-locked mode (pattern-based assignment)
+ * const resultLocked = generateCorrectiveRoster({
  *   days: ['2025-01-10', '2025-01-11'],
  *   staff: [{ id: '1', name: 'John', availability: {}, isNightEligible: true }],
  *   requirements: { '2025-01-10': { D: 2, N: 1 } },
- *   policy: { ...DEFAULT_CORRECTIVE_POLICY },
- *   framework: '12h'
+ *   policy: DEFAULT_CORRECTIVE_POLICY,
+ *   framework: '12h',
+ *   patternLocked: true,      // Enable pattern mode
+ *   tenantId: 'tenant-123',   // Required for pattern resolution
+ *   siteId: 'site-456'        // Optional site filter
  * });
  * ```
  */
+
 
 // ============================================================================
 // RE-EXPORTS: WTD ROSTER GENERATOR
@@ -286,6 +298,84 @@ export {
 // LEGACY COMPATIBILITY NOTES
 // ============================================================================
 
+// ============================================================================
+// RE-EXPORTS: PATTERN MANAGEMENT
+// ============================================================================
+
+export {
+  // Pattern types
+  type ShiftCode,
+  type ShiftSystem,
+  type StaffPattern,
+  type StaffPatternAssignment,
+  type ResolvedShift,
+  type PatternTemplate,
+  type StaffPatternBinding,
+  type ExpandedPatternDay,
+  type PatternLockedConfig,
+  
+  // Pattern loaders
+  loadSitePatterns,
+  loadCustomPatterns,
+  loadAllPatterns,
+  
+  // Pattern resolution
+  getStaffPatternBinding,
+  resolvePatternForStaff,
+  resolvePatternsBatch,
+  
+  // Pattern expansion
+  expandPatternOverRange,
+  expandPatternsBatch,
+  getShiftCodeForDate,
+  
+  // Pattern-locked generation
+  generatePatternLockedDuties,
+  isPatternRestDay,
+  type PatternDuty,
+  type PatternLockedInput,
+  type PatternLockedResult,
+} from '../patterns';
+
+/**
+ * Pattern management system for repeating shift schedules
+ * 
+ * Provides complete pattern lifecycle:
+ * - Loading patterns from database (site + custom)
+ * - Resolving patterns per staff (custom > site default)
+ * - Expanding patterns across date ranges
+ * - Pattern-locked roster generation
+ * 
+ * @example
+ * ```ts
+ * // Load patterns
+ * const patterns = await loadAllPatterns(tenantId);
+ * 
+ * // Resolve staff pattern
+ * const { template, binding } = await resolvePatternForStaff(
+ *   staffId, tenantId, siteId
+ * );
+ * 
+ * // Expand over dates
+ * const days = expandPatternOverRange(
+ *   template, binding, '2025-01-01', '2025-01-31'
+ * );
+ * 
+ * // Generate pattern-locked duties
+ * const duties = await generatePatternLockedDuties({
+ *   startDate: '2025-01-01',
+ *   endDate: '2025-01-31',
+ *   staffIds: ['staff-1', 'staff-2'],
+ *   tenantId: 'tenant-123',
+ *   framework: '12h'
+ * });
+ * ```
+ */
+
+// ============================================================================
+// LEGACY COMPATIBILITY NOTES
+// ============================================================================
+
 /**
  * MIGRATION GUIDE:
  * 
@@ -296,11 +386,19 @@ export {
  * - import { generateCorrectiveRoster } from '@/engine2/generators/correctiveRosterGenerator'
  * 
  * New imports:
- * - import { expandShift, costShift, validateRest, generateCorrectiveRoster } from '@/features/roster/engine'
+ * - import { 
+ *     expandShift, 
+ *     costShift, 
+ *     validateRest, 
+ *     generateCorrectiveRoster,
+ *     generatePatternLockedDuties,
+ *     resolvePatternForStaff
+ *   } from '@/features/roster/engine'
  * 
  * Benefits:
  * - Single canonical import path
  * - Consistent API surface
  * - Easier refactoring and testing
  * - Clear separation between engine internals and public API
+ * - Unified pattern management
  */

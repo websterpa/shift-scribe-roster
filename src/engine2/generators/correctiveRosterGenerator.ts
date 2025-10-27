@@ -63,6 +63,11 @@ export interface CorrectiveInput {
   requirements: CoverageRequirements;
   policy: CorrectivePolicy;
   framework?: '8h' | '12h'; // Optional framework (defaults to 8h)
+  
+  // PATTERN-LOCKED MODE
+  patternLocked?: boolean;  // If true, use pattern-based duty generation (default: false)
+  tenantId?: string;        // Required for pattern resolution when patternLocked=true
+  siteId?: string | null;   // Optional site ID for pattern resolution
 }
 
 export interface Assignment {
