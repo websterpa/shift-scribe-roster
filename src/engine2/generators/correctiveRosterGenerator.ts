@@ -49,6 +49,11 @@ export interface CorrectivePolicy {
   
   // SOFT PREFERENCE HANDLING
   preferencePenalty: number;       // Penalty for violating soft preferences (0.1-0.2 recommended)
+  
+  // DISTRIBUTION TARGETS (per cycle/roster period)
+  maxNightsPerCycle: number;       // Maximum nights per staff for the roster period (default 8)
+  maxWeekendsPerCycle: number;     // Maximum weekend days per staff for the roster period (default 6)
+  distributionPenalty: number;     // Penalty when approaching distribution caps (default 0.5)
 }
 
 export interface CorrectiveInput {
@@ -79,6 +84,11 @@ export interface CorrectiveResult {
   diagnostics: {
     staffPoolCount: number;
     staffUsedCount: number;
+    distributionStats: Record<string, {
+      nights: number;
+      weekendDays: number;
+      totalHours: number;
+    }>;
   };
   unfilledShifts?: Array<{ // Diagnostic: why shifts couldn't be filled
     dateISO: string;
@@ -115,6 +125,11 @@ export const DEFAULT_CORRECTIVE_POLICY: CorrectivePolicy = {
   
   // SOFT PREFERENCE HANDLING (small penalty - coverage still dominates)
   preferencePenalty: 0.15,
+  
+  // DISTRIBUTION TARGETS (caps to ensure fair distribution)
+  maxNightsPerCycle: 8,          // Maximum nights per staff per roster period
+  maxWeekendsPerCycle: 6,        // Maximum weekend days per staff per roster period
+  distributionPenalty: 0.5,      // Penalty multiplier when approaching caps
 };
 
 // ============================================================================
@@ -512,6 +527,22 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
         const meanHours = allTotals.reduce((a, b) => a + b, 0) / allTotals.length;
         const currentVariance = allTotals.reduce((sum, val) => sum + Math.pow(val - meanHours, 2), 0) / allTotals.length;
         
+        // Track distribution counts for penalty calculation
+        const getStaffDistribution = (staffId: string): { nights: number; weekendDays: number } => {
+          const staffMap = currentAssignments.get(staffId)!;
+          let nights = 0;
+          let weekendDays = 0;
+          
+          for (const [date, shift] of staffMap.entries()) {
+            if (shift === 'N') nights++;
+            if ((shift === 'E' || shift === 'L' || shift === 'N' || shift === 'D') && isWeekendDay(date)) {
+              weekendDays++;
+            }
+          }
+          
+          return { nights, weekendDays };
+        };
+        
         candidates.sort((a, b) => {
           const aStats = assigned[a.id];
           const bStats = assigned[b.id];
@@ -527,6 +558,54 @@ export function generateCorrectiveRoster(input: CorrectiveInput): CorrectiveResu
           const bPrefPenalty = calculatePreferencePenalty(b, dateISO, shiftType, policy);
           const prefDiff = aPrefPenalty - bPrefPenalty;
           if (Math.abs(prefDiff) > 0.01) return prefDiff;
+          
+          // 0.5. DISTRIBUTION PENALTY: Penalize staff approaching nights/weekends caps
+          //      This ensures fair distribution of nights and weekend shifts
+          const aDist = getStaffDistribution(a.id);
+          const bDist = getStaffDistribution(b.id);
+          
+          // Calculate penalties based on how close to cap
+          let aDistPenalty = 0;
+          let bDistPenalty = 0;
+          
+          // Night shift penalty (if assigning a night shift)
+          if (shiftType === 'N') {
+            const aCapRatio = aDist.nights / policy.maxNightsPerCycle;
+            const bCapRatio = bDist.nights / policy.maxNightsPerCycle;
+            
+            // Exponential penalty as approaching cap (penalty kicks in at 75% of cap)
+            if (aCapRatio > 0.75) {
+              aDistPenalty += Math.pow(aCapRatio - 0.75, 2) * policy.distributionPenalty * 10;
+            }
+            if (bCapRatio > 0.75) {
+              bDistPenalty += Math.pow(bCapRatio - 0.75, 2) * policy.distributionPenalty * 10;
+            }
+            
+            // Hard block if at cap
+            if (aDist.nights >= policy.maxNightsPerCycle) aDistPenalty += 1000;
+            if (bDist.nights >= policy.maxNightsPerCycle) bDistPenalty += 1000;
+          }
+          
+          // Weekend penalty (if assigning on weekend)
+          if (isWeekendDay(dateISO)) {
+            const aCapRatio = aDist.weekendDays / policy.maxWeekendsPerCycle;
+            const bCapRatio = bDist.weekendDays / policy.maxWeekendsPerCycle;
+            
+            // Exponential penalty as approaching cap (penalty kicks in at 75% of cap)
+            if (aCapRatio > 0.75) {
+              aDistPenalty += Math.pow(aCapRatio - 0.75, 2) * policy.distributionPenalty * 10;
+            }
+            if (bCapRatio > 0.75) {
+              bDistPenalty += Math.pow(bCapRatio - 0.75, 2) * policy.distributionPenalty * 10;
+            }
+            
+            // Hard block if at cap
+            if (aDist.weekendDays >= policy.maxWeekendsPerCycle) aDistPenalty += 1000;
+            if (bDist.weekendDays >= policy.maxWeekendsPerCycle) bDistPenalty += 1000;
+          }
+          
+          const distDiff = aDistPenalty - bDistPenalty;
+          if (Math.abs(distDiff) > 0.01) return distDiff;
           
           // 1. FAIRNESS: Prioritize staff with lower total hours (reduces variance)
           //    Weight: Use fairnessWeight from policy (default 0.3)
@@ -872,6 +951,15 @@ function ensureAllStaffUtilized(
 // BUILD RESULT
 // ============================================================================
 
+/**
+ * Helper: Check if a date is a weekend (Saturday or Sunday)
+ */
+function isWeekendDay(dateISO: string): boolean {
+  const date = new Date(dateISO);
+  const day = date.getDay();
+  return day === 0 || day === 6; // Sunday = 0, Saturday = 6
+}
+
 function buildResult(
   staff: CorrectiveStaffMember[],
   days: string[],
@@ -886,6 +974,7 @@ function buildResult(
   const coverage: Record<string, { E: number; L: number; N: number; D: number }> = {};
   const violations: string[] = [];
   const utilizationReport: Record<string, number> = {};
+  const distributionStats: Record<string, { nights: number; weekendDays: number; totalHours: number }> = {};
   
   // Count staff used
   let staffUsedCount = 0;
@@ -895,6 +984,9 @@ function buildResult(
     const staffMap = currentAssignments.get(s.id)!;
     roster[s.id] = {};
     let totalAssignments = 0;
+    let nightsCount = 0;
+    let weekendDaysCount = 0;
+    let totalHours = 0;
 
     for (const [dateISO, shiftCode] of staffMap.entries()) {
       roster[s.id][dateISO] = shiftCode;
@@ -902,11 +994,35 @@ function buildResult(
       if (shiftCode === 'E' || shiftCode === 'L' || shiftCode === 'N' || shiftCode === 'D') {
         assignments.push({ staffId: s.id, dateISO, shiftType: shiftCode });
         totalAssignments++;
+        
+        // Track nights
+        if (shiftCode === 'N') {
+          nightsCount++;
+        }
+        
+        // Track weekend days worked
+        if (isWeekendDay(dateISO)) {
+          weekendDaysCount++;
+        }
+        
+        // Calculate hours (8h for E/L/N, 12h for D)
+        if (shiftCode === 'D') {
+          totalHours += 12;
+        } else {
+          totalHours += 8;
+        }
       }
     }
 
     utilizationReport[s.id] = totalAssignments;
     if (totalAssignments > 0) staffUsedCount++;
+    
+    // Store distribution stats
+    distributionStats[s.id] = {
+      nights: nightsCount,
+      weekendDays: weekendDaysCount,
+      totalHours,
+    };
   }
 
   // Calculate coverage
@@ -973,6 +1089,20 @@ function buildResult(
     mean: totalHoursPerStaff.reduce((a, b) => a + b, 0) / totalHoursPerStaff.length,
   });
   
+  // Log distribution diagnostics
+  const nightsArray = Object.values(distributionStats).map(s => s.nights);
+  const weekendsArray = Object.values(distributionStats).map(s => s.weekendDays);
+  console.info("[DISTRIBUTION] Nights per staff:", {
+    min: Math.min(...nightsArray),
+    max: Math.max(...nightsArray),
+    avg: (nightsArray.reduce((a, b) => a + b, 0) / nightsArray.length).toFixed(1),
+  });
+  console.info("[DISTRIBUTION] Weekend days per staff:", {
+    min: Math.min(...weekendsArray),
+    max: Math.max(...weekendsArray),
+    avg: (weekendsArray.reduce((a, b) => a + b, 0) / weekendsArray.length).toFixed(1),
+  });
+  
   logger.info('Fairness metrics calculated', {
     shiftVariance: variance,
     hoursVariance,
@@ -994,6 +1124,7 @@ function buildResult(
     diagnostics: {
       staffPoolCount: staff.length,
       staffUsedCount,
+      distributionStats,
     },
     unfilledShifts: unfilledShifts.length > 0 ? unfilledShifts : undefined,
   };

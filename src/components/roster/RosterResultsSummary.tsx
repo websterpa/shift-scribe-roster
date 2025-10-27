@@ -11,7 +11,8 @@ import {
   Clock, 
   Calendar,
   TrendingUp,
-  Eye
+  Eye,
+  Moon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { RosterGenerationResult } from './ManagerRosterGenerator';
@@ -262,6 +263,43 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
             </div>
           </CardContent>
         </Card>
+
+        {/* Distribution Diagnostics - NEW */}
+        {result.diagnostics?.distributionStats && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Moon className="h-5 w-5" />
+                Distribution Balance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div className="text-muted-foreground">Nights Range</div>
+                  <div className="font-medium">
+                    {Math.min(...Object.values(result.diagnostics.distributionStats).map(s => s.nights))} - 
+                    {Math.max(...Object.values(result.diagnostics.distributionStats).map(s => s.nights))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Weekend Days Range</div>
+                  <div className="font-medium">
+                    {Math.min(...Object.values(result.diagnostics.distributionStats).map(s => s.weekendDays))} - 
+                    {Math.max(...Object.values(result.diagnostics.distributionStats).map(s => s.weekendDays))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Hours Range</div>
+                  <div className="font-medium">
+                    {Math.min(...Object.values(result.diagnostics.distributionStats).map(s => s.totalHours))}h - 
+                    {Math.max(...Object.values(result.diagnostics.distributionStats).map(s => s.totalHours))}h
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Violations */}
         {result.violations.length > 0 && (
