@@ -121,6 +121,53 @@ export async function generateAndSavePatternLockedRoster(
 
   console.log('✅ Pattern-locked roster saved successfully');
 
+  // Development diagnostics: Show per-staff assignment counts and pattern compliance
+  if (import.meta.env.DEV) {
+    console.groupCollapsed('🧮 Pattern-Locked Roster Diagnostics');
+    console.log(`Total assignments inserted: ${assignmentsWithVersion.length}`);
+    
+    // Calculate assignments per staff
+    const assignmentsByStaff = assignmentsWithVersion.reduce((acc, assignment) => {
+      const staffId = assignment.staff_id;
+      if (!acc[staffId]) {
+        acc[staffId] = { count: 0, shifts: [] };
+      }
+      acc[staffId].count++;
+      acc[staffId].shifts.push(assignment.shift_code);
+      return acc;
+    }, {} as Record<string, { count: number; shifts: string[] }>);
+
+    console.log('\n📊 Assignments per staff:');
+    Object.entries(assignmentsByStaff).forEach(([staffId, data]) => {
+      const shiftBreakdown = data.shifts.reduce((acc, shift) => {
+        acc[shift] = (acc[shift] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log(`  Staff ${staffId}: ${data.count} assignments`, shiftBreakdown);
+    });
+
+    // Calculate pattern compliance
+    const totalDays = input.endDate ? 
+      Math.ceil((new Date(input.endDate).getTime() - new Date(input.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1 :
+      31; // Default to month
+    const totalStaff = input.staffIds.length;
+    const expectedWorkDays = totalDays * totalStaff;
+    const complianceRate = (assignmentsWithVersion.length / expectedWorkDays) * 100;
+    
+    console.log(`\n✓ Pattern coverage: ${complianceRate.toFixed(1)}%`);
+    console.log(`  Total days: ${totalDays}`);
+    console.log(`  Staff count: ${totalStaff}`);
+    console.log(`  Work assignments: ${assignmentsWithVersion.length}`);
+    console.log(`  Average assignments/staff: ${(assignmentsWithVersion.length / totalStaff).toFixed(1)}`);
+
+    if (patternResult.warnings.length > 0) {
+      console.log('\n⚠️ Warnings:');
+      patternResult.warnings.forEach(warning => console.log(`  - ${warning}`));
+    }
+
+    console.groupEnd();
+  }
+
   return {
     success: true,
     warnings: patternResult.warnings,

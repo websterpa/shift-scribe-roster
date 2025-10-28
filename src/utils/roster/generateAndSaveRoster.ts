@@ -401,6 +401,55 @@ export async function generateAndSaveRoster(
     if (insertError) {
       return Promise.reject(insertError);
     }
+
+    // Development diagnostics: Show per-staff assignment counts and pattern compliance
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('🧮 Roster Generation Diagnostics');
+      console.log(`Total assignments inserted: ${assignmentsToInsert.length}`);
+      
+      // Calculate assignments per staff
+      const assignmentsByStaff = assignmentsToInsert.reduce((acc, assignment) => {
+        const staffId = assignment.staff_id;
+        if (!acc[staffId]) {
+          acc[staffId] = { count: 0, shifts: [] };
+        }
+        acc[staffId].count++;
+        acc[staffId].shifts.push(assignment.shift_code);
+        return acc;
+      }, {} as Record<string, { count: number; shifts: string[] }>);
+
+      console.log('\n📊 Assignments per staff:');
+      Object.entries(assignmentsByStaff).forEach(([staffId, data]) => {
+        const staffName = correctiveStaff.find(s => s.id === staffId)?.name || staffId;
+        const shiftBreakdown = data.shifts.reduce((acc, shift) => {
+          acc[shift] = (acc[shift] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log(`  ${staffName}: ${data.count} assignments`, shiftBreakdown);
+      });
+
+      // Calculate pattern compliance (if patterns were used)
+      const totalDays = days.length;
+      const totalStaff = correctiveStaff.length;
+      const expectedAssignments = totalDays * totalStaff;
+      const complianceRate = (assignmentsToInsert.length / expectedAssignments) * 100;
+      
+      console.log(`\n✓ Pattern compliance: ${complianceRate.toFixed(1)}%`);
+      console.log(`  Expected slots: ${expectedAssignments} (${totalStaff} staff × ${totalDays} days)`);
+      console.log(`  Actual assignments: ${assignmentsToInsert.length}`);
+      console.log(`  Unassigned slots: ${expectedAssignments - assignmentsToInsert.length}`);
+
+      // Utilization report from engine
+      if (result.utilizationReport) {
+        console.log('\n📈 Staff utilization:');
+        Object.entries(result.utilizationReport).forEach(([staffId, count]) => {
+          const staffName = correctiveStaff.find(s => s.id === staffId)?.name || staffId;
+          console.log(`  ${staffName}: ${count} shifts`);
+        });
+      }
+
+      console.groupEnd();
+    }
   }
 
   logger.info('Roster generation complete', { 
