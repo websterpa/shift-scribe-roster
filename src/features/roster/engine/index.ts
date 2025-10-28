@@ -336,10 +336,9 @@ export {
   type AbsenceRecord,
   
   // Adherence tracking
-  calculateStaffAdherence,
   calculatePatternAdherence,
   validatePatternAdherence,
-  type PatternAdherenceMetrics,
+  type StaffAdherenceMetrics,
   type PatternAdherenceSummary,
   
   // Pattern-locked generation

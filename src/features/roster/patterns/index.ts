@@ -72,10 +72,9 @@ export {
 // ============================================================================
 
 export {
-  calculateStaffAdherence,
   calculatePatternAdherence,
   validatePatternAdherence,
-  type PatternAdherenceMetrics,
+  type StaffAdherenceMetrics,
   type PatternAdherenceSummary,
 } from './adherence';
 

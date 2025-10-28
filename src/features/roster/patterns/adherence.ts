@@ -1,222 +1,224 @@
 /**
- * Pattern adherence tracking and diagnostics
- * 
- * Calculates how closely roster assignments follow staff patterns,
- * tracking matches, overrides, remaps, and absences.
+ * Pattern adherence diagnostics
+ * Validates that generated rosters match staff patterns and calculates compliance metrics
  */
 
-import type { ExpandedPatternDay } from './types';
-import type { Assignment } from '../types';
+import { supabase } from '@/integrations/supabase/client';
+import { differenceInCalendarDays } from 'date-fns';
+import type { ShiftCode, PatternTemplate, StaffPatternBinding } from './types';
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface PatternAdherenceMetrics {
+export interface StaffAdherenceMetrics {
   staffId: string;
-  staffName?: string;
-  expectedDutyDays: number;      // Work days in pattern (not R)
-  matchedDutyDays: number;        // Assignments on expected work days
-  adherencePct: number;           // matchedDutyDays / expectedDutyDays * 100
-  remappedELtoD?: number;         // E/L codes remapped to D (12h framework)
-  restPreservedDays?: number;     // R days with no assignment
-  absenceDays?: number;           // Days marked as absence (A)
+  staffName: string;
+  totalDays: number;
+  matchingDays: number;
+  deviations: number;
+  adherencePercent: number;
+  expectedPattern: string[]; // Pattern sequence
+  deviationDetails: Array<{
+    date: string;
+    expected: ShiftCode;
+    actual: ShiftCode;
+  }>;
 }
 
 export interface PatternAdherenceSummary {
-  byStaff: PatternAdherenceMetrics[];
-  overallAdherence: number;       // Average adherence across all staff
-  totalExpectedDays: number;
-  totalMatchedDays: number;
-  totalRestPreserved: number;
-  totalAbsenceDays: number;
-}
-
-// ============================================================================
-// ADHERENCE CALCULATION
-// ============================================================================
-
-/**
- * Calculate pattern adherence metrics for a single staff member
- * 
- * @param staffId - Staff member ID
- * @param expandedPattern - Expanded pattern days
- * @param assignments - Actual roster assignments for this staff
- * @param staffName - Optional staff name for display
- * @returns Adherence metrics
- */
-export function calculateStaffAdherence(
-  staffId: string,
-  expandedPattern: Array<ExpandedPatternDay & { absence?: 'A'; absenceType?: string }>,
-  assignments: Assignment[],
-  staffName?: string
-): PatternAdherenceMetrics {
-  console.log(`📊 Calculating adherence for staff: ${staffId}`);
-
-  // Create assignment lookup by date
-  const assignmentsByDate = new Map<string, Assignment>();
-  for (const assignment of assignments) {
-    if (assignment.staff_id === staffId) {
-      assignmentsByDate.set(assignment.date, assignment);
-    }
-  }
-
-  let expectedDutyDays = 0;
-  let matchedDutyDays = 0;
-  let remappedELtoD = 0;
-  let restPreservedDays = 0;
-  let absenceDays = 0;
-
-  for (const day of expandedPattern) {
-    const hasAssignment = assignmentsByDate.has(day.date);
-
-    // Track absences
-    if (day.absence === 'A') {
-      absenceDays++;
-      // Absence days should be rest (no assignment)
-      if (!hasAssignment) {
-        restPreservedDays++;
-      }
-      continue;
-    }
-
-    // Track rest days
-    if (day.is_rest) {
-      if (!hasAssignment) {
-        restPreservedDays++;
-      }
-      continue;
-    }
-
-    // Work day in pattern
-    expectedDutyDays++;
-
-    // Check if assignment matches pattern
-    const assignment = assignmentsByDate.get(day.date);
-    if (assignment) {
-      matchedDutyDays++;
-
-      // Track E/L → D remapping
-      if ((day.shift_code === 'E' || day.shift_code === 'L') && 
-          assignment.shift_code === 'D') {
-        remappedELtoD++;
-      }
-    }
-  }
-
-  const adherencePct = expectedDutyDays > 0 
-    ? (matchedDutyDays / expectedDutyDays) * 100 
-    : 100;
-
-  console.log(`✓ Adherence for ${staffId}: ${adherencePct.toFixed(1)}%`, {
-    expectedDutyDays,
-    matchedDutyDays,
-    restPreservedDays,
-    absenceDays,
-  });
-
-  return {
-    staffId,
-    staffName,
-    expectedDutyDays,
-    matchedDutyDays,
-    adherencePct,
-    remappedELtoD: remappedELtoD > 0 ? remappedELtoD : undefined,
-    restPreservedDays,
-    absenceDays: absenceDays > 0 ? absenceDays : undefined,
-  };
+  overallAdherence: number;
+  totalStaff: number;
+  fullyCompliant: number; // 100% adherence
+  mostlyCompliant: number; // >= 90% adherence
+  partiallyCompliant: number; // >= 70% adherence
+  nonCompliant: number; // < 70% adherence
+  staffMetrics: StaffAdherenceMetrics[];
+  generatedAt: string;
 }
 
 /**
- * Calculate pattern adherence for all staff members
+ * Calculate pattern adherence for a roster
+ * Compares actual assignments against expected pattern expansion
  * 
- * @param expansions - Pattern expansions by staff ID
- * @param assignments - All roster assignments
- * @param staffNames - Optional map of staff IDs to names
- * @returns Complete adherence summary
+ * @param versionId - Roster version to analyze
+ * @param startDate - Start of roster period (YYYY-MM-DD)
+ * @param endDate - End of roster period (YYYY-MM-DD)
+ * @returns Pattern adherence metrics
  */
-export function calculatePatternAdherence(
-  expansions: Map<string, Array<ExpandedPatternDay & { absence?: 'A'; absenceType?: string }>>,
-  assignments: Assignment[],
-  staffNames?: Map<string, string>
-): PatternAdherenceSummary {
-  console.log('📊 Calculating pattern adherence for all staff');
+export async function calculatePatternAdherence(
+  versionId: string,
+  startDate: string,
+  endDate: string
+): Promise<PatternAdherenceSummary> {
+  console.log('📊 Calculating pattern adherence for version:', versionId);
 
-  const byStaff: PatternAdherenceMetrics[] = [];
-  let totalExpectedDays = 0;
-  let totalMatchedDays = 0;
-  let totalRestPreserved = 0;
-  let totalAbsenceDays = 0;
+  // Fetch actual assignments
+  const { data: assignments, error: assignError } = await supabase
+    .from('roster_assignments')
+    .select('staff_id, date, shift_code')
+    .eq('version_id', versionId);
 
-  for (const [staffId, expandedPattern] of expansions.entries()) {
-    const staffName = staffNames?.get(staffId);
-    const metrics = calculateStaffAdherence(
-      staffId,
-      expandedPattern,
-      assignments,
-      staffName
-    );
-
-    byStaff.push(metrics);
-    totalExpectedDays += metrics.expectedDutyDays;
-    totalMatchedDays += metrics.matchedDutyDays;
-    totalRestPreserved += metrics.restPreservedDays || 0;
-    totalAbsenceDays += metrics.absenceDays || 0;
+  if (assignError || !assignments) {
+    throw new Error(`Failed to fetch assignments: ${assignError?.message}`);
   }
 
-  const overallAdherence = totalExpectedDays > 0
-    ? (totalMatchedDays / totalExpectedDays) * 100
-    : 100;
+  // Get unique staff IDs
+  const staffIds = Array.from(new Set(assignments.map(a => a.staff_id)));
 
-  console.log('✅ Overall pattern adherence:', {
+  // Fetch staff patterns and bindings
+  const { data: staffProfiles } = await supabase
+    .from('staff_profiles')
+    .select('id, first_name, last_name, name, pattern_id, pattern_offset')
+    .in('id', staffIds);
+
+  if (!staffProfiles || staffProfiles.length === 0) {
+    console.warn('No staff profiles found for adherence calculation');
+    return createEmptySummary();
+  }
+
+  const staffMetrics: StaffAdherenceMetrics[] = [];
+
+  // Calculate metrics for each staff member
+  for (const staff of staffProfiles) {
+    if (!staff.pattern_id) {
+      console.warn(`Staff ${staff.id} has no pattern - skipping adherence check`);
+      continue;
+    }
+
+    // Fetch pattern template
+    const { data: pattern } = await supabase
+      .from('site_patterns')
+      .select('id, name, sequence, system')
+      .eq('id', staff.pattern_id)
+      .maybeSingle();
+
+    if (!pattern || !pattern.sequence) {
+      console.warn(`Pattern ${staff.pattern_id} not found or has no sequence`);
+      continue;
+    }
+
+    // Calculate expected vs actual
+    const staffName = staff.name || `${staff.first_name} ${staff.last_name}`;
+    const patternSequence = (Array.isArray(pattern.sequence) 
+      ? pattern.sequence.filter((s): s is string => typeof s === 'string')
+      : []) as string[];
+    const patternOffset = staff.pattern_offset ?? 0;
+    const staffAssignments = assignments.filter(a => a.staff_id === staff.id);
+
+    const deviations: Array<{ date: string; expected: ShiftCode; actual: ShiftCode }> = [];
+    let matchingDays = 0;
+    let totalDays = 0;
+
+    // Compare each assignment against expected pattern
+    for (const assignment of staffAssignments) {
+      totalDays++;
+      
+      // Calculate expected shift code from pattern
+      const dateObj = new Date(assignment.date);
+      const anchor = new Date(startDate);
+      const daysSinceStart = differenceInCalendarDays(dateObj, anchor);
+      const patternIndex = (daysSinceStart + patternOffset) % patternSequence.length;
+      const expectedCode = patternSequence[patternIndex] as ShiftCode;
+      const actualCode = assignment.shift_code as ShiftCode;
+
+      if (expectedCode === actualCode) {
+        matchingDays++;
+      } else {
+        deviations.push({
+          date: assignment.date,
+          expected: expectedCode,
+          actual: actualCode,
+        });
+      }
+    }
+
+    const adherencePercent = totalDays > 0 ? (matchingDays / totalDays) * 100 : 0;
+
+    staffMetrics.push({
+      staffId: staff.id,
+      staffName,
+      totalDays,
+      matchingDays,
+      deviations: deviations.length,
+      adherencePercent,
+      expectedPattern: patternSequence,
+      deviationDetails: deviations.slice(0, 10), // Limit to first 10 for performance
+    });
+  }
+
+  // Calculate summary statistics
+  const fullyCompliant = staffMetrics.filter(m => m.adherencePercent === 100).length;
+  const mostlyCompliant = staffMetrics.filter(m => m.adherencePercent >= 90 && m.adherencePercent < 100).length;
+  const partiallyCompliant = staffMetrics.filter(m => m.adherencePercent >= 70 && m.adherencePercent < 90).length;
+  const nonCompliant = staffMetrics.filter(m => m.adherencePercent < 70).length;
+
+  const overallAdherence = staffMetrics.length > 0
+    ? staffMetrics.reduce((sum, m) => sum + m.adherencePercent, 0) / staffMetrics.length
+    : 0;
+
+  console.log('✅ Pattern adherence calculated:', {
     overallAdherence: `${overallAdherence.toFixed(1)}%`,
-    totalExpectedDays,
-    totalMatchedDays,
-    totalRestPreserved,
-    totalAbsenceDays,
+    fullyCompliant,
+    totalStaff: staffMetrics.length,
   });
 
   return {
-    byStaff,
     overallAdherence,
-    totalExpectedDays,
-    totalMatchedDays,
-    totalRestPreserved,
-    totalAbsenceDays,
+    totalStaff: staffMetrics.length,
+    fullyCompliant,
+    mostlyCompliant,
+    partiallyCompliant,
+    nonCompliant,
+    staffMetrics,
+    generatedAt: new Date().toISOString(),
   };
 }
 
 /**
- * Validate pattern adherence meets minimum threshold
- * 
- * @param summary - Adherence summary
- * @param minAdherencePct - Minimum acceptable adherence percentage (default: 95)
- * @returns Whether adherence meets threshold
+ * Create empty summary for cases with no data
+ */
+function createEmptySummary(): PatternAdherenceSummary {
+  return {
+    overallAdherence: 0,
+    totalStaff: 0,
+    fullyCompliant: 0,
+    mostlyCompliant: 0,
+    partiallyCompliant: 0,
+    nonCompliant: 0,
+    staffMetrics: [],
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Validate pattern adherence thresholds
+ * Returns pass/fail based on compliance targets
  */
 export function validatePatternAdherence(
   summary: PatternAdherenceSummary,
-  minAdherencePct: number = 95
-): { valid: boolean; violations: string[] } {
-  const violations: string[] = [];
+  thresholds: {
+    minOverallAdherence?: number; // Default: 95%
+    maxNonCompliantStaff?: number; // Default: 0
+  } = {}
+): { passed: boolean; issues: string[] } {
+  const {
+    minOverallAdherence = 95,
+    maxNonCompliantStaff = 0,
+  } = thresholds;
 
-  // Check overall adherence
-  if (summary.overallAdherence < minAdherencePct) {
-    violations.push(
-      `Overall adherence ${summary.overallAdherence.toFixed(1)}% below minimum ${minAdherencePct}%`
+  const issues: string[] = [];
+
+  if (summary.overallAdherence < minOverallAdherence) {
+    issues.push(
+      `Overall adherence ${summary.overallAdherence.toFixed(1)}% is below threshold ${minOverallAdherence}%`
     );
   }
 
-  // Check individual staff adherence
-  for (const staff of summary.byStaff) {
-    if (staff.adherencePct < minAdherencePct) {
-      violations.push(
-        `Staff ${staff.staffName || staff.staffId} adherence ${staff.adherencePct.toFixed(1)}% below minimum`
-      );
-    }
+  if (summary.nonCompliant > maxNonCompliantStaff) {
+    issues.push(
+      `${summary.nonCompliant} staff members have less than 70% adherence (max allowed: ${maxNonCompliantStaff})`
+    );
   }
 
   return {
-    valid: violations.length === 0,
-    violations,
+    passed: issues.length === 0,
+    issues,
   };
 }

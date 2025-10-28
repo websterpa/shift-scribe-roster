@@ -319,11 +319,67 @@ export async function generateAndSaveRoster(
   if (config.patternLocked) {
     logger.info('🔒 Pattern-locked mode enabled - generating from staff patterns');
     
+    // Step 1: Read and increment cycle index for rotation fairness
+    const currentCycleIndex = configData.cycle_index ?? 0;
+    const nextCycleIndex = currentCycleIndex + 1;
+    
+    logger.info('🔄 Applying fairness rotation', {
+      currentCycle: currentCycleIndex,
+      nextCycle: nextCycleIndex,
+    });
+    
+    // Update cycle index in database for next generation
+    await supabase
+      .from('roster_config')
+      .update({ cycle_index: nextCycleIndex })
+      .eq('id', configId);
+    
+    // Step 2: Apply rotation offset to staff patterns
+    // This rotates unpopular shifts across staff over multiple periods
+    const rotationOffset = currentCycleIndex % 8; // Assume max pattern length ~8
+    
+    for (const staff of dedupedStaffList) {
+      if (staff.pattern_id) {
+        // Fetch pattern length to apply proper rotation
+        const { data: patternData } = await supabase
+          .from('site_patterns')
+          .select('sequence')
+          .eq('id', staff.pattern_id)
+          .maybeSingle();
+        
+        if (patternData?.sequence) {
+          const patternLength = Array.isArray(patternData.sequence) 
+            ? patternData.sequence.length 
+            : 8;
+          
+          // Calculate rotated offset
+          const baseOffset = staff.pattern_offset ?? 0;
+          const rotatedOffset = (baseOffset + rotationOffset) % patternLength;
+          
+          // Update staff pattern offset in database for this generation
+          await supabase
+            .from('staff_profiles')
+            .update({ pattern_offset: rotatedOffset })
+            .eq('id', staff.id);
+          
+          // Update local copy
+          staff.pattern_offset = rotatedOffset;
+          
+          logger.info(`Rotated offset for staff ${staff.id}:`, {
+            base: baseOffset,
+            rotation: rotationOffset,
+            final: rotatedOffset,
+            patternLength,
+          });
+        }
+      }
+    }
+    
     // Import pattern generation utilities
     const { generatePatternLockedDuties } = await import('@/features/roster/patterns/generator');
     const { getTenantId } = await import('@/features/tenant/useTenant');
     
-    // Generate duties from patterns
+    // Step 3: Generate duties from rotated patterns
     const patternResult = await generatePatternLockedDuties({
       startDate: days[0],
       endDate: days[days.length - 1],

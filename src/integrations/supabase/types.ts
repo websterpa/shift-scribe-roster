@@ -335,6 +335,7 @@ export type Database = {
         Row: {
           config_name: string
           created_at: string | null
+          cycle_index: number | null
           cycle_length_weeks: number
           default_ot_hours: number | null
           default_ot_start_local_time: string | null
@@ -352,6 +353,7 @@ export type Database = {
         Insert: {
           config_name: string
           created_at?: string | null
+          cycle_index?: number | null
           cycle_length_weeks: number
           default_ot_hours?: number | null
           default_ot_start_local_time?: string | null
@@ -369,6 +371,7 @@ export type Database = {
         Update: {
           config_name?: string
           created_at?: string | null
+          cycle_index?: number | null
           cycle_length_weeks?: number
           default_ot_hours?: number | null
           default_ot_start_local_time?: string | null
