@@ -1,12 +1,9 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, CheckCircle } from 'lucide-react';
-
 export const HeroSection = () => {
-  return (
-    <section className="bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 py-20 relative overflow-hidden">
+  return <section className="bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 py-20 relative overflow-hidden">
       {/* Background gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-indigo-600/5"></div>
       
@@ -14,7 +11,7 @@ export const HeroSection = () => {
         <div className="text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
             Effortless Shift
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 block">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 block my-0 py-[5px]">
               Roster Management
             </span>
           </h1>
@@ -54,6 +51,5 @@ export const HeroSection = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
