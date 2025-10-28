@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { PatternLibrary } from '@/components/patterns/PatternLibrary';
 import { PatternEditor } from '@/components/patterns/PatternEditor';
 import { PatternTestingInterface } from '@/components/patterns/PatternTestingInterface';
+import { PatternStaffAssignment } from '@/components/patterns/PatternStaffAssignment';
 import { COMMON_PATTERNS } from '@/components/patterns/constants';
 
 interface Pattern {
@@ -30,6 +31,8 @@ export default function PatternManagement() {
   const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+  const [patternForAssignment, setPatternForAssignment] = useState<Pattern | null>(null);
   
   const { user, isAuthenticated } = useSupabaseAuth();
   const navigate = useNavigate();
@@ -217,6 +220,17 @@ export default function PatternManagement() {
     setEditingPattern(null);
   };
 
+  const handleAssignToStaff = (pattern: Pattern) => {
+    console.log('👥 Opening staff assignment for pattern:', pattern.name);
+    setPatternForAssignment(pattern);
+    setAssignmentDialogOpen(true);
+  };
+
+  const handleAssignmentComplete = () => {
+    console.log('✅ Pattern assignment completed, reloading patterns');
+    loadCustomPatterns();
+  };
+
   const commonPatterns = COMMON_PATTERNS[selectedShiftType].map(pattern => ({
     ...pattern,
     shift_type: selectedShiftType,
@@ -293,6 +307,7 @@ export default function PatternManagement() {
                 onDuplicatePattern={handleDuplicatePattern}
                 onDeletePattern={handleDeletePattern}
                 onUsePattern={handleUsePattern}
+                onAssignToStaff={handleAssignToStaff}
                 isLoading={isLoading}
               />
             </TabsContent>
@@ -323,6 +338,14 @@ export default function PatternManagement() {
           </div>
         )}
       </div>
+
+      {/* Staff Assignment Dialog */}
+      <PatternStaffAssignment
+        pattern={patternForAssignment}
+        open={assignmentDialogOpen}
+        onOpenChange={setAssignmentDialogOpen}
+        onAssignmentComplete={handleAssignmentComplete}
+      />
     </div>
   );
 }

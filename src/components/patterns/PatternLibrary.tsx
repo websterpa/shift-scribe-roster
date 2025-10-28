@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Edit, Copy, Trash, Star } from 'lucide-react';
+import { Search, Plus, Edit, Copy, Trash, Star, Users } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Pattern {
   id: string;
@@ -26,6 +27,7 @@ interface PatternLibraryProps {
   onDuplicatePattern: (pattern: Pattern) => void;
   onDeletePattern: (patternId: string) => void;
   onUsePattern: (pattern: Pattern) => void;
+  onAssignToStaff?: (pattern: Pattern) => void;
   isLoading?: boolean;
 }
 
@@ -49,9 +51,41 @@ export function PatternLibrary({
   onDuplicatePattern,
   onDeletePattern,
   onUsePattern,
+  onAssignToStaff,
   isLoading = false
 }: PatternLibraryProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [patternStaffCounts, setPatternStaffCounts] = useState<Record<string, number>>({});
+
+  // Load staff counts for each pattern
+  useEffect(() => {
+    loadPatternStaffCounts();
+  }, [customPatterns]);
+
+  const loadPatternStaffCounts = async () => {
+    try {
+      const patternIds = customPatterns.map(p => p.id);
+      if (patternIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('staff_profiles')
+        .select('pattern_id')
+        .in('pattern_id', patternIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      data?.forEach(row => {
+        if (row.pattern_id) {
+          counts[row.pattern_id] = (counts[row.pattern_id] || 0) + 1;
+        }
+      });
+
+      setPatternStaffCounts(counts);
+    } catch (error) {
+      console.error('Error loading pattern staff counts:', error);
+    }
+  };
 
   const filteredCustomPatterns = customPatterns.filter(pattern =>
     pattern.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -63,24 +97,33 @@ export function PatternLibrary({
     pattern.pattern.join('').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const PatternCard = ({ pattern, isCustom = false }: { pattern: Pattern; isCustom?: boolean }) => (
-    <Card className="relative hover:shadow-md transition-shadow" data-testid="pattern-card">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-base flex items-center gap-2">
-              {pattern.name}
-              {isCustom && <Star className="h-4 w-4 text-yellow-500" />}
-            </CardTitle>
-            <div className="text-sm text-muted-foreground mt-1">
-              {pattern.shift_type} • {pattern.pattern.length}-day cycle
+  const PatternCard = ({ pattern, isCustom = false }: { pattern: Pattern; isCustom?: boolean }) => {
+    const staffCount = isCustom ? patternStaffCounts[pattern.id] || 0 : 0;
+    
+    return (
+      <Card className="relative hover:shadow-md transition-shadow" data-testid="pattern-card">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                {pattern.name}
+                {isCustom && <Star className="h-4 w-4 text-yellow-500" />}
+              </CardTitle>
+              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                <span>{pattern.shift_type} • {pattern.pattern.length}-day cycle</span>
+                {isCustom && staffCount > 0 && (
+                  <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {staffCount}
+                  </Badge>
+                )}
+              </div>
             </div>
+            <Badge variant="outline" className="text-xs">
+              {pattern.shift_type}
+            </Badge>
           </div>
-          <Badge variant="outline" className="text-xs">
-            {pattern.shift_type}
-          </Badge>
-        </div>
-      </CardHeader>
+        </CardHeader>
       <CardContent className="space-y-3">
         {/* Pattern Preview */}
         <div className="flex flex-wrap gap-1">
@@ -95,22 +138,37 @@ export function PatternLibrary({
         </div>
         
         {/* Actions */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            size="sm"
-            onClick={() => onUsePattern(pattern)}
-            className="flex-1"
-          >
-            Use Pattern
-          </Button>
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => onUsePattern(pattern)}
+              className="flex-1"
+            >
+              Use Pattern
+            </Button>
+            {isCustom && onAssignToStaff && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onAssignToStaff(pattern)}
+                className="flex items-center gap-1"
+              >
+                <Users className="h-3 w-3" />
+                Assign
+              </Button>
+            )}
+          </div>
           {isCustom ? (
-            <>
+            <div className="flex gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onEditPattern(pattern)}
+                className="flex-1"
               >
-                <Edit className="h-3 w-3" />
+                <Edit className="h-3 w-3 mr-1" />
+                Edit
               </Button>
               <Button
                 size="sm"
@@ -130,6 +188,11 @@ export function PatternLibrary({
                     <AlertDialogTitle>Delete Pattern</AlertDialogTitle>
                     <AlertDialogDescription>
                       Are you sure you want to delete "{pattern.name}"? This action cannot be undone.
+                      {staffCount > 0 && (
+                        <span className="block mt-2 text-destructive font-medium">
+                          Warning: {staffCount} staff member(s) are currently assigned to this pattern.
+                        </span>
+                      )}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -143,20 +206,23 @@ export function PatternLibrary({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            </>
+            </div>
           ) : (
             <Button
               size="sm"
               variant="outline"
               onClick={() => onDuplicatePattern(pattern)}
+              className="w-full"
             >
-              <Copy className="h-3 w-3" />
+              <Copy className="h-3 w-3 mr-1" />
+              Duplicate
             </Button>
           )}
         </div>
       </CardContent>
     </Card>
   );
+};
 
   return (
     <div className="space-y-6">
