@@ -66,6 +66,11 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
           <div className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
             Roster Generation Results
+            {result.patternLocked && (
+              <Badge className="bg-green-100 text-green-800 border-green-300">
+                🔒 Pattern-Locked
+              </Badge>
+            )}
           </div>
           {result.generatedVersionId && (
             <Button onClick={handleViewRoster} variant="outline" size="sm">

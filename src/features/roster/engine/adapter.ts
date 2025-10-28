@@ -328,7 +328,8 @@ export function transformCorrectiveResult(
 export function transformToUIResult(
   engineResult: CorrectiveResult,
   versionId?: string,
-  budgetSet?: number
+  budgetSet?: number,
+  patternLocked?: boolean
 ): RosterGenerationResultUI {
   console.log('✓ Adapter: Transforming to UI result format');
   
@@ -369,5 +370,6 @@ export function transformToUIResult(
     violations: engineResult.violations,
     generatedVersionId: versionId,
     diagnostics: engineResult.diagnostics,
+    patternLocked,
   };
 }

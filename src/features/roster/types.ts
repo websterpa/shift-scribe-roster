@@ -148,6 +148,7 @@ export interface RosterGenerationResultUI {
   violations: string[];
   generatedVersionId?: string;
   diagnostics?: Diagnostics | RosterDiagnosticsLegacy; // Support both formats
+  patternLocked?: boolean; // Flag indicating pattern-locked generation mode
 }
 
 // ============================================================================

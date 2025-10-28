@@ -30,6 +30,7 @@ export async function generateAndSaveRoster(
   wtrResult?: { violations: unknown[] };
   costResult?: { totalCost: number; averageCost: number; breakdown: Record<string, unknown> };
   generatorResult?: CorrectiveResult;
+  patternLocked?: boolean;
 }> {
   // Extract config properties - handle both new and legacy formats
   const configId = config.configId || config.id;
@@ -469,6 +470,63 @@ export async function generateAndSaveRoster(
       assignmentsCount: result.assignments.length,
       staffUsed: patternResult.staffWithPatterns.length
     });
+    
+    // 🧮 PATTERN COMPLIANCE DIAGNOSTICS (Development only)
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('🧮 Pattern Compliance Report');
+      
+      // Group assignments by staff
+      const grouped = result.assignments.reduce((acc, assignment) => {
+        if (!acc[assignment.staffId]) {
+          acc[assignment.staffId] = [];
+        }
+        acc[assignment.staffId].push(assignment);
+        return acc;
+      }, {} as Record<string, Array<{ staffId: string; dateISO: string; shiftType: string }>>);
+      
+      // Calculate compliance for each staff member
+      for (const [staffId, assignments] of Object.entries(grouped)) {
+        const staff = dedupedStaffList.find(s => s.id === staffId);
+        if (!staff?.pattern_id) continue;
+        
+        // Fetch pattern sequence
+        const { data: patternData } = await supabase
+          .from('site_patterns')
+          .select('sequence')
+          .eq('id', staff.pattern_id)
+          .maybeSingle();
+        
+        if (!patternData?.sequence) continue;
+        
+        const patternSequence = Array.isArray(patternData.sequence)
+          ? patternData.sequence.filter((s): s is string => typeof s === 'string')
+          : [];
+        
+        if (patternSequence.length === 0) continue;
+        
+        // Compare actual vs expected
+        const shifts = assignments.map(a => a.shiftType);
+        const patternOffset = staff.pattern_offset ?? 0;
+        
+        let matches = 0;
+        shifts.forEach((actualShift, index) => {
+          const patternIndex = (index + patternOffset) % patternSequence.length;
+          const expectedShift = patternSequence[patternIndex];
+          if (actualShift === expectedShift) {
+            matches++;
+          }
+        });
+        
+        const compliancePct = shifts.length > 0 ? (matches / shifts.length * 100) : 0;
+        const staffName = staff.name || `${staff.first_name} ${staff.last_name}`;
+        
+        console.log(
+          `${compliancePct >= 95 ? '✅' : compliancePct >= 80 ? '⚠️' : '❌'} Staff ${staffName}: ${compliancePct.toFixed(1)}% compliant (${matches}/${shifts.length} matches)`
+        );
+      }
+      
+      console.groupEnd();
+    }
   } else {
     // COVERAGE-FIRST MODE: Use traditional corrective generator
     logger.info('📊 Coverage-first mode - using corrective generator');
@@ -677,6 +735,7 @@ export async function generateAndSaveRoster(
     wtrResult: { violations: result.violations },
     costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
     generatorResult: result, // Pass through full engine result with diagnostics
+    patternLocked: config.patternLocked ?? false, // Pass through pattern-locked mode flag
   };
 }
 
