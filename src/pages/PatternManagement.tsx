@@ -160,6 +160,8 @@ export default function PatternManagement() {
     setIsSaving(true);
 
     try {
+      let savedPatternId: string | null = null;
+
       if (editingPattern?.id) {
         // Update existing pattern
         const { error } = await supabase
@@ -178,13 +180,15 @@ export default function PatternManagement() {
 
         if (error) throw error;
 
+        savedPatternId = editingPattern.id;
+
         toast({
           title: "Pattern updated",
           description: `"${patternData.name}" has been updated`,
         });
       } else {
-        // Create new pattern
-        const { error } = await supabase
+        // Create new pattern - get the ID back
+        const { data, error } = await supabase
           .from('custom_patterns')
           .insert({
             user_id: user.id,
@@ -195,9 +199,13 @@ export default function PatternManagement() {
             teams_required: patternData.teams_required,
             is_wtd_compliant: patternData.is_wtd_compliant,
             description: patternData.description
-          });
+          })
+          .select('id')
+          .single();
 
         if (error) throw error;
+
+        savedPatternId = data?.id || null;
 
         toast({
           title: "Pattern created",
@@ -208,6 +216,25 @@ export default function PatternManagement() {
       setViewMode('library');
       setEditingPattern(null);
       await loadCustomPatterns();
+
+      // Open staff assignment dialog for newly created patterns
+      if (savedPatternId && !editingPattern?.id) {
+        console.log('👥 Opening staff assignment for newly created pattern:', savedPatternId);
+        const newPattern: Pattern = {
+          id: savedPatternId,
+          name: patternData.name,
+          pattern: patternData.pattern,
+          shift_type: patternData.shift_type,
+          created_at: new Date().toISOString(),
+          cycle_length: patternData.cycle_length,
+          avg_weekly_hours: patternData.avg_weekly_hours,
+          teams_required: patternData.teams_required,
+          is_wtd_compliant: patternData.is_wtd_compliant,
+          description: patternData.description,
+        };
+        setPatternForAssignment(newPattern);
+        setAssignmentDialogOpen(true);
+      }
     } catch (error: any) {
       console.error('❌ PatternManagement: Exception saving pattern:', error);
       toast({
