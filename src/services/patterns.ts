@@ -9,9 +9,9 @@ export type SavedPattern = {
   name: string;
   system: "8h" | "12h";
   sequence: PatternToken[];
-  repeat_weeks: number;
+  cycle_length: number;
   avg_weekly_hours?: number;
-  crews_required?: number;
+  teams_required?: number;
   is_wtd_compliant?: boolean;
   description?: string;
   created_at: string;
@@ -22,7 +22,7 @@ export async function listPatterns(siteId: string): Promise<SavedPattern[]> {
   // TODO(tenant): Add tenant_id filter when site_patterns table has tenant_id column
   const { data, error } = await supabase
     .from("site_patterns")
-    .select("id,site_id,created_by,name,system,sequence,repeat_weeks,created_at")
+    .select("id,site_id,created_by,name,system,sequence,cycle_length,created_at")
     .eq("site_id", siteId)
     // .eq("tenant_id", getTenantId()) // Uncomment when column exists
     .order("created_at", { ascending: false });
@@ -41,9 +41,9 @@ export async function savePattern(args: {
   name: string;
   system: "8h" | "12h";
   sequence: PatternToken[];
-  repeatWeeks: number;
+  cycleLength: number;
   avgWeeklyHours?: number;
-  crewsRequired?: number;
+  teamsRequired?: number;
   isWtdCompliant?: boolean;
   description?: string;
 }): Promise<{ ok: boolean; id?: string }> {
@@ -61,9 +61,9 @@ export async function savePattern(args: {
       name: args.name?.trim() || "Untitled pattern",
       system: args.system,
       sequence: args.sequence,
-      repeat_weeks: args.repeatWeeks,
+      cycle_length: args.cycleLength,
       avg_weekly_hours: args.avgWeeklyHours,
-      crews_required: args.crewsRequired,
+      teams_required: args.teamsRequired,
       is_wtd_compliant: args.isWtdCompliant,
       description: args.description,
       // tenant_id: getTenantId(), // Uncomment when column exists

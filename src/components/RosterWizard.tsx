@@ -407,7 +407,7 @@ export default function RosterWizard() {
         name: name.trim(),
         system: state.system,
         sequence: (state.pattern as any).sequence,
-        repeatWeeks: state.weeks
+        cycleLength: state.weeks
       });
 
       if (result.ok) {

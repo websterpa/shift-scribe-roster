@@ -17,9 +17,9 @@ interface PatternEditorProps {
     name: string;
     pattern: string[];
     shift_type: '8h' | '12h';
-    repeat_weeks?: number;
+    cycle_length?: number;
     avg_weekly_hours?: number;
-    crews_required?: number;
+    teams_required?: number;
     is_wtd_compliant?: boolean;
     description?: string;
   };
@@ -28,9 +28,9 @@ interface PatternEditorProps {
     name: string; 
     pattern: string[]; 
     shift_type: '8h' | '12h';
-    repeat_weeks?: number;
+    cycle_length?: number;
     avg_weekly_hours?: number;
-    crews_required?: number;
+    teams_required?: number;
     is_wtd_compliant?: boolean;
     description?: string;
   }) => void;
@@ -65,9 +65,9 @@ export function PatternEditor({
   const [name, setName] = useState(pattern?.name || '');
   const [shiftType, setShiftType] = useState<'8h' | '12h'>(pattern?.shift_type || '8h');
   const [patternCodes, setPatternCodes] = useState<string[]>(pattern?.pattern || ['R']);
-  const [repeatWeeks, setRepeatWeeks] = useState(pattern?.repeat_weeks || 17);
+  const [cycleLength, setCycleLength] = useState(pattern?.cycle_length || 17);
   const [avgWeeklyHours, setAvgWeeklyHours] = useState(pattern?.avg_weekly_hours || 37.5);
-  const [crewsRequired, setCrewsRequired] = useState(pattern?.crews_required || 5);
+  const [teamsRequired, setTeamsRequired] = useState(pattern?.teams_required || 5);
   const [isWtdCompliant, setIsWtdCompliant] = useState(pattern?.is_wtd_compliant ?? true);
   const [description, setDescription] = useState(pattern?.description || '');
 
@@ -108,9 +108,9 @@ export function PatternEditor({
         name: name.trim(),
         pattern: patternCodes,
         shift_type: shiftType,
-        repeat_weeks: repeatWeeks,
+        cycle_length: cycleLength,
         avg_weekly_hours: avgWeeklyHours,
-        crews_required: crewsRequired,
+        teams_required: teamsRequired,
         is_wtd_compliant: isWtdCompliant,
         description: description.trim() || undefined
       });
@@ -197,8 +197,8 @@ export function PatternEditor({
                   type="number"
                   min="1"
                   max="52"
-                  value={repeatWeeks}
-                  onChange={(e) => setRepeatWeeks(parseInt(e.target.value) || 17)}
+                  value={cycleLength}
+                  onChange={(e) => setCycleLength(parseInt(e.target.value) || 17)}
                   placeholder="17"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -230,8 +230,8 @@ export function PatternEditor({
                   type="number"
                   min="1"
                   max="10"
-                  value={crewsRequired}
-                  onChange={(e) => setCrewsRequired(parseInt(e.target.value) || 5)}
+                  value={teamsRequired}
+                  onChange={(e) => setTeamsRequired(parseInt(e.target.value) || 5)}
                   placeholder="5"
                 />
                 <p className="text-xs text-muted-foreground">

@@ -10,7 +10,7 @@ vi.mock("@/integrations/supabase/client", () => {
     name: "4D–4R–4N–4R",
     system: "12h",
     sequence: ["D","D","D","D","R","R","R","R","N","N","N","N","R","R","R","R"],
-    repeat_weeks: 17,
+    cycle_length: 17,
     created_at: new Date().toISOString()
   }];
 
@@ -39,7 +39,7 @@ describe("patterns service (Supabase)", () => {
       name: "My Pattern",
       system: "12h",
       sequence: ["D","D","R","R"],
-      repeatWeeks: 17
+      cycleLength: 17
     });
     expect(res.ok).toBe(true);
     expect(res.id).toBeDefined();

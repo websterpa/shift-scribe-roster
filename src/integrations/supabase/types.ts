@@ -482,43 +482,46 @@ export type Database = {
           avg_weekly_hours: number | null
           created_at: string
           created_by: string
-          crews_required: number | null
+          cycle_length: number
           description: string | null
           id: string
           is_wtd_compliant: boolean | null
           name: string
-          repeat_weeks: number
           sequence: Json
           site_id: string
           system: string
+          teams_required: number | null
+          tenant_id: string | null
         }
         Insert: {
           avg_weekly_hours?: number | null
           created_at?: string
           created_by: string
-          crews_required?: number | null
+          cycle_length?: number
           description?: string | null
           id?: string
           is_wtd_compliant?: boolean | null
           name: string
-          repeat_weeks?: number
           sequence: Json
           site_id: string
           system: string
+          teams_required?: number | null
+          tenant_id?: string | null
         }
         Update: {
           avg_weekly_hours?: number | null
           created_at?: string
           created_by?: string
-          crews_required?: number | null
+          cycle_length?: number
           description?: string | null
           id?: string
           is_wtd_compliant?: boolean | null
           name?: string
-          repeat_weeks?: number
           sequence?: Json
           site_id?: string
           system?: string
+          teams_required?: number | null
+          tenant_id?: string | null
         }
         Relationships: []
       }

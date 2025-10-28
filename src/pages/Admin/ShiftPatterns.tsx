@@ -91,7 +91,7 @@ export default function ShiftPatterns() {
         name: patternData.name,
         system: patternData.system,
         sequence: patternData.sequence as any,
-        repeatWeeks: Math.ceil(patternData.sequence.length / 7),
+        cycleLength: Math.ceil(patternData.sequence.length / 7),
       });
 
       if (result.ok) {

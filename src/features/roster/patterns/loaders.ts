@@ -88,9 +88,9 @@ export async function loadSitePatterns(tenantId: string): Promise<PatternTemplat
       const patternLength = sequence.length;
 
       // Validate pattern_length matches sequence length
-      if (row.repeat_weeks && patternLength !== row.repeat_weeks * 7) {
+      if (row.cycle_length && patternLength !== row.cycle_length * 7) {
         console.warn(
-          `⚠️ Pattern "${row.name}" has mismatched length: sequence=${patternLength}, repeat_weeks=${row.repeat_weeks}`
+          `⚠️ Pattern "${row.name}" has mismatched length: sequence=${patternLength}, cycle_length=${row.cycle_length}`
         );
         // Not a hard error - just log warning
       }

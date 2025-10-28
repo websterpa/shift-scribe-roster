@@ -20,9 +20,9 @@ interface Pattern {
   pattern: string[];
   shift_type: '8h' | '12h';
   created_at: string;
-  repeat_weeks?: number;
+  cycle_length?: number;
   avg_weekly_hours?: number;
-  crews_required?: number;
+  teams_required?: number;
   is_wtd_compliant?: boolean;
   description?: string;
 }
@@ -148,9 +148,9 @@ export default function PatternManagement() {
     name: string; 
     pattern: string[]; 
     shift_type: '8h' | '12h';
-    repeat_weeks?: number;
+    cycle_length?: number;
     avg_weekly_hours?: number;
-    crews_required?: number;
+    teams_required?: number;
     is_wtd_compliant?: boolean;
     description?: string;
   }) => {
@@ -169,7 +169,7 @@ export default function PatternManagement() {
             pattern: patternData.pattern,
             shift_type: patternData.shift_type,
             avg_weekly_hours: patternData.avg_weekly_hours,
-            crews_required: patternData.crews_required,
+            teams_required: patternData.teams_required,
             is_wtd_compliant: patternData.is_wtd_compliant,
             description: patternData.description
           })
@@ -192,7 +192,7 @@ export default function PatternManagement() {
             pattern: patternData.pattern,
             shift_type: patternData.shift_type,
             avg_weekly_hours: patternData.avg_weekly_hours,
-            crews_required: patternData.crews_required,
+            teams_required: patternData.teams_required,
             is_wtd_compliant: patternData.is_wtd_compliant,
             description: patternData.description
           });
