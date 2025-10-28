@@ -1176,17 +1176,36 @@ function buildResult(
     staffCountForAvg++;
     
     if (!wtdResult.valid) {
+      // Record the opted-out status from staff data
+      const hasOptedOut = s.wtd_opt_out ?? false;
+      
       wtdStaffViolations.push({
         staffId: s.id,
         staffName: s.name,
         violations: wtdResult.violations,
-        optedOut: false,
+        optedOut: hasOptedOut,
       });
       
-      logger.warn('WTD violations detected for staff', {
-        staffId: s.id,
-        violations: wtdResult.violations,
-      });
+      // Only log warning for non-opted-out staff
+      if (!hasOptedOut) {
+        logger.warn('WTD violations detected for non-opted-out staff', {
+          staffId: s.id,
+          staffName: s.name,
+          violations: wtdResult.violations,
+        });
+        
+        // Show toast warning for non-opted-out staff with violations
+        toast({
+          title: "⚠️ WTD Limit Exceeded",
+          description: `${s.name} exceeds WTD working time limits. Consider reviewing their schedule.`,
+          variant: "default",
+        });
+      } else {
+        logger.info('WTD check skipped for opted-out staff', {
+          staffId: s.id,
+          staffName: s.name,
+        });
+      }
     } else {
       compliantStaffCount++;
     }

@@ -355,30 +355,45 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
                       {wtd.staffViolations.map((staff) => (
                         <div 
                           key={staff.staffId}
-                          className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
+                          className={`p-3 rounded-lg border ${
+                            staff.optedOut 
+                              ? 'bg-blue-50 border-blue-200' 
+                              : 'bg-yellow-50 border-yellow-200'
+                          }`}
                         >
-                          <div className="font-medium text-sm mb-1">
+                          <div className="font-medium text-sm mb-1 flex items-center gap-2">
                             {staff.staffName || staff.staffId}
-                            {staff.optedOut && (
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                Opted Out
+                            {staff.optedOut ? (
+                              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-300">
+                                🟢 WTD Opted Out
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800 border-yellow-300">
+                                ⚠️ Not Opted Out
                               </Badge>
                             )}
                           </div>
-                          <ul className="text-xs text-muted-foreground space-y-1">
-                            {staff.violations.map((violation, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="text-yellow-600">•</span>
-                                <span>{violation}</span>
-                              </li>
-                            ))}
-                          </ul>
+                          {staff.optedOut ? (
+                            <div className="text-xs text-blue-700 flex items-center gap-2">
+                              <CheckCircle className="h-3 w-3" />
+                              WTD check skipped — staff opted out
+                            </div>
+                          ) : (
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              {staff.violations.map((violation, idx) => (
+                                <li key={idx} className="flex items-start gap-2">
+                                  <span className="text-yellow-600">•</span>
+                                  <span>{violation}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       ))}
                     </div>
                     <div className="text-xs text-muted-foreground bg-yellow-50 p-2 rounded border border-yellow-200">
                       <strong>Note:</strong> WTD violations are shown as warnings. Staff who have opted out of the 48-hour limit 
-                      or patterns requiring adjustments should be reviewed. Consider adjusting shift patterns or verifying opt-out status.
+                      are shown in blue. Non-opted-out staff should be reviewed and schedules adjusted if needed.
                     </div>
                   </div>
                 )}
