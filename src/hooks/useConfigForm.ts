@@ -16,6 +16,7 @@ export interface ConfigFormData {
   default_ot_hours?: number;
   default_ot_start_local_time?: string;
   pattern?: string[];
+  patternLocked?: boolean; // If true, use pattern-based roster generation
   staffing_requirements?: {
     day_shift_staff?: number;
     night_shift_staff?: number;
@@ -42,6 +43,7 @@ export function useConfigForm() {
     default_ot_hours: 4,
     default_ot_start_local_time: '10:00',
     pattern: [],
+    patternLocked: true, // Default to pattern-based generation
     staffing_requirements: {
       day_shift_staff: 2,
       night_shift_staff: 2,
@@ -120,6 +122,7 @@ export function useConfigForm() {
         default_ot_hours: data.default_ot_hours || undefined,
         default_ot_start_local_time: data.default_ot_start_local_time || undefined,
         pattern: pattern,
+        patternLocked: true, // Default to pattern-based generation
         staffing_requirements: staffingRequirements
       });
     } catch (error) {

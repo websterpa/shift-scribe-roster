@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Settings } from 'lucide-react';
 import { ConfigFormData } from '@/hooks/useConfigForm';
 
@@ -162,6 +163,35 @@ export const ConfigForm = ({ formData, onFormDataChange }: ConfigFormProps) => {
             min="1"
             max="24"
           />
+        </div>
+
+        <div className="space-y-4 border-t pt-4">
+          <h4 className="text-sm font-semibold text-muted-foreground">Roster Generation Mode</h4>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="pattern_locked" className="text-base">
+                Pattern-Locked Rosters
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Generate rosters by expanding each staff member's assigned shift pattern
+              </p>
+            </div>
+            <Switch
+              id="pattern_locked"
+              checked={formData.patternLocked ?? true}
+              onCheckedChange={(checked) => handleFieldChange('patternLocked', checked)}
+            />
+          </div>
+
+          <div className="bg-muted/20 p-3 rounded-md">
+            <p className="text-xs text-muted-foreground">
+              <strong>ℹ️ Pattern-Locked Mode:</strong> When enabled, each staff member's roster is generated 
+              from their assigned repeating pattern (e.g., 2E-2L-2N-2R). This respects collectively 
+              agreed patterns and produces predictable, fair cycles. When disabled, the system uses 
+              coverage-first allocation.
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>

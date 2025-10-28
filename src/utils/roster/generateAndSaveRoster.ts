@@ -309,18 +309,148 @@ export async function generateAndSaveRoster(
   logger.info('Generating roster with corrective engine', { 
     staffCount: correctiveStaff.length,
     daysCount: days.length,
-    sampleRequirements: requirements[days[0]]
+    sampleRequirements: requirements[days[0]],
+    patternLocked: config.patternLocked
   });
 
-  // Generate roster using corrective engine
-  const result = generateCorrectiveRoster({
-    days,
-    staff: correctiveStaff,
-    requirements,
-    policy: DEFAULT_CORRECTIVE_POLICY,
-  });
+  let result: CorrectiveResult;
 
-  logger.info('Corrective roster generated', { 
+  // PATTERN-LOCKED MODE: Use staff-specific pattern expansion
+  if (config.patternLocked) {
+    logger.info('🔒 Pattern-locked mode enabled - expanding staff patterns');
+    
+    // Import pattern expansion utilities
+    const { expandPatternForStaff } = await import('@/features/roster/engine/expandPatternForStaff');
+    type StaffPatternExpansion = import('@/features/roster/engine/expandPatternForStaff').StaffPatternExpansion;
+    
+    // Fetch patterns for all staff members
+    const staffPatternExpansions: StaffPatternExpansion[] = [];
+    
+    for (const staff of dedupedStaffList) {
+      if (!staff.pattern_id) {
+        logger.warn(`Staff ${staff.name} has no pattern assigned - skipping`);
+        continue;
+      }
+      
+      // Fetch pattern from database
+      const { data: patternData, error: patternError } = await supabase
+        .from('site_patterns')
+        .select('id, name, sequence')
+        .eq('id', staff.pattern_id)
+        .maybeSingle();
+      
+      if (patternError || !patternData) {
+        logger.error(new Error(`Failed to fetch pattern for staff ${staff.name}`), { error: patternError });
+        continue;
+      }
+      
+      // Validate and cast sequence
+      const patternSequence = Array.isArray(patternData.sequence) 
+        ? patternData.sequence.filter((s): s is string => typeof s === 'string')
+        : [];
+      
+      if (patternSequence.length === 0) {
+        logger.warn(`Pattern ${patternData.name} has empty sequence - skipping staff ${staff.name}`);
+        continue;
+      }
+      
+      staffPatternExpansions.push({
+        staffId: staff.id,
+        staffName: staff.name || `${staff.first_name} ${staff.last_name}`,
+        pattern: patternSequence,
+        patternOffset: staff.pattern_offset ?? 0,
+        startDate: days[0],
+        endDate: days[days.length - 1]
+      });
+    }
+    
+    logger.info(`Expanding patterns for ${staffPatternExpansions.length} staff members`);
+    
+    // Expand all patterns
+    const allExpandedAssignments: Array<{ date: string; staffId: string; shiftCode: string }> = [];
+    for (const expansion of staffPatternExpansions) {
+      const expanded = expandPatternForStaff(expansion);
+      allExpandedAssignments.push(...expanded);
+    }
+    
+    logger.info(`Generated ${allExpandedAssignments.length} pattern-based assignments`);
+    
+    // Convert to CorrectiveResult format for compatibility with downstream code
+    const assignmentsByDate: Record<string, Array<{ staffId: string; shiftCode: string }>> = {};
+    allExpandedAssignments.forEach(a => {
+      if (!assignmentsByDate[a.date]) {
+        assignmentsByDate[a.date] = [];
+      }
+      assignmentsByDate[a.date].push({ staffId: a.staffId, shiftCode: a.shiftCode });
+    });
+    
+    // Calculate coverage
+    const coverage: Record<string, { E: number; L: number; N: number; D: number }> = {};
+    days.forEach(dateISO => {
+      const dayAssignments = assignmentsByDate[dateISO] || [];
+      coverage[dateISO] = {
+        E: dayAssignments.filter(a => a.shiftCode === 'E').length,
+        L: dayAssignments.filter(a => a.shiftCode === 'L').length,
+        N: dayAssignments.filter(a => a.shiftCode === 'N').length,
+        D: dayAssignments.filter(a => a.shiftCode === 'D').length,
+      };
+    });
+    
+    // Calculate staff totals
+    const staffTotals: Record<string, { E: number; L: number; N: number; D: number; total: number }> = {};
+    allExpandedAssignments.forEach(a => {
+      if (!staffTotals[a.staffId]) {
+        staffTotals[a.staffId] = { E: 0, L: 0, N: 0, D: 0, total: 0 };
+      }
+      const key = a.shiftCode as 'E' | 'L' | 'N' | 'D';
+      staffTotals[a.staffId][key]++;
+      staffTotals[a.staffId].total++;
+    });
+    
+    // Build result in CorrectiveResult format
+    result = {
+      assignments: allExpandedAssignments
+        .filter(a => ['E', 'L', 'N', 'D'].includes(a.shiftCode))
+        .map(a => ({
+          staffId: a.staffId,
+          dateISO: a.date,
+          shiftType: a.shiftCode as 'E' | 'L' | 'N' | 'D'
+        })),
+      roster: {}, // Not needed for pattern-locked mode
+      coverage,
+      fairness: {
+        staffTotals,
+        targets: { E: 0, L: 0, N: 0, D: 0 }, // Not relevant for pattern-locked
+        variance: { E: 0, L: 0, N: 0, D: 0 }
+      },
+      violations: [],
+      utilizationReport: Object.fromEntries(
+        Object.entries(staffTotals).map(([id, totals]) => [id, totals.total])
+      ),
+      diagnostics: {
+        staffPoolCount: correctiveStaff.length,
+        staffUsedCount: staffPatternExpansions.length,
+        distributionStats: {}
+      }
+    };
+    
+    logger.info('Pattern-locked roster generation complete', {
+      assignmentsCount: result.assignments.length,
+      staffUsed: staffPatternExpansions.length
+    });
+  } else {
+    // COVERAGE-FIRST MODE: Use traditional corrective generator
+    logger.info('📊 Coverage-first mode - using corrective generator');
+    
+    result = generateCorrectiveRoster({
+      days,
+      staff: correctiveStaff,
+      requirements,
+      policy: DEFAULT_CORRECTIVE_POLICY,
+    });
+  }
+
+  logger.info('Roster generated', { 
     assignmentsCount: result.assignments.length,
     utilizationReport: result.utilizationReport
   });
