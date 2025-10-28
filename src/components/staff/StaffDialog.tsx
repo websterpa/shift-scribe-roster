@@ -33,6 +33,15 @@ interface StaffMember {
   eligible_shifts?: string[];
   is_shift_worker?: boolean;
   opted_out_wtd?: boolean;
+  pattern_id?: string | null;
+  pattern_offset?: number;
+}
+
+interface SitePattern {
+  id: string;
+  name: string;
+  system: string;
+  sequence: string[];
 }
 
 interface StaffDialogProps {
@@ -65,6 +74,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
 }) => {
   const { user, isAuthenticated } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
+  const [patterns, setPatterns] = useState<SitePattern[]>([]);
   const [formData, setFormData] = useState<Partial<StaffMember>>({
     employee_id: '',
     first_name: '',
@@ -84,43 +94,103 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
     max_hours_per_week: 48,
     eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
     is_shift_worker: true,
-    opted_out_wtd: true
+    opted_out_wtd: true,
+    pattern_id: null,
+    pattern_offset: 0
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Fetch available patterns
   useEffect(() => {
-    if (staffMember) {
-      setFormData({
-        ...staffMember,
-        hire_date: staffMember.hire_date || new Date().toISOString().split('T')[0],
-        eligible_shifts: staffMember.eligible_shifts || ['Early', 'Late', 'Night', 'Day'],
-        availability_status: staffMember.availability_status || 'active'
-      });
-    } else {
-      setFormData({
-        employee_id: '',
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        hire_date: new Date().toISOString().split('T')[0],
-        is_active: true,
-        availability_status: 'active',
-        unavailability_reason: '',
-        unavailable_from: '',
-        expected_return_date: '',
-        unavailability_notes: '',
-        role: 'CCTV Operator',
-        hourly_rate: 15.50,
-        min_hours_per_week: 37,
-        max_hours_per_week: 48,
-        eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
-        is_shift_worker: true,
-        opted_out_wtd: true
-      });
+    const fetchPatterns = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('site_patterns')
+        .select('id, name, system, sequence')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching patterns:', error);
+        return;
+      }
+      
+      // Cast sequence from Json to string[]
+      const typedPatterns: SitePattern[] = (data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        system: p.system,
+        sequence: Array.isArray(p.sequence) 
+          ? p.sequence.filter((s): s is string => typeof s === 'string')
+          : []
+      }));
+      
+      setPatterns(typedPatterns);
+    };
+    
+    if (open) {
+      fetchPatterns();
     }
-    setErrors({});
-  }, [staffMember, open]);
+  }, [open, user]);
+
+  useEffect(() => {
+    const initializeForm = async () => {
+      if (staffMember) {
+        setFormData({
+          ...staffMember,
+          hire_date: staffMember.hire_date || new Date().toISOString().split('T')[0],
+          eligible_shifts: staffMember.eligible_shifts || ['Early', 'Late', 'Night', 'Day'],
+          availability_status: staffMember.availability_status || 'active',
+          pattern_offset: staffMember.pattern_offset ?? 0
+        });
+      } else {
+        // For new staff, auto-assign first available pattern
+        let defaultPatternId = null;
+        
+        if (user) {
+          const { data } = await supabase
+            .from('site_patterns')
+            .select('id')
+            .eq('created_by', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          defaultPatternId = data?.id || null;
+        }
+        
+        setFormData({
+          employee_id: '',
+          first_name: '',
+          last_name: '',
+          email: '',
+          phone: '',
+          hire_date: new Date().toISOString().split('T')[0],
+          is_active: true,
+          availability_status: 'active',
+          unavailability_reason: '',
+          unavailable_from: '',
+          expected_return_date: '',
+          unavailability_notes: '',
+          role: 'CCTV Operator',
+          hourly_rate: 15.50,
+          min_hours_per_week: 37,
+          max_hours_per_week: 48,
+          eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
+          is_shift_worker: true,
+          opted_out_wtd: true,
+          pattern_id: defaultPatternId,
+          pattern_offset: 0
+        });
+      }
+      setErrors({});
+    };
+    
+    if (open) {
+      initializeForm();
+    }
+  }, [staffMember, open, user]);
 
   const handleInputChange = (field: keyof StaffMember, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -181,6 +251,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         eligible_shifts: formData.eligible_shifts,
         is_shift_worker: formData.is_shift_worker,
         opted_out_wtd: formData.opted_out_wtd ?? true,
+        pattern_id: formData.pattern_id || null,
+        pattern_offset: formData.pattern_offset ?? 0,
         user_id: user.id // Use the authenticated user's ID
       };
 
@@ -335,6 +407,45 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
               {errors.hourly_rate && (
                 <p className="text-sm text-red-600 mt-1">{errors.hourly_rate}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="pattern_id">Shift Pattern</Label>
+              <Select
+                value={formData.pattern_id || 'none'}
+                onValueChange={(value) => handleInputChange('pattern_id', value === 'none' ? null : value)}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select a pattern" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  <SelectItem value="none">No pattern assigned</SelectItem>
+                  {patterns.map(pattern => (
+                    <SelectItem key={pattern.id} value={pattern.id}>
+                      {pattern.name} ({pattern.system})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Repeating shift pattern for this staff member
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="pattern_offset">Pattern Offset (Days)</Label>
+              <Input
+                id="pattern_offset"
+                type="number"
+                min="0"
+                max="365"
+                value={formData.pattern_offset ?? 0}
+                onChange={(e) => handleInputChange('pattern_offset', parseInt(e.target.value) || 0)}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Starting day in the pattern sequence (0 = start at beginning)
+              </p>
             </div>
           </div>
 

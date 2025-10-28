@@ -41,6 +41,8 @@ export interface StaffMember {
   leave_allowance_days: number;
   leave_taken_monthly?: Record<string, number>; // Added for leave management
   wtd_opt_out?: boolean; // WTD 48-hour opt-out flag
+  pattern_id?: string | null; // Reference to site_patterns for repeating shift pattern
+  pattern_offset?: number; // Starting index in the pattern sequence (0-based)
   // Computed field for backwards compatibility
   name?: string;
   preferences?: {
