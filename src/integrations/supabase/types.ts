@@ -578,6 +578,8 @@ export type Database = {
           min_hours_per_week: number | null
           name: string | null
           opted_out_wtd: boolean
+          pattern_id: string | null
+          pattern_offset: number | null
           phone: string | null
           role: string | null
           role_id: string | null
@@ -611,6 +613,8 @@ export type Database = {
           min_hours_per_week?: number | null
           name?: string | null
           opted_out_wtd?: boolean
+          pattern_id?: string | null
+          pattern_offset?: number | null
           phone?: string | null
           role?: string | null
           role_id?: string | null
@@ -644,6 +648,8 @@ export type Database = {
           min_hours_per_week?: number | null
           name?: string | null
           opted_out_wtd?: boolean
+          pattern_id?: string | null
+          pattern_offset?: number | null
           phone?: string | null
           role?: string | null
           role_id?: string | null
@@ -655,6 +661,20 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "staff_profiles_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "patterns_legacy"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "site_patterns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "staff_profiles_role_id_fkey"
             columns: ["role_id"]
