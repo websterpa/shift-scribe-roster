@@ -55,6 +55,11 @@ export const StaffRow = ({ staff, onEdit, onDelete }: StaffRowProps) => {
       <td className="py-3 px-4">
         <div className={`font-medium ${textClassName}`}>
           {staff.first_name} {staff.last_name}
+          {(staff.wtd_opt_out ?? staff.opted_out_wtd ?? true) && (
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+              WTD Opt-Out
+            </span>
+          )}
           {staff.availability_status === 'temporarily_unavailable' && staff.unavailability_reason && (
             <span className="ml-2 text-xs text-yellow-600 font-normal">
               ({staff.unavailability_reason})

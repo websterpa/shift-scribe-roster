@@ -40,6 +40,7 @@ export interface StaffMember {
   holiday_multiplier: number;
   leave_allowance_days: number;
   leave_taken_monthly?: Record<string, number>; // Added for leave management
+  wtd_opt_out?: boolean; // WTD 48-hour opt-out flag
   // Computed field for backwards compatibility
   name?: string;
   preferences?: {
