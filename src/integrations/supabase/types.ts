@@ -577,7 +577,7 @@ export type Database = {
           max_hours_per_week: number | null
           min_hours_per_week: number | null
           name: string | null
-          opted_out_wtd: boolean | null
+          opted_out_wtd: boolean
           phone: string | null
           role: string | null
           role_id: string | null
@@ -610,7 +610,7 @@ export type Database = {
           max_hours_per_week?: number | null
           min_hours_per_week?: number | null
           name?: string | null
-          opted_out_wtd?: boolean | null
+          opted_out_wtd?: boolean
           phone?: string | null
           role?: string | null
           role_id?: string | null
@@ -643,7 +643,7 @@ export type Database = {
           max_hours_per_week?: number | null
           min_hours_per_week?: number | null
           name?: string | null
-          opted_out_wtd?: boolean | null
+          opted_out_wtd?: boolean
           phone?: string | null
           role?: string | null
           role_id?: string | null

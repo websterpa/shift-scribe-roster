@@ -32,6 +32,7 @@ interface StaffMember {
   max_hours_per_week?: number;
   eligible_shifts?: string[];
   is_shift_worker?: boolean;
+  opted_out_wtd?: boolean;
 }
 
 interface StaffDialogProps {
@@ -82,7 +83,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
     min_hours_per_week: 37,
     max_hours_per_week: 48,
     eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
-    is_shift_worker: true
+    is_shift_worker: true,
+    opted_out_wtd: true
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -113,7 +115,8 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         min_hours_per_week: 37,
         max_hours_per_week: 48,
         eligible_shifts: ['Early', 'Late', 'Night', 'Day'],
-        is_shift_worker: true
+        is_shift_worker: true,
+        opted_out_wtd: true
       });
     }
     setErrors({});
@@ -177,6 +180,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         max_hours_per_week: formData.max_hours_per_week,
         eligible_shifts: formData.eligible_shifts,
         is_shift_worker: formData.is_shift_worker,
+        opted_out_wtd: formData.opted_out_wtd ?? true,
         user_id: user.id // Use the authenticated user's ID
       };
 
@@ -464,6 +468,18 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
               />
               <span>Shift Worker</span>
             </label>
+
+            <label className="flex items-center space-x-2">
+              <Checkbox
+                checked={formData.opted_out_wtd ?? true}
+                onCheckedChange={(checked) => handleInputChange('opted_out_wtd', checked)}
+              />
+              <span className="font-medium">WTD Opt-Out</span>
+            </label>
+          </div>
+
+          <div className="text-xs text-muted-foreground mt-1 ml-1">
+            Staff with WTD opt-out are not subject to the 48-hour weekly average limit
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
