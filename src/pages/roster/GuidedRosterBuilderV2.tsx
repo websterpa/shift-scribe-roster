@@ -234,7 +234,7 @@ export default function GuidedRosterBuilderV2() {
       if (configError) throw configError;
 
       // Generate and save roster (this creates the version and saves assignments)
-      const { generateAndSaveRoster } = await import('@/utils/roster/generateAndSaveRoster');
+      const { generateAndSaveRoster } = await import('@/services/roster/generation');
       
       const result = await generateAndSaveRoster(
         staffList, 
