@@ -2,9 +2,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Calendar, Users, FileText, BarChart3, HelpCircle, Wand2, Shield, ListTree } from 'lucide-react';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 const Navigation = () => {
   const location = useLocation();
+  const { isAdmin } = useAdminAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -12,12 +14,15 @@ const Navigation = () => {
     { path: '/dashboard', label: 'Dashboard', icon: Calendar, gradient: 'from-blue-500 to-purple-600' },
     { path: '/staff', label: 'Staff', icon: Users, gradient: 'from-yellow-500 to-orange-600' },
     { path: '/roster/builder', label: 'Roster Builder', icon: Wand2, gradient: 'from-indigo-500 to-blue-600' },
-    { path: '/pattern-library', label: 'Pattern Library', icon: ListTree, gradient: 'from-violet-500 to-purple-600' },
     { path: '/leave-requests', label: 'Leave Requests', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
     { path: '/reports', label: 'Reports', icon: BarChart3, gradient: 'from-emerald-500 to-green-600' },
     { path: '/help', label: 'Help & Support', icon: HelpCircle, gradient: 'from-teal-500 to-cyan-600' },
-    { path: '/admin/rls-setup', label: 'Admin: RLS Setup', icon: Shield, gradient: 'from-red-500 to-rose-600' }
+    { path: '/admin/pattern-library', label: 'Pattern Library', icon: ListTree, gradient: 'from-violet-500 to-purple-600', adminOnly: true },
+    { path: '/admin/rls-setup', label: 'Admin: RLS Setup', icon: Shield, gradient: 'from-red-500 to-rose-600', adminOnly: true }
   ];
+
+  // Filter navigation items based on admin status
+  const visibleItems = navigationItems.filter(item => !item.adminOnly || isAdmin);
 
   return (
     <nav className="bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 shadow-lg border-b border-blue-100/50 backdrop-blur-sm">
@@ -26,7 +31,7 @@ const Navigation = () => {
           {/* Desktop Navigation */}
           <div className="hidden sm:block">
             <div className="flex gap-2">
-              {navigationItems.map((item) => (
+              {visibleItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
@@ -46,7 +51,7 @@ const Navigation = () => {
           {/* Mobile Navigation Menu */}
           <div className="sm:hidden">
             <div className="space-y-1">
-              {navigationItems.map((item) => (
+              {visibleItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}

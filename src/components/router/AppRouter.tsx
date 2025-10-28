@@ -66,13 +66,13 @@ export function AppRouter() {
               <Route path="support" element={<SupportPage />} />
               <Route path="help" element={<HelpSupport />} />
               <Route path="patterns" element={<PatternManagement />} />
-              <Route path="pattern-library" element={<PatternLibrary />} />
               <Route path="roster/builder" element={<GuidedRosterBuilderV2 />} />
               <Route path="roster/summary" element={<RosterSummary />} />
               <Route path="roster/monthly" element={<MonthlyPage />} />
               <Route path="wizard" element={<Wizard />} />
               <Route path="admin/rls-setup" element={<RLSHelp />} />
               <Route path="admin/patterns" element={<ShiftPatterns />} />
+              <Route path="admin/pattern-library" element={<PatternLibrary />} />
             </Route>
             
       {/* 404 route */}

@@ -6,10 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LoadingState } from '@/components/ui/loading-state';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { toast } from '@/hooks/use-toast';
-import { Clock, Users, Calendar, UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, Users, Calendar, UserPlus, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
 
 interface SitePattern {
   id: string;
@@ -295,6 +297,7 @@ const StaffAssignmentDialog: React.FC<{
 
 export const PatternLibrary: React.FC = () => {
   const { user } = useSupabaseAuth();
+  const { isAdmin, loading: adminLoading } = useAdminAuth();
   const [patterns, setPatterns] = useState<SitePattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterSystem, setFilterSystem] = useState<'all' | '8h' | '12h'>('all');
@@ -356,8 +359,24 @@ export const PatternLibrary: React.FC = () => {
     filterSystem === 'all' || p.system === filterSystem
   );
 
-  if (loading) {
+  // Show loading while checking admin status
+  if (loading || adminLoading) {
     return <LoadingState message="Loading pattern library..." />;
+  }
+
+  // Restrict access to admin users only
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertDescription>
+            Access Denied: Pattern Library is restricted to administrators only.
+            Please contact your system administrator if you need access.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   return (
