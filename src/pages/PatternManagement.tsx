@@ -20,6 +20,11 @@ interface Pattern {
   pattern: string[];
   shift_type: '8h' | '12h';
   created_at: string;
+  repeat_weeks?: number;
+  avg_weekly_hours?: number;
+  crews_required?: number;
+  is_wtd_compliant?: boolean;
+  description?: string;
 }
 
 type ViewMode = 'library' | 'edit' | 'create' | 'testing';
@@ -139,7 +144,16 @@ export default function PatternManagement() {
     }
   };
 
-  const handleSavePattern = async (patternData: { name: string; pattern: string[]; shift_type: '8h' | '12h' }) => {
+  const handleSavePattern = async (patternData: { 
+    name: string; 
+    pattern: string[]; 
+    shift_type: '8h' | '12h';
+    repeat_weeks?: number;
+    avg_weekly_hours?: number;
+    crews_required?: number;
+    is_wtd_compliant?: boolean;
+    description?: string;
+  }) => {
     if (!user) return;
 
     console.log('💾 PatternManagement: Saving pattern:', patternData);
@@ -153,7 +167,11 @@ export default function PatternManagement() {
           .update({
             name: patternData.name,
             pattern: patternData.pattern,
-            shift_type: patternData.shift_type
+            shift_type: patternData.shift_type,
+            avg_weekly_hours: patternData.avg_weekly_hours,
+            crews_required: patternData.crews_required,
+            is_wtd_compliant: patternData.is_wtd_compliant,
+            description: patternData.description
           })
           .eq('id', editingPattern.id)
           .eq('user_id', user.id);
@@ -172,7 +190,11 @@ export default function PatternManagement() {
             user_id: user.id,
             name: patternData.name,
             pattern: patternData.pattern,
-            shift_type: patternData.shift_type
+            shift_type: patternData.shift_type,
+            avg_weekly_hours: patternData.avg_weekly_hours,
+            crews_required: patternData.crews_required,
+            is_wtd_compliant: patternData.is_wtd_compliant,
+            description: patternData.description
           });
 
         if (error) throw error;
@@ -231,11 +253,7 @@ export default function PatternManagement() {
     loadCustomPatterns();
   };
 
-  const commonPatterns = COMMON_PATTERNS[selectedShiftType].map(pattern => ({
-    ...pattern,
-    shift_type: selectedShiftType,
-    created_at: new Date().toISOString()
-  }));
+  const commonPatterns = COMMON_PATTERNS[selectedShiftType];
 
   const getViewTitle = () => {
     switch (viewMode) {

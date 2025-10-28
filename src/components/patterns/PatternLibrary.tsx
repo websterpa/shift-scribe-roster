@@ -15,6 +15,11 @@ interface Pattern {
   pattern: string[];
   shift_type: '8h' | '12h';
   created_at: string;
+  repeat_weeks?: number;
+  avg_weekly_hours?: number;
+  crews_required?: number;
+  is_wtd_compliant?: boolean;
+  description?: string;
   isCustom?: boolean;
 }
 
@@ -108,9 +113,20 @@ export function PatternLibrary({
               <CardTitle className="text-base flex items-center gap-2">
                 {pattern.name}
                 {isCustom && <Star className="h-4 w-4 text-yellow-500" />}
+                {pattern.is_wtd_compliant && (
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                    WTD ✓
+                  </Badge>
+                )}
               </CardTitle>
-              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                 <span>{pattern.shift_type} • {pattern.pattern.length}-day cycle</span>
+                {pattern.avg_weekly_hours && (
+                  <span>• {pattern.avg_weekly_hours}h/week avg</span>
+                )}
+                {pattern.crews_required && (
+                  <span>• {pattern.crews_required} crews</span>
+                )}
                 {isCustom && staffCount > 0 && (
                   <Badge variant="secondary" className="text-xs flex items-center gap-1">
                     <Users className="h-3 w-3" />
@@ -118,6 +134,11 @@ export function PatternLibrary({
                   </Badge>
                 )}
               </div>
+              {pattern.description && (
+                <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                  {pattern.description}
+                </p>
+              )}
             </div>
             <Badge variant="outline" className="text-xs">
               {pattern.shift_type}

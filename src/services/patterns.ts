@@ -10,6 +10,10 @@ export type SavedPattern = {
   system: "8h" | "12h";
   sequence: PatternToken[];
   repeat_weeks: number;
+  avg_weekly_hours?: number;
+  crews_required?: number;
+  is_wtd_compliant?: boolean;
+  description?: string;
   created_at: string;
 };
 
@@ -38,6 +42,10 @@ export async function savePattern(args: {
   system: "8h" | "12h";
   sequence: PatternToken[];
   repeatWeeks: number;
+  avgWeeklyHours?: number;
+  crewsRequired?: number;
+  isWtdCompliant?: boolean;
+  description?: string;
 }): Promise<{ ok: boolean; id?: string }> {
   if (!args.siteId || !args.sequence?.length) return { ok: false };
   
@@ -54,6 +62,10 @@ export async function savePattern(args: {
       system: args.system,
       sequence: args.sequence,
       repeat_weeks: args.repeatWeeks,
+      avg_weekly_hours: args.avgWeeklyHours,
+      crews_required: args.crewsRequired,
+      is_wtd_compliant: args.isWtdCompliant,
+      description: args.description,
       // tenant_id: getTenantId(), // Uncomment when column exists
     })
     .select("id")

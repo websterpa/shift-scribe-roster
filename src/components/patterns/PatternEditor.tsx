@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Save, Copy, Trash, Plus, Edit } from 'lucide-react';
+import { Save, Copy, Trash, Plus, Edit, CheckCircle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface PatternEditorProps {
   pattern?: {
@@ -15,9 +17,23 @@ interface PatternEditorProps {
     name: string;
     pattern: string[];
     shift_type: '8h' | '12h';
+    repeat_weeks?: number;
+    avg_weekly_hours?: number;
+    crews_required?: number;
+    is_wtd_compliant?: boolean;
+    description?: string;
   };
   isNew?: boolean;
-  onSave: (pattern: { name: string; pattern: string[]; shift_type: '8h' | '12h' }) => void;
+  onSave: (pattern: { 
+    name: string; 
+    pattern: string[]; 
+    shift_type: '8h' | '12h';
+    repeat_weeks?: number;
+    avg_weekly_hours?: number;
+    crews_required?: number;
+    is_wtd_compliant?: boolean;
+    description?: string;
+  }) => void;
   onCancel: () => void;
   onDelete?: () => void;
   isSaving?: boolean;
@@ -49,6 +65,11 @@ export function PatternEditor({
   const [name, setName] = useState(pattern?.name || '');
   const [shiftType, setShiftType] = useState<'8h' | '12h'>(pattern?.shift_type || '8h');
   const [patternCodes, setPatternCodes] = useState<string[]>(pattern?.pattern || ['R']);
+  const [repeatWeeks, setRepeatWeeks] = useState(pattern?.repeat_weeks || 17);
+  const [avgWeeklyHours, setAvgWeeklyHours] = useState(pattern?.avg_weekly_hours || 37.5);
+  const [crewsRequired, setCrewsRequired] = useState(pattern?.crews_required || 5);
+  const [isWtdCompliant, setIsWtdCompliant] = useState(pattern?.is_wtd_compliant ?? true);
+  const [description, setDescription] = useState(pattern?.description || '');
 
   const availableShifts = SHIFT_CODES[shiftType];
 
@@ -86,7 +107,12 @@ export function PatternEditor({
       onSave({
         name: name.trim(),
         pattern: patternCodes,
-        shift_type: shiftType
+        shift_type: shiftType,
+        repeat_weeks: repeatWeeks,
+        avg_weekly_hours: avgWeeklyHours,
+        crews_required: crewsRequired,
+        is_wtd_compliant: isWtdCompliant,
+        description: description.trim() || undefined
       });
     }
   };
@@ -139,6 +165,93 @@ export function PatternEditor({
                   <SelectItem value="12h">12-Hour Shifts</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* WTD Compliance Metadata */}
+          <Separator className="my-4" />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">WTD Compliance Metadata</Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="wtd-compliant"
+                  checked={isWtdCompliant}
+                  onCheckedChange={(checked) => setIsWtdCompliant(checked as boolean)}
+                />
+                <label
+                  htmlFor="wtd-compliant"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-1"
+                >
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  WTD Compliant
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="repeat-weeks">Repeat Cycle (weeks)</Label>
+                <Input
+                  id="repeat-weeks"
+                  type="number"
+                  min="1"
+                  max="52"
+                  value={repeatWeeks}
+                  onChange={(e) => setRepeatWeeks(parseInt(e.target.value) || 17)}
+                  placeholder="17"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Pattern cycle length in weeks
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="avg-hours">Avg Weekly Hours</Label>
+                <Input
+                  id="avg-hours"
+                  type="number"
+                  min="0"
+                  max="60"
+                  step="0.5"
+                  value={avgWeeklyHours}
+                  onChange={(e) => setAvgWeeklyHours(parseFloat(e.target.value) || 37.5)}
+                  placeholder="37.5"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Average hours per week
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="crews-required">Crews Required</Label>
+                <Input
+                  id="crews-required"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={crewsRequired}
+                  onChange={(e) => setCrewsRequired(parseInt(e.target.value) || 5)}
+                  placeholder="5"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Teams for 24/7 coverage
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe the pattern characteristics, benefits, and use cases..."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional: Explain when to use this pattern and its key benefits
+              </p>
             </div>
           </div>
         </CardContent>

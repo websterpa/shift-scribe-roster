@@ -76,24 +76,36 @@ export type Database = {
       }
       custom_patterns: {
         Row: {
+          avg_weekly_hours: number | null
           created_at: string
+          crews_required: number | null
+          description: string | null
           id: string
+          is_wtd_compliant: boolean | null
           name: string
           pattern: string[]
           shift_type: string
           user_id: string
         }
         Insert: {
+          avg_weekly_hours?: number | null
           created_at?: string
+          crews_required?: number | null
+          description?: string | null
           id?: string
+          is_wtd_compliant?: boolean | null
           name: string
           pattern: string[]
           shift_type: string
           user_id: string
         }
         Update: {
+          avg_weekly_hours?: number | null
           created_at?: string
+          crews_required?: number | null
+          description?: string | null
           id?: string
+          is_wtd_compliant?: boolean | null
           name?: string
           pattern?: string[]
           shift_type?: string
@@ -467,9 +479,13 @@ export type Database = {
       }
       site_patterns: {
         Row: {
+          avg_weekly_hours: number | null
           created_at: string
           created_by: string
+          crews_required: number | null
+          description: string | null
           id: string
+          is_wtd_compliant: boolean | null
           name: string
           repeat_weeks: number
           sequence: Json
@@ -477,9 +493,13 @@ export type Database = {
           system: string
         }
         Insert: {
+          avg_weekly_hours?: number | null
           created_at?: string
           created_by: string
+          crews_required?: number | null
+          description?: string | null
           id?: string
+          is_wtd_compliant?: boolean | null
           name: string
           repeat_weeks?: number
           sequence: Json
@@ -487,9 +507,13 @@ export type Database = {
           system: string
         }
         Update: {
+          avg_weekly_hours?: number | null
           created_at?: string
           created_by?: string
+          crews_required?: number | null
+          description?: string | null
           id?: string
+          is_wtd_compliant?: boolean | null
           name?: string
           repeat_weeks?: number
           sequence?: Json
