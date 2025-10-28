@@ -161,9 +161,10 @@ export default function PatternManagement() {
 
     try {
       let savedPatternId: string | null = null;
+      let sitePatternId: string | null = null;
 
       if (editingPattern?.id) {
-        // Update existing pattern
+        // Update existing pattern in custom_patterns
         const { error } = await supabase
           .from('custom_patterns')
           .update({
@@ -187,8 +188,8 @@ export default function PatternManagement() {
           description: `"${patternData.name}" has been updated`,
         });
       } else {
-        // Create new pattern - get the ID back
-        const { data, error } = await supabase
+        // Create new pattern in custom_patterns first
+        const { data: customData, error: customError } = await supabase
           .from('custom_patterns')
           .insert({
             user_id: user.id,
@@ -203,9 +204,35 @@ export default function PatternManagement() {
           .select('id')
           .single();
 
-        if (error) throw error;
+        if (customError) throw customError;
 
-        savedPatternId = data?.id || null;
+        savedPatternId = customData?.id || null;
+
+        // Also save to site_patterns for staff assignment compatibility
+        const { data: siteData, error: siteError } = await supabase
+          .from('site_patterns')
+          .insert({
+            site_id: 'default', // Default site ID
+            created_by: user.id,
+            name: patternData.name,
+            system: patternData.shift_type,
+            sequence: patternData.pattern,
+            cycle_length: patternData.cycle_length || patternData.pattern.length,
+            avg_weekly_hours: patternData.avg_weekly_hours,
+            teams_required: patternData.teams_required,
+            is_wtd_compliant: patternData.is_wtd_compliant,
+            description: patternData.description
+          })
+          .select('id')
+          .single();
+
+        if (siteError) {
+          console.error('⚠️ Failed to create site_pattern:', siteError);
+          // Don't throw - custom pattern is created, just log the error
+        } else {
+          sitePatternId = siteData?.id || null;
+          console.log('✅ Pattern saved to both custom_patterns and site_patterns');
+        }
 
         toast({
           title: "Pattern created",
@@ -218,10 +245,12 @@ export default function PatternManagement() {
       await loadCustomPatterns();
 
       // Open staff assignment dialog for newly created patterns
-      if (savedPatternId && !editingPattern?.id) {
-        console.log('👥 Opening staff assignment for newly created pattern:', savedPatternId);
+      // Use site_patterns ID for staff assignment
+      if ((sitePatternId || savedPatternId) && !editingPattern?.id) {
+        const assignmentId = sitePatternId || savedPatternId;
+        console.log('👥 Opening staff assignment for newly created pattern:', assignmentId);
         const newPattern: Pattern = {
-          id: savedPatternId,
+          id: assignmentId!,
           name: patternData.name,
           pattern: patternData.pattern,
           shift_type: patternData.shift_type,
