@@ -108,7 +108,6 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
       const { data, error } = await supabase
         .from('site_patterns')
         .select('id, name, system, sequence')
-        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -152,7 +151,6 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
           const { data } = await supabase
             .from('site_patterns')
             .select('id')
-            .eq('created_by', user.id)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
