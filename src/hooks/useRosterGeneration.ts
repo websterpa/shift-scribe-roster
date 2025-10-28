@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAllConfigs, fetchConfigById } from '@/utils/configHelpers';
-import { generateAndSaveRoster } from '@/utils/roster/generateAndSaveRoster';
+import { generateAndSaveRoster } from '@/services/roster/generation';
 import { fetchStaffMembers } from '@/utils/roster/staffHelpers';
 import { ConfigItem, StaffMember } from '@/types/roster';
 import { createLogger } from '@/utils/errorLogger';

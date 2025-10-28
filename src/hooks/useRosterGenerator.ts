@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { on } from "@/utils/events";
 import type { ManagerRosterForm, GenerateRosterResult } from "@/types/managerUI";
-import { generateAndSaveRoster } from "@/utils/roster/generateAndSaveRoster";
+import { generateAndSaveRoster } from "@/services/roster/generation";
 import { fetchStaffMembers } from "@/utils/roster/staffHelpers";
 import type { StaffMember } from "@/types/roster";
 import { createLogger } from "@/utils/errorLogger";

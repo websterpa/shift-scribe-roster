@@ -19,7 +19,7 @@ export {
 
 export {
   generateAndSaveRoster
-} from "./roster/generateAndSaveRoster";
+} from "@/services/roster/generation";
 
 export {
   saveRosterVersion,

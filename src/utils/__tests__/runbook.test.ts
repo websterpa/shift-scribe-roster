@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { RunbookTester, generateSampleStaff, createSample8hConfig, createSample12hConfig } from '../roster/testDataGenerator';
-import { generateAndSaveRoster } from '../roster/generateAndSaveRoster';
+import { generateAndSaveRoster } from '@/services/roster/generation';
 import { ensureShiftSystemConsistency } from '../constraints';
 
 describe("Runbook Tests - Roster Generation System", () => {

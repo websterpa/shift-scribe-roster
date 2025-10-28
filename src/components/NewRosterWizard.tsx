@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Check, Settings } from 'lucide-react';
 import { StaffMember } from '@/types/roster';
-import { generateAndSaveRoster } from '@/utils/roster/generateAndSaveRoster';
+import { generateAndSaveRoster } from '@/services/roster/generation';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
