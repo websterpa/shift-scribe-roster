@@ -21,6 +21,7 @@ export interface CorrectiveStaffMember {
     avoidShifts?: Array<'E' | 'L' | 'N' | 'D'>;  // Shift types they prefer not to work
   };
   isNightEligible?: boolean;
+  wtd_opt_out?: boolean; // WTD 48-hour opt-out flag
 }
 
 export interface CoverageRequirements {
@@ -1161,7 +1162,7 @@ function buildResult(
       staffAssignments,
       DEFAULT_WTD_RULES,
       DEFAULT_SHIFT_TIMES,
-      false // optedOut - could be passed from staff data if available
+      s.wtd_opt_out ?? false // Use staff's WTD opt-out status
     );
     
     // Calculate weekly hours for this staff member

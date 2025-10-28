@@ -158,6 +158,7 @@ export async function generateAndSaveRoster(
       name: s.name || `${s.first_name} ${s.last_name}`,
       availability: {}, // All days available by default
       isNightEligible,
+      wtd_opt_out: s.wtd_opt_out ?? s.opted_out_wtd ?? true, // Include WTD opt-out status (default true)
     };
   });
   

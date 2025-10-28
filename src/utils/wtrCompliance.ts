@@ -104,6 +104,18 @@ export function checkWTDCompliance(
   lastShiftEnd?: Date,
   nextShiftStart?: Date
 ): WTDComplianceResult {
+  // Early return if staff has opted out of WTD
+  if (optedOut) {
+    logger.debug('Staff opted out of WTD - skipping compliance checks', { staffId });
+    return {
+      compliant: true,
+      violations: [],
+      weeklyHours: proposedWeeklyHours,
+      rollingAverage: calculateRollingAverage(weeklyHours),
+      canWork: true
+    };
+  }
+
   const violations: string[] = [];
   let compliant = true;
 

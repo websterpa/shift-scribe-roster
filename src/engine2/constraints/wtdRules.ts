@@ -238,6 +238,14 @@ export function validateStaffWTD(
   shiftTimes: ShiftTimes = DEFAULT_SHIFT_TIMES,
   optedOut: boolean = false
 ): { valid: boolean; violations: string[] } {
+  // Early return if staff has opted out of WTD
+  if (optedOut) {
+    return { 
+      valid: true, 
+      violations: [] 
+    };
+  }
+
   const violations: string[] = [];
   
   // 1. Check consecutive days
