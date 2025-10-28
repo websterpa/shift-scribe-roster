@@ -226,13 +226,17 @@ export default function PatternManagement() {
           .select('id')
           .single();
 
+        // CRITICAL: site_patterns must succeed for staff assignment to work
         if (siteError) {
-          console.error('⚠️ Failed to create site_pattern:', siteError);
-          // Don't throw - custom pattern is created, just log the error
-        } else {
-          sitePatternId = siteData?.id || null;
-          console.log('✅ Pattern saved to both custom_patterns and site_patterns');
+          console.error('❌ Failed to create site_pattern:', siteError);
+          throw new Error(`Failed to create pattern for staff assignment: ${siteError.message}`);
         }
+
+        sitePatternId = siteData?.id || null;
+        console.log('✅ Pattern saved to both custom_patterns and site_patterns:', {
+          customId: savedPatternId,
+          siteId: sitePatternId
+        });
 
         toast({
           title: "Pattern created",
@@ -245,9 +249,9 @@ export default function PatternManagement() {
       await loadCustomPatterns();
 
       // Open staff assignment dialog for newly created patterns
-      // Use site_patterns ID for staff assignment
-      if ((sitePatternId || savedPatternId) && !editingPattern?.id) {
-        const assignmentId = sitePatternId || savedPatternId;
+      // Use site_patterns ID for staff assignment (required for FK constraint)
+      if (sitePatternId && !editingPattern?.id) {
+        const assignmentId = sitePatternId;
         console.log('👥 Opening staff assignment for newly created pattern:', assignmentId);
         const newPattern: Pattern = {
           id: assignmentId!,
