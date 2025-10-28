@@ -407,42 +407,87 @@ export async function generateAndSaveRoster(
       console.groupCollapsed('🧮 Roster Generation Diagnostics');
       console.log(`Total assignments inserted: ${assignmentsToInsert.length}`);
       
-      // Calculate assignments per staff
-      const assignmentsByStaff = assignmentsToInsert.reduce((acc, assignment) => {
-        const staffId = assignment.staff_id;
+      // Group assignments by staff
+      const byStaff = assignmentsToInsert.reduce((acc, a) => {
+        const staffId = a.staff_id;
         if (!acc[staffId]) {
-          acc[staffId] = { count: 0, shifts: [] };
+          acc[staffId] = [];
         }
-        acc[staffId].count++;
-        acc[staffId].shifts.push(assignment.shift_code);
+        acc[staffId].push(a);
         return acc;
-      }, {} as Record<string, { count: number; shifts: string[] }>);
+      }, {} as Record<string, typeof assignmentsToInsert>);
 
       console.log('\n📊 Assignments per staff:');
-      Object.entries(assignmentsByStaff).forEach(([staffId, data]) => {
-        const staffName = correctiveStaff.find(s => s.id === staffId)?.name || staffId;
-        const shiftBreakdown = data.shifts.reduce((acc, shift) => {
+      
+      for (const [staffId, staffAssignments] of Object.entries(byStaff)) {
+        const staffMember = correctiveStaff.find(s => s.id === staffId);
+        const staffName = staffMember?.name || staffId;
+        
+        // Extract shift pattern
+        const pattern = staffAssignments.map(a => a.shift_code);
+        const totalDays = staffAssignments.length;
+        
+        // Calculate shift type breakdown
+        const shiftBreakdown = pattern.reduce((acc, shift) => {
           acc[shift] = (acc[shift] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
-        console.log(`  ${staffName}: ${data.count} assignments`, shiftBreakdown);
-      });
 
-      // Calculate pattern compliance (if patterns were used)
+        // Try to load staff's pattern from database for compliance check
+        let compliance = 100; // Default to 100% if no pattern reference
+        
+        // Attempt to fetch pattern (non-blocking, best effort)
+        try {
+          const { data: staffPattern } = await supabase
+            .from('site_patterns')
+            .select('sequence')
+            .eq('created_by', staffId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (staffPattern?.sequence) {
+            const expectedPattern = Array.isArray(staffPattern.sequence) 
+              ? staffPattern.sequence 
+              : JSON.parse(staffPattern.sequence as string);
+            
+            // Calculate compliance: how many shifts match expected pattern
+            const matches = pattern.filter((actualShift, index) => {
+              const expectedIndex = index % expectedPattern.length;
+              return actualShift === expectedPattern[expectedIndex];
+            }).length;
+            
+            compliance = (matches / totalDays) * 100;
+          }
+        } catch (err) {
+          // Pattern fetch failed, use default 100%
+          console.debug(`Could not fetch pattern for ${staffName}:`, err);
+        }
+
+        console.log(`👤 Staff: ${staffName}`);
+        console.log(`   • Assignments: ${totalDays}`);
+        console.log(`   • Shift breakdown:`, shiftBreakdown);
+        console.log(`   • Pattern compliance: ${compliance.toFixed(1)}%`);
+      }
+
+      // Calculate overall pattern compliance
       const totalDays = days.length;
       const totalStaff = correctiveStaff.length;
       const expectedAssignments = totalDays * totalStaff;
       const complianceRate = (assignmentsToInsert.length / expectedAssignments) * 100;
       
-      console.log(`\n✓ Pattern compliance: ${complianceRate.toFixed(1)}%`);
+      console.log(`\n✓ Overall coverage: ${complianceRate.toFixed(1)}%`);
       console.log(`  Expected slots: ${expectedAssignments} (${totalStaff} staff × ${totalDays} days)`);
       console.log(`  Actual assignments: ${assignmentsToInsert.length}`);
       console.log(`  Unassigned slots: ${expectedAssignments - assignmentsToInsert.length}`);
 
       // Utilization report from engine
       if (result.utilizationReport) {
-        console.log('\n📈 Staff utilization:');
-        Object.entries(result.utilizationReport).forEach(([staffId, count]) => {
+        console.log('\n📈 Staff utilization summary:');
+        const utilizationEntries = Object.entries(result.utilizationReport)
+          .sort((a, b) => (b[1] as number) - (a[1] as number));
+        
+        utilizationEntries.forEach(([staffId, count]) => {
           const staffName = correctiveStaff.find(s => s.id === staffId)?.name || staffId;
           console.log(`  ${staffName}: ${count} shifts`);
         });
