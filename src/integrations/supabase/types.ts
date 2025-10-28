@@ -342,6 +342,7 @@ export type Database = {
           id: string
           operational_hours_per_day: number
           pattern: Json | null
+          pattern_locked: boolean | null
           shift_type: string
           site_start_time: string | null
           staffing_requirements: Json | null
@@ -358,6 +359,7 @@ export type Database = {
           id?: string
           operational_hours_per_day: number
           pattern?: Json | null
+          pattern_locked?: boolean | null
           shift_type: string
           site_start_time?: string | null
           staffing_requirements?: Json | null
@@ -374,6 +376,7 @@ export type Database = {
           id?: string
           operational_hours_per_day?: number
           pattern?: Json | null
+          pattern_locked?: boolean | null
           shift_type?: string
           site_start_time?: string | null
           staffing_requirements?: Json | null
