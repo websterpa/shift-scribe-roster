@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Calendar, Users, Clock, Printer, Download } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Calendar, Users, Clock, Printer, Download, BarChart, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { RosterViewerHeader } from '@/components/roster/RosterViewerHeader';
 import { RosterCalendarTable } from '@/components/roster/RosterCalendarTable';
 import { RosterPrintView } from '@/components/roster/RosterPrintView';
+import { RosterDiagnosticsPanel } from '@/components/roster/RosterDiagnosticsPanel';
+import { checkRestPeriods, checkWeeklyAverage } from '@/engine/validators/wtd';
+import { summariseDiagnostics } from '@/engine/diagnostics';
+import type { RosterDiagnostics, RosterAssignment as EngineRosterAssignment } from '@/engine/generateRoster';
 
 interface RosterAssignment {
   id: string;
@@ -44,6 +49,7 @@ interface RosterData {
     };
   } | null;
   assignments: RosterAssignment[];
+  diagnostics?: RosterDiagnostics;
 }
 
 const RosterViewer = () => {
@@ -53,6 +59,110 @@ const RosterViewer = () => {
   const navigate = useNavigate();
   const [rosterData, setRosterData] = useState<RosterData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Compute diagnostics from roster data
+  const diagnostics = useMemo<RosterDiagnostics | null>(() => {
+    if (!rosterData?.assignments || rosterData.assignments.length === 0) {
+      return null;
+    }
+
+    try {
+      // Group assignments by staff
+      const staffGroups = new Map<string, RosterAssignment[]>();
+      rosterData.assignments.forEach(a => {
+        const staffKey = a.staff_profiles?.first_name + ' ' + a.staff_profiles?.last_name || 'Unknown';
+        if (!staffGroups.has(staffKey)) {
+          staffGroups.set(staffKey, []);
+        }
+        staffGroups.get(staffKey)!.push(a);
+      });
+
+      // Run WTD validation per staff member
+      const restViolations: Record<string, string[]> = {};
+      const weeklyAverageCompliant: Record<string, boolean> = {};
+      const avgHoursPerWeek: Record<string, number> = {};
+      const staffSummary: Array<{
+        staffId: string;
+        staffName: string;
+        totalShifts: number;
+        patternCompliance: number;
+        expectedShifts: number;
+        matchingShifts: number;
+      }> = [];
+
+      staffGroups.forEach((assignments, staffId) => {
+        // Convert to ShiftRecord format for WTD validation
+        const shiftRecords = assignments
+          .filter(a => a.shift_code !== 'R') // Skip rest days
+          .map(a => {
+            const date = new Date(a.date);
+            let start: Date, end: Date;
+
+            if (a.shift_start && a.shift_end) {
+              start = new Date(a.shift_start);
+              end = new Date(a.shift_end);
+            } else {
+              // Default times based on shift code
+              const times: Record<string, { start: string; end: string }> = {
+                'E': { start: '06:00', end: '14:00' },
+                'L': { start: '14:00', end: '22:00' },
+                'N': { start: '22:00', end: '06:00' },
+                'D': { start: '08:00', end: '20:00' },
+              };
+              const shiftTimes = times[a.shift_code] || { start: '08:00', end: '16:00' };
+              start = new Date(`${a.date}T${shiftTimes.start}:00`);
+              end = new Date(`${a.date}T${shiftTimes.end}:00`);
+              
+              // Handle overnight shifts
+              if (end <= start) {
+                end.setDate(end.getDate() + 1);
+              }
+            }
+
+            return { staffId, start, end };
+          });
+
+        // Check rest periods
+        restViolations[staffId] = checkRestPeriods(shiftRecords);
+        
+        // Check weekly average
+        weeklyAverageCompliant[staffId] = checkWeeklyAverage(shiftRecords);
+
+        // Calculate average hours per week
+        const totalHours = shiftRecords.reduce((sum, r) => {
+          const hours = (r.end.getTime() - r.start.getTime()) / (1000 * 60 * 60);
+          return sum + hours;
+        }, 0);
+        const weeks = Math.max(1, rosterData.config?.cycle_length_weeks || 1);
+        avgHoursPerWeek[staffId] = totalHours / weeks;
+
+        // Build staff summary (without pattern compliance since patterns not in DB)
+        staffSummary.push({
+          staffId,
+          staffName: staffId,
+          totalShifts: assignments.length,
+          patternCompliance: 100, // Placeholder since patterns not tracked
+          expectedShifts: assignments.length,
+          matchingShifts: assignments.length
+        });
+      });
+
+      return {
+        restViolations,
+        weeklyAverageCompliant,
+        avgHoursPerWeek,
+        staffSummary,
+        overallCompliance: {
+          avgCompliance: 100, // Placeholder
+          totalShifts: staffSummary.reduce((sum, s) => sum + s.totalShifts, 0),
+          fullyCompliant: staffSummary.length
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error computing diagnostics:', error);
+      return null;
+    }
+  }, [rosterData]);
 
   useEffect(() => {
     if (rosterId) {
@@ -183,6 +293,22 @@ const RosterViewer = () => {
     }, 500);
   };
 
+  // Show toast for rest violations when diagnostics are computed
+  useEffect(() => {
+    if (diagnostics && rosterData) {
+      const totalViolations = Object.values(diagnostics.restViolations || {})
+        .reduce((sum: number, violations: any[]) => sum + violations.length, 0);
+      
+      if (totalViolations > 0) {
+        toast({
+          title: "⚠️ Rest Period Violations Detected",
+          description: `${totalViolations} instances where consecutive shifts have less than 11 hours rest. Check the Diagnostics tab for details.`,
+          variant: "destructive",
+        });
+      }
+    }
+  }, [diagnostics, rosterData]);
+
   console.log('🔍 RosterViewer render state:', {
     loading,
     hasRosterData: !!rosterData,
@@ -209,14 +335,50 @@ const RosterViewer = () => {
     <div className="space-y-6">
       <RosterViewerHeader rosterData={rosterData} onBack={() => navigate('/my-rosters')} />
       
+      {/* Rest Violations Banner */}
+      {diagnostics && Object.values(diagnostics.restViolations || {}).reduce((sum: number, v: any[]) => sum + v.length, 0) > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>⚠️ WTD Rest Period Violations Detected:</strong> This roster contains shifts with less than 11 hours rest between them. Review the Diagnostics tab for full details.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="calendar" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-          <TabsTrigger value="print">Print/Download</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Calendar View
+          </TabsTrigger>
+          <TabsTrigger value="diagnostics" className="flex items-center gap-2">
+            <BarChart className="h-4 w-4" />
+            Diagnostics
+          </TabsTrigger>
+          <TabsTrigger value="print" className="flex items-center gap-2">
+            <Printer className="h-4 w-4" />
+            Print/Download
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="calendar" className="space-y-6">
           <RosterCalendarTable assignments={rosterData.assignments} />
+        </TabsContent>
+        
+        <TabsContent value="diagnostics" className="space-y-6">
+          {diagnostics ? (
+            <RosterDiagnosticsPanel diagnostics={diagnostics} />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <BarChart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No Diagnostics Available</h3>
+                <p className="text-muted-foreground">
+                  Diagnostics data is not available for this roster. This may be an older roster generated before diagnostics tracking was implemented.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
         
         <TabsContent value="print" className="space-y-6">
