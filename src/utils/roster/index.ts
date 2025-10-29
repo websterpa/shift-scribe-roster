@@ -1,18 +1,17 @@
 /**
- * DEPRECATED SHIM — imports from src/utils/roster are temporary.
- * Use @/services/roster instead.
+ * COMPATIBILITY SHIM — stable backward compatibility layer
  * 
- * This module provides backward compatibility while we transition
- * to the new services layer architecture.
+ * This module provides backward compatibility for legacy imports.
+ * New code should import from @/services/roster instead.
  * 
- * @deprecated since 2025-10-28
+ * Architecture:
+ * - Production imports go through this shim to services layer
+ * - Tests will gradually migrate to direct services imports
+ * - This shim remains stable to avoid breaking changes
+ * 
+ * @stable
  * @see src/services/roster
  */
-
-if (import.meta?.env?.DEV) {
-  // eslint-disable-next-line no-console
-  console.warn('[DEPRECATED] Import from "@/services/roster" instead of "@/utils/roster".');
-}
 
 // Re-export from canonical services layer
 export * from '@/services/roster/generation';
