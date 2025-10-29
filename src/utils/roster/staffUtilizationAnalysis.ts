@@ -1,3 +1,7 @@
+/**
+ * @deprecated Moved to src/services/roster/helpers/utilizationAnalysis.ts
+ * Remove after all test suites updated.
+ */
 
 import { supabase } from "@/integrations/supabase/client";
 import { StaffMember } from "@/types/roster";

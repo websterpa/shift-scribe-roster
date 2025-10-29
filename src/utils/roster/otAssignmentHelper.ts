@@ -1,3 +1,8 @@
+/**
+ * @deprecated Moved to src/services/roster/helpers/overtimeAssignments.ts
+ * Remove after all test suites updated.
+ */
+
 import { OTOptions } from "@/utils/shiftWindowResolver";
 import { ShiftCode } from "../constraints";
 

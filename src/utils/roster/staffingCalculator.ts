@@ -1,3 +1,8 @@
+/**
+ * @deprecated Moved to src/services/roster/helpers/staffingCalculators.ts
+ * Remove after all test suites updated.
+ */
+
 import { StaffMember, ConfigItem } from "@/types/roster";
 import { createLogger } from "../errorLogger";
 
