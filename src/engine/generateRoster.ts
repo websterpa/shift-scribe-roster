@@ -7,6 +7,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { createLogger } from "@/utils/errorLogger";
+import { checkRestPeriods, checkWeeklyAverage, type ShiftRecord } from "@/engine/validators/wtd";
+import { summariseDiagnostics, type StaffDiagnostics } from "@/engine/diagnostics";
+import type { PatternDefinition, StaffPattern, Assignment } from "@/engine/diagnostics";
 
 const logger = createLogger('AtlasRosterGenerator');
 
@@ -24,6 +27,23 @@ export interface RosterAssignment {
   date: Date;
   shift: string;
   patternId: string;
+}
+
+export interface RosterDiagnostics {
+  restViolations: Record<string, string[]>;
+  weeklyAverageCompliant: Record<string, boolean>;
+  avgHoursPerWeek: Record<string, number>;
+  staffSummary: StaffDiagnostics[];
+  overallCompliance: {
+    avgCompliance: number;
+    totalShifts: number;
+    fullyCompliant: number;
+  };
+}
+
+export interface RosterWithChecks {
+  roster: RosterAssignment[];
+  diagnostics: RosterDiagnostics;
 }
 
 /**
@@ -156,4 +176,172 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
   console.log('[AtlasGenerator] Shift distribution:', shiftCounts);
   
   return roster;
+}
+
+/**
+ * Generate roster with WTD validation and diagnostics
+ * 
+ * @param input - Roster generation parameters
+ * @returns Roster assignments with compliance diagnostics
+ */
+export async function generateRosterWithChecks(
+  input: GenerateRosterInput
+): Promise<RosterWithChecks> {
+  console.log('🚀 [AtlasGenerator] Starting roster generation with validation checks');
+  
+  // 1. Generate base roster
+  const roster = await generateRoster(input);
+  
+  if (roster.length === 0) {
+    console.warn('⚠️ [AtlasGenerator] No assignments generated');
+    return {
+      roster: [],
+      diagnostics: {
+        restViolations: {},
+        weeklyAverageCompliant: {},
+        avgHoursPerWeek: {},
+        staffSummary: [],
+        overallCompliance: { avgCompliance: 0, totalShifts: 0, fullyCompliant: 0 }
+      }
+    };
+  }
+  
+  // 2. Load pattern data for diagnostics
+  const { data: patterns } = await supabase
+    .from("site_patterns")
+    .select("id, sequence, cycle_length");
+  
+  const patternMap: Record<string, PatternDefinition> = {};
+  if (patterns) {
+    for (const p of patterns) {
+      const sequence = Array.isArray(p.sequence)
+        ? p.sequence.filter((item): item is string => typeof item === 'string')
+        : [];
+      patternMap[p.id] = {
+        id: p.id,
+        sequence,
+        cycleLength: p.cycle_length || sequence.length
+      };
+    }
+  }
+  
+  // 3. Build staff pattern map
+  const { data: staff } = await supabase
+    .from("staff_profiles")
+    .select("id, pattern_id, pattern_offset")
+    .eq("is_active", true)
+    .not("pattern_id", "is", null);
+  
+  const staffPatternMap: Record<string, StaffPattern> = {};
+  if (staff) {
+    for (const s of staff) {
+      if (s.pattern_id) {
+        staffPatternMap[s.id] = {
+          staffId: s.id,
+          patternId: s.pattern_id,
+          offset: s.pattern_offset || 0
+        };
+      }
+    }
+  }
+  
+  // 4. Convert roster to diagnostics format
+  const diagnosticAssignments: Assignment[] = roster.map(a => ({
+    staffId: a.staffId,
+    date: a.date.toISOString().split('T')[0],
+    shiftCode: a.shift,
+    dayIndex: a.dayIndex
+  }));
+  
+  // 5. Run pattern adherence diagnostics
+  console.log('📊 [AtlasGenerator] Running pattern adherence analysis');
+  const staffSummary = summariseDiagnostics(diagnosticAssignments, patternMap, staffPatternMap);
+  
+  const totalShifts = staffSummary.reduce((sum, s) => sum + s.totalShifts, 0);
+  const totalMatching = staffSummary.reduce((sum, s) => sum + s.matchingShifts, 0);
+  const avgCompliance = totalShifts > 0 ? Math.round((totalMatching / totalShifts) * 100) : 0;
+  const fullyCompliant = staffSummary.filter(s => s.patternCompliance === 100).length;
+  
+  // 6. Run WTD validation per staff member
+  console.log('⚖️ [AtlasGenerator] Running WTD compliance checks');
+  const restViolations: Record<string, string[]> = {};
+  const weeklyAverageCompliant: Record<string, boolean> = {};
+  const avgHoursPerWeek: Record<string, number> = {};
+  
+  // Group assignments by staff
+  const staffAssignments = roster.reduce((acc, a) => {
+    if (!acc[a.staffId]) acc[a.staffId] = [];
+    acc[a.staffId].push(a);
+    return acc;
+  }, {} as Record<string, RosterAssignment[]>);
+  
+  for (const [staffId, assignments] of Object.entries(staffAssignments)) {
+    // Convert to ShiftRecords
+    const shiftRecords: ShiftRecord[] = assignments.map(a => {
+      const shiftTimes = getDefaultShiftTimes(a.shift);
+      const start = new Date(`${a.date.toISOString().split('T')[0]}T${shiftTimes.start}`);
+      let end = new Date(`${a.date.toISOString().split('T')[0]}T${shiftTimes.end}`);
+      
+      // Handle overnight shifts
+      if (end <= start) {
+        end.setDate(end.getDate() + 1);
+      }
+      
+      return { staffId, start, end };
+    });
+    
+    // Check rest periods
+    restViolations[staffId] = checkRestPeriods(shiftRecords);
+    
+    // Check weekly average
+    weeklyAverageCompliant[staffId] = checkWeeklyAverage(shiftRecords);
+    
+    // Calculate average hours
+    const totalMs = shiftRecords.reduce((sum, r) => 
+      sum + (r.end.getTime() - r.start.getTime()), 0
+    );
+    const totalHours = totalMs / (1000 * 60 * 60);
+    const sorted = [...shiftRecords].sort((a, b) => a.start.getTime() - b.start.getTime());
+    const spanMs = sorted.length > 0
+      ? sorted[sorted.length - 1].end.getTime() - sorted[0].start.getTime()
+      : 0;
+    const spanWeeks = Math.max(spanMs / (1000 * 60 * 60 * 24 * 7), 17);
+    avgHoursPerWeek[staffId] = parseFloat((totalHours / spanWeeks).toFixed(1));
+  }
+  
+  // 7. Log summary
+  const totalViolations = Object.values(restViolations).reduce((sum, v) => sum + v.length, 0);
+  const compliantStaff = Object.values(weeklyAverageCompliant).filter(c => c).length;
+  
+  console.log('✅ [AtlasGenerator] Validation complete:', {
+    totalAssignments: roster.length,
+    patternCompliance: `${avgCompliance}%`,
+    restViolations: totalViolations,
+    wtdCompliantStaff: `${compliantStaff}/${Object.keys(weeklyAverageCompliant).length}`
+  });
+  
+  return {
+    roster,
+    diagnostics: {
+      restViolations,
+      weeklyAverageCompliant,
+      avgHoursPerWeek,
+      staffSummary,
+      overallCompliance: { avgCompliance, totalShifts, fullyCompliant }
+    }
+  };
+}
+
+/**
+ * Get default shift times based on shift code
+ */
+function getDefaultShiftTimes(shiftCode: string): { start: string; end: string } {
+  const times: Record<string, { start: string; end: string }> = {
+    'E': { start: '06:00:00', end: '14:00:00' },
+    'L': { start: '14:00:00', end: '22:00:00' },
+    'N': { start: '22:00:00', end: '06:00:00' },
+    'D': { start: '08:00:00', end: '20:00:00' }, // 12-hour day
+  };
+  
+  return times[shiftCode] || { start: '08:00:00', end: '16:00:00' };
 }
