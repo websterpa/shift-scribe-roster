@@ -1,7 +1,6 @@
-
 /**
  * This file serves as a redirector for backward compatibility.
- * All functionality has been moved to more focused utility files.
+ * All functionality has been moved to the services layer.
  */
 
 import { createLogger } from "./errorLogger";
@@ -9,22 +8,17 @@ import { createLogger } from "./errorLogger";
 const logger = createLogger('EnhancedRosterCalculations');
 logger.info('Using refactored roster calculation utilities');
 
-// Re-export functionality from new utility files
+// Re-export functionality from services layer
 export { 
   generateRoster,
   getDefaultRatePolicy,
   getDefaultRestRules,
   getDefaultGeneratorConfig
-} from "./roster/rosterGeneration";
+} from "@/services/roster/helpers/rosterGeneration";
 
 export {
   generateAndSaveRoster
 } from "@/services/roster/generation";
-
-export {
-  saveRosterVersion,
-  generateRosterAssignments
-} from "./roster/rosterHelpers";
 
 export {
   fetchStaffMembers

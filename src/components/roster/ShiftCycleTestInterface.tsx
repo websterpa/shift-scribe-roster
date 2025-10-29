@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, XCircle, TestTube, RefreshCw } from 'lucide-react';
-import { generateShiftCycle, validateShiftCycle } from '@/utils/roster/shiftCycleGenerator';
+import { generateShiftCycle, validateShiftCycle } from '@/services/roster/helpers/shiftCycleGenerator';
 
 export const ShiftCycleTestInterface = () => {
   const [cycleLength, setCycleLength] = useState(14);

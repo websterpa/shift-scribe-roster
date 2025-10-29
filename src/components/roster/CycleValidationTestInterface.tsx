@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle, XCircle, TestTube, RefreshCw, AlertTriangle, TrendingUp } from 'lucide-react';
-import { generateEnhancedRosterCycle, validateEnhancedCycle, CycleValidationResult } from '@/utils/roster/enhancedCycleIntegration';
+import { generateEnhancedRosterCycle, validateEnhancedCycle, CycleValidationResult } from '@/services/roster/helpers/enhancedCycleIntegration';
 import { StaffMember } from '@/types/roster';
 
 interface TestStaff {

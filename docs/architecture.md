@@ -35,10 +35,6 @@ src/
 │   ├── constraints/               # WTD rules and validation
 │   ├── cost/                      # Shift costing
 │   └── time/                      # Time expansion utilities
-│
-└── utils/
-    └── roster/                    # Compatibility shim (stable)
-        └── index.ts               # Re-exports from services layer
 ```
 
 ### Import Paths
@@ -53,7 +49,11 @@ import {
   calculateOptimalStaffing,
   validateStaffingRequirements,
   analyzeStaffUtilization,
-  createOTCycleEntry
+  createOTCycleEntry,
+  normalizeShiftCode,
+  buildDemand,
+  checkNightReadiness,
+  hasDailyRest
 } from '@/services/roster/helpers';
 
 // Engine (advanced usage)
@@ -63,12 +63,6 @@ import {
   costShift,
   validateRest
 } from '@/features/roster/engine';
-```
-
-#### ⚠️ Legacy (Compatibility Shim)
-```typescript
-// Still works via stable compatibility layer
-import { generateAndSaveRoster } from '@/utils/roster';
 ```
 
 ### Architecture Principles
@@ -83,34 +77,24 @@ import { generateAndSaveRoster } from '@/utils/roster';
    UI Components → services/roster → features/roster/engine → engine2
    ```
 
-3. **Backward Compatibility**
-   - `src/utils/roster/index.ts` provides stable shim
-   - No breaking changes for existing code
-   - Gradual migration path for tests
-
-4. **Helper Organization**
+3. **Helper Organization**
+   - All roster utilities now live in `src/services/roster/helpers/`
    - Staffing calculations: optimal staffing, validation
    - OT assignments: variable overtime utilities
    - Utilization analysis: workload distribution
    - Validation utilities: requirement validation
+   - Shift normalization and window resolution
+   - Night readiness checks and demand building
 
 ### Migration Status
 
 ✅ **Completed**
-- Core helpers migrated to `services/roster/helpers/`
+- All roster utilities migrated to `services/roster/helpers/`
+- `src/utils/roster/` directory completely removed
+- All production imports updated to services layer
+- All test imports updated to services layer
 - Main generation function in `services/roster/generation.ts`
 - Engine2 API exposed via `features/roster/engine/`
-- Production components updated to services imports
-- Compatibility shim established
-
-🔄 **In Progress**
-- Test suite migration (gradual)
-- Additional utility functions (phase 2c)
-
-📋 **Planned**
-- Complete test migration by 2025-11-15
-- Remove deprecated helper files after tests updated
-- Archive old utils after full transition
 
 ### Testing Strategy
 
@@ -146,18 +130,17 @@ try {
 
 ### Future Enhancements
 
-1. **Phase 2b**: Migrate remaining utils
-   - staffHelpers.ts
-   - enhancedCycleIntegration.ts
-   - shiftCycleGenerator.ts
-   - rosterGeneration.ts
+1. **Performance Optimization**
+   - Engine result caching
+   - Parallel roster generation
+   - Incremental updates
 
-2. **Phase 2c**: Test migration
-   - Update test imports to services layer
-   - Remove old test fixtures
-   - Consolidate test utilities
+2. **Feature Additions**
+   - Advanced shift patterns
+   - Multi-site rostering
+   - Real-time constraint validation
 
-3. **Phase 3**: Documentation
+3. **Documentation**
    - API reference generation
    - Integration guides
    - Performance benchmarks

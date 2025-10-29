@@ -1,6 +1,6 @@
 import React from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { normalizeShiftCode } from "@/utils/roster/normalizeShift";
+import { normalizeShiftCode } from "@/services/roster/helpers/normalizeShift";
 
 type Props = { versionId: string };
 

@@ -1,5 +1,5 @@
 
-import { generateEnhancedRosterCycle } from './roster/enhancedCycleIntegration';
+import { generateEnhancedRosterCycle } from '@/services/roster/helpers/enhancedCycleIntegration';
 
 type ShiftCode = "D" | "E" | "L" | "N" | "R" | "S";
 

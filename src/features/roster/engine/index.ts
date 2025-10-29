@@ -5,7 +5,7 @@
  * and validation logic, wrapping the engine2 implementation.
  * 
  * IMPORTANT: All roster generation features should import from this module
- * instead of directly importing from engine2/* or src/utils/roster/*.
+ * or from @/services/roster/helpers for utility functions.
  * 
  * @module roster/engine
  */

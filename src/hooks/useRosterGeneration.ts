@@ -37,7 +37,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     name?: string;
     general?: string;
   }>({});
-  const [validationReport, setValidationReport] = useState<import('@/utils/roster/staffingValidation').StaffingValidationReport | null>(null);
+  const [validationReport, setValidationReport] = useState<import('@/services/roster/helpers/validationUtils').StaffingValidationReport | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     setIsValidating(true);
     
     try {
-      const { validateStaffingRequirements } = await import('@/utils/roster/staffingValidation');
+      const { validateStaffingRequirements } = await import('@/services/roster/helpers/validationUtils');
       const report = validateStaffingRequirements(staff, config);
       
       setValidationReport(report);

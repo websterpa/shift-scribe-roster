@@ -1,6 +1,6 @@
 
 import { createLogger } from "../errorLogger";
-import { hasDailyRest, enforceRestRequirement } from "../roster/restValidation";
+import { hasDailyRest, enforceRestRequirement } from "@/services/roster/helpers/restValidation";
 
 const logger = createLogger('CoreFixesTest');
 
