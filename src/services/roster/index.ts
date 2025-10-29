@@ -67,3 +67,15 @@ export type {
 // ============================================================================
 
 export { DEFAULT_CORRECTIVE_POLICY } from '@/features/roster/engine';
+
+// ============================================================================
+// COMPATIBILITY HELPERS (Phase 2a)
+// ============================================================================
+
+/**
+ * Compatibility helpers re-exported for backward compatibility.
+ * These are thin adapters around src/utils/roster/* helpers.
+ * 
+ * TODO: Phase 2b - Migrate underlying implementations to services layer
+ */
+export * from './helpers';
