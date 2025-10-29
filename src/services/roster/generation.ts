@@ -500,7 +500,8 @@ export async function generateAndSaveRoster(
         diagnostics: {
           staffPoolCount: correctiveStaff.length,
           staffUsedCount: staffIdsWithPatterns.size,
-          distributionStats: {}
+          distributionStats: {},
+          patternAdherence: []
         }
       };
       
@@ -523,6 +524,13 @@ export async function generateAndSaveRoster(
     
     let totalCompliance = 0;
     let staffWithPatternsCount = 0;
+    const patternAdherenceData: Array<{
+      staffId: string;
+      staffName?: string;
+      expectedDutyDays: number;
+      matchedDutyDays: number;
+      adherencePct: number;
+    }> = [];
     
     // Calculate compliance for each staff member
     for (const [staffId, assignments] of Object.entries(grouped)) {
@@ -575,6 +583,15 @@ export async function generateAndSaveRoster(
       totalCompliance += compliancePct;
       staffWithPatternsCount++;
       
+      // Store in diagnostics array
+      patternAdherenceData.push({
+        staffId,
+        staffName,
+        expectedDutyDays: shifts.length,
+        matchedDutyDays: matches,
+        adherencePct: compliancePct,
+      });
+      
       const icon = compliancePct >= 95 ? '✅' : compliancePct >= 80 ? '⚠️' : '❌';
       console.log(
         `   ${icon} Pattern: "${patternData.name}" | Compliance: ${compliancePct.toFixed(1)}% (${matches}/${shifts.length} matches)`
@@ -590,6 +607,9 @@ export async function generateAndSaveRoster(
     console.log(`   • Total assignments generated: ${result.assignments.length}`);
     
     console.groupEnd();
+    
+    // Store pattern adherence in diagnostics
+    result.diagnostics.patternAdherence = patternAdherenceData;
     
       logger.info('Pattern compliance diagnostics', {
         totalStaff: Object.keys(grouped).length,

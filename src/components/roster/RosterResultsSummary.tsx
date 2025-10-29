@@ -274,6 +274,131 @@ export const RosterResultsSummary: React.FC<RosterResultsSummaryProps> = ({ resu
           </CardContent>
         </Card>
 
+        {/* Pattern Compliance - NEW */}
+        {(() => {
+          const diagnostics = result.diagnostics;
+          if (!diagnostics || !('patternAdherence' in diagnostics)) {
+            return null;
+          }
+
+          const patternAdherence = diagnostics.patternAdherence;
+          if (!patternAdherence || patternAdherence.length === 0) {
+            return null;
+          }
+
+          const avgCompliance = patternAdherence.reduce((sum, s) => sum + s.adherencePct, 0) / patternAdherence.length;
+          const allCompliant = patternAdherence.every(s => s.adherencePct >= 95);
+
+          return (
+            <Card 
+              key="pattern-compliance"
+              className={`border-2 ${
+                allCompliant 
+                  ? 'border-green-200 bg-green-50/50' 
+                  : 'border-blue-200 bg-blue-50/50'
+              }`}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="h-5 w-5" />
+                  Pattern Adherence
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Overall Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-4 border-b">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Status</div>
+                    <div className={`flex items-center gap-2 text-xl font-bold ${
+                      allCompliant ? 'text-green-600' : 'text-blue-600'
+                    }`}>
+                      {allCompliant ? (
+                        <>
+                          <CheckCircle className="h-5 w-5" />
+                          Excellent
+                        </>
+                      ) : (
+                        <>
+                          <Target className="h-5 w-5" />
+                          Good
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Avg Adherence</div>
+                    <div className={`text-xl font-medium ${
+                      avgCompliance >= 95 ? 'text-green-600' : 'text-blue-600'
+                    }`}>
+                      {avgCompliance.toFixed(1)}%
+                    </div>
+                    <Badge variant={avgCompliance >= 95 ? "default" : "secondary"} className="text-xs mt-1">
+                      {patternAdherence.length} staff tracked
+                    </Badge>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Perfect Match</div>
+                    <div className="text-xl font-medium">
+                      {patternAdherence.filter(s => s.adherencePct === 100).length}
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs mt-1"
+                    >
+                      of {patternAdherence.length} staff
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Staff Details */}
+                {patternAdherence.filter(s => s.adherencePct < 95).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      Staff Below Target (95%)
+                    </h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {patternAdherence
+                        .filter(s => s.adherencePct < 95)
+                        .sort((a, b) => a.adherencePct - b.adherencePct)
+                        .map((staff) => (
+                          <div 
+                            key={staff.staffId}
+                            className="p-3 rounded-lg border bg-blue-50 border-blue-200"
+                          >
+                            <div className="font-medium text-sm mb-1 flex items-center justify-between">
+                              <span>{staff.staffName || staff.staffId}</span>
+                              <Badge 
+                                variant={staff.adherencePct >= 80 ? "secondary" : "destructive"} 
+                                className="text-xs"
+                              >
+                                {staff.adherencePct.toFixed(1)}%
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Matched {staff.matchedDutyDays} of {staff.expectedDutyDays} expected pattern days
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Compliant Message */}
+                {allCompliant && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <div className="text-sm">
+                      <div className="font-medium text-green-900">All staff follow their assigned patterns</div>
+                      <div className="text-green-700">Pattern compliance ≥95% across all {patternAdherence.length} staff members</div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* WTD Compliance - NEW */}
         {(() => {
           const diagnostics = result.diagnostics;

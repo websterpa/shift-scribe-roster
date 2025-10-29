@@ -110,6 +110,13 @@ export interface CorrectiveResult {
       }>;
       avgRestCompliancePct: number;
     };
+    patternAdherence?: Array<{
+      staffId: string;
+      staffName?: string;
+      expectedDutyDays: number;
+      matchedDutyDays: number;
+      adherencePct: number;
+    }>;
   };
   unfilledShifts?: Array<{ // Diagnostic: why shifts couldn't be filled
     dateISO: string;
