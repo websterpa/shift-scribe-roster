@@ -1,3 +1,4 @@
+// TODO: Migrate to @/services/roster by 2025-11-15
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';

@@ -30,7 +30,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 // Mock the roster generator
-vi.mock('@/utils/roster/generateAndSaveRoster', () => ({
+vi.mock('@/services/roster', () => ({
   generateAndSaveRoster: vi.fn(() => Promise.resolve({
     versionId: 'test-version-id',
     totalAssignments: 2,
