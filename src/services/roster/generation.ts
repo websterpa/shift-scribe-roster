@@ -321,6 +321,23 @@ export async function generateAndSaveRoster(
   if (config.patternLocked) {
     logger.info('🔒 Pattern-locked mode enabled - generating from staff patterns');
     
+    // Log which staff have patterns assigned
+    const staffWithPatterns = dedupedStaffList.filter(s => s.pattern_id);
+    const staffWithoutPatterns = dedupedStaffList.filter(s => !s.pattern_id);
+    
+    console.group('🎯 Pattern Assignment Status');
+    console.log(`✅ Staff with patterns: ${staffWithPatterns.length}`);
+    staffWithPatterns.forEach(s => {
+      console.log(`   - ${s.first_name} ${s.last_name}: pattern ${s.pattern_id}, offset ${s.pattern_offset || 0}`);
+    });
+    if (staffWithoutPatterns.length > 0) {
+      console.warn(`⚠️ Staff without patterns: ${staffWithoutPatterns.length}`);
+      staffWithoutPatterns.forEach(s => {
+        console.warn(`   - ${s.first_name} ${s.last_name}: NO PATTERN ASSIGNED`);
+      });
+    }
+    console.groupEnd();
+    
     // Step 1: Read and increment cycle index for rotation fairness
     const currentCycleIndex = configData.cycle_index ?? 0;
     const nextCycleIndex = currentCycleIndex + 1;

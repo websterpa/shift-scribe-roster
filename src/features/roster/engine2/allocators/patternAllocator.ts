@@ -85,6 +85,12 @@ export async function patternAllocator(
   logger.info('Loaded patterns', { 
     patternCount: patterns.length,
     patternIds,
+    patterns: patterns.map(p => ({
+      id: p.id,
+      system: p.system,
+      sequenceLength: p.sequence.length,
+      sequence: p.sequence.join(','),
+    })),
   });
 
   // Generate assignments for each staff member
@@ -234,11 +240,16 @@ function generateStaffAssignments(
     prevCode = shiftCode;
   }
 
-  logger.debug('Generated assignments for staff', {
+  logger.info('Generated assignments for staff', {
     staffId: member.id,
+    staffName: `${member.first_name} ${member.last_name}`.trim() || 'Unknown',
     assignmentCount: assignments.length,
     totalDays,
     patternLength: seq.length,
+    patternOffset: offset,
+    patternCycle: cycle,
+    patternSequence: seq.join(','),
+    assignedShifts: assignments.map(a => a.shift_code).join(','),
   });
 
   return assignments;
