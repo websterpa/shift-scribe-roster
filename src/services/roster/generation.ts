@@ -377,103 +377,140 @@ export async function generateAndSaveRoster(
       }
     }
     
-    // Import pattern generation utilities
-    const { generatePatternLockedDuties } = await import('@/features/roster/patterns/generator');
-    const { getTenantId } = await import('@/features/tenant/useTenant');
+    // Import pattern allocation utilities
+    const { patternAllocator } = await import('@/features/roster/engine2/allocators/patternAllocator');
     
-    // Step 3: Generate duties from rotated patterns
-    const patternResult = await generatePatternLockedDuties({
-      startDate: days[0],
-      endDate: days[days.length - 1],
-      staffIds: dedupedStaffList.map(s => s.id),
-      tenantId: getTenantId(),
-      siteId: configData.site_id || null,
-      framework: shiftSystem === '12h' ? '12h' : '8h'
+    // Step 3: Generate duties from rotated patterns using pattern allocator
+    const rosterStart = new Date(days[0] + 'T00:00:00');
+    const rosterEnd = new Date(days[days.length - 1] + 'T23:59:59');
+    
+    logger.info('🎯 Calling patternAllocator', {
+      rosterStart: rosterStart.toISOString(),
+      rosterEnd: rosterEnd.toISOString(),
+      staffCount: dedupedStaffList.length,
     });
     
-    logger.info(`Pattern generation complete`, {
-      dutiesCount: patternResult.duties.length,
-      staffWithPatterns: patternResult.staffWithPatterns.length,
-      staffWithoutPatterns: patternResult.staffWithoutPatterns.length,
-      warnings: patternResult.warnings
+    const patternAssignments = await patternAllocator({
+      rosterStart,
+      rosterEnd,
+      staff: dedupedStaffList.map(s => ({
+        id: s.id,
+        pattern_id: s.pattern_id,
+        pattern_offset: s.pattern_offset,
+        opted_out_wtd: s.opted_out_wtd,
+        wtd_opt_out: s.wtd_opt_out,
+        first_name: s.first_name,
+        last_name: s.last_name,
+      })),
+      supabase,
     });
     
-    // Show warnings if any staff lack patterns
-    if (patternResult.staffWithoutPatterns.length > 0) {
+    logger.info(`Pattern allocation complete`, {
+      assignmentsCount: patternAssignments.length,
+    });
+    
+    // SAFEGUARD: Fallback to coverage-first if no pattern assignments generated
+    if (patternAssignments.length === 0) {
+      logger.warn('⚠️ Pattern allocator returned 0 assignments, falling back to coverage-first mode');
       toast({
-        title: "Staff Without Patterns",
-        description: `${patternResult.staffWithoutPatterns.length} staff members have no pattern assigned and were skipped.`,
+        title: "Pattern Allocation Empty",
+        description: "No staff have patterns assigned. Falling back to coverage-first allocation.",
         variant: "destructive",
       });
-    }
-    
-    // Convert PatternDuty[] to CorrectiveResult format for downstream compatibility
-    const assignmentsByDate: Record<string, Array<{ staffId: string; shiftCode: string }>> = {};
-    patternResult.duties.forEach(duty => {
-      if (!assignmentsByDate[duty.date]) {
-        assignmentsByDate[duty.date] = [];
-      }
-      assignmentsByDate[duty.date].push({ 
-        staffId: duty.staffId, 
-        shiftCode: duty.shiftCode 
+      
+      // Generate using coverage-first mode as fallback
+      result = generateCorrectiveRoster({
+        days,
+        staff: correctiveStaff,
+        requirements,
+        policy: DEFAULT_CORRECTIVE_POLICY,
       });
-    });
-    
-    // Calculate coverage
-    const coverage: Record<string, { E: number; L: number; N: number; D: number }> = {};
-    days.forEach(dateISO => {
-      const dayAssignments = assignmentsByDate[dateISO] || [];
-      coverage[dateISO] = {
-        E: dayAssignments.filter(a => a.shiftCode === 'E').length,
-        L: dayAssignments.filter(a => a.shiftCode === 'L').length,
-        N: dayAssignments.filter(a => a.shiftCode === 'N').length,
-        D: dayAssignments.filter(a => a.shiftCode === 'D').length,
+      
+      logger.info('Fallback to coverage-first complete', {
+        assignmentsCount: result.assignments.length
+      });
+    } else {
+      // Convert PatternAssignment[] to CorrectiveResult format for downstream compatibility
+      const assignmentsByDate: Record<string, Array<{ staffId: string; shiftCode: string }>> = {};
+      patternAssignments.forEach(assignment => {
+        const dateISO = assignment.date.toISOString().split('T')[0];
+        if (!assignmentsByDate[dateISO]) {
+          assignmentsByDate[dateISO] = [];
+        }
+        assignmentsByDate[dateISO].push({ 
+          staffId: assignment.staff_id, 
+          shiftCode: assignment.shift_code 
+        });
+      });
+      
+      // Calculate coverage
+      const coverage: Record<string, { E: number; L: number; N: number; D: number }> = {};
+      days.forEach(dateISO => {
+        const dayAssignments = assignmentsByDate[dateISO] || [];
+        coverage[dateISO] = {
+          E: dayAssignments.filter(a => a.shiftCode === 'E').length,
+          L: dayAssignments.filter(a => a.shiftCode === 'L').length,
+          N: dayAssignments.filter(a => a.shiftCode === 'N').length,
+          D: dayAssignments.filter(a => a.shiftCode === 'D').length,
+        };
+      });
+      
+      // Calculate staff totals
+      const staffTotals: Record<string, { E: number; L: number; N: number; D: number; total: number }> = {};
+      patternAssignments.forEach(assignment => {
+        if (!staffTotals[assignment.staff_id]) {
+          staffTotals[assignment.staff_id] = { E: 0, L: 0, N: 0, D: 0, total: 0 };
+        }
+        const key = assignment.shift_code as 'E' | 'L' | 'N' | 'D';
+        staffTotals[assignment.staff_id][key]++;
+        staffTotals[assignment.staff_id].total++;
+      });
+      
+      
+      const staffIdsWithPatterns = new Set(patternAssignments.map(a => a.staff_id));
+      const staffWithoutPatterns = dedupedStaffList.filter(s => !staffIdsWithPatterns.has(s.id));
+      
+      // Show warnings if any staff lack patterns
+      if (staffWithoutPatterns.length > 0) {
+        toast({
+          title: "Staff Without Patterns",
+          description: `${staffWithoutPatterns.length} staff members have no pattern assigned and were skipped.`,
+          variant: "destructive",
+        });
+      }
+      
+      // Build result in CorrectiveResult format
+      result = {
+        assignments: patternAssignments.map(assignment => ({
+          staffId: assignment.staff_id,
+          dateISO: assignment.date.toISOString().split('T')[0],
+          shiftType: assignment.shift_code as 'E' | 'L' | 'N' | 'D'
+        })),
+        roster: {}, // Not needed for pattern-locked mode
+        coverage,
+        fairness: {
+          staffTotals,
+          targets: { E: 0, L: 0, N: 0, D: 0 }, // Not relevant for pattern-locked
+          variance: { E: 0, L: 0, N: 0, D: 0 }
+        },
+        violations: [],
+        utilizationReport: Object.fromEntries(
+          Object.entries(staffTotals).map(([id, totals]) => [id, totals.total])
+        ),
+        diagnostics: {
+          staffPoolCount: correctiveStaff.length,
+          staffUsedCount: staffIdsWithPatterns.size,
+          distributionStats: {}
+        }
       };
-    });
-    
-    // Calculate staff totals
-    const staffTotals: Record<string, { E: number; L: number; N: number; D: number; total: number }> = {};
-    patternResult.duties.forEach(duty => {
-      if (!staffTotals[duty.staffId]) {
-        staffTotals[duty.staffId] = { E: 0, L: 0, N: 0, D: 0, total: 0 };
-      }
-      const key = duty.shiftCode as 'E' | 'L' | 'N' | 'D';
-      staffTotals[duty.staffId][key]++;
-      staffTotals[duty.staffId].total++;
-    });
-    
-    // Build result in CorrectiveResult format
-    result = {
-      assignments: patternResult.duties.map(duty => ({
-        staffId: duty.staffId,
-        dateISO: duty.date,
-        shiftType: duty.shiftCode as 'E' | 'L' | 'N' | 'D'
-      })),
-      roster: {}, // Not needed for pattern-locked mode
-      coverage,
-      fairness: {
-        staffTotals,
-        targets: { E: 0, L: 0, N: 0, D: 0 }, // Not relevant for pattern-locked
-        variance: { E: 0, L: 0, N: 0, D: 0 }
-      },
-      violations: [],
-      utilizationReport: Object.fromEntries(
-        Object.entries(staffTotals).map(([id, totals]) => [id, totals.total])
-      ),
-      diagnostics: {
-        staffPoolCount: correctiveStaff.length,
-        staffUsedCount: patternResult.staffWithPatterns.length,
-        distributionStats: {}
-      }
-    };
-    
-    logger.info('Pattern-locked roster generation complete', {
-      assignmentsCount: result.assignments.length,
-      staffUsed: patternResult.staffWithPatterns.length
-    });
-    
-    // 🧮 PATTERN COMPLIANCE DIAGNOSTICS (Always enabled)
-    console.group('🧮 POST-GENERATION DIAGNOSTICS: Pattern Compliance');
+      
+      logger.info('Pattern-locked roster generation complete', {
+        assignmentsCount: result.assignments.length,
+        staffUsed: result.diagnostics.staffUsedCount
+      });
+      
+      // 🧮 PATTERN COMPLIANCE DIAGNOSTICS (Always enabled for pattern mode)
+      console.group('🧮 POST-GENERATION DIAGNOSTICS: Pattern Compliance');
     
     // Group assignments by staff
     const grouped = result.assignments.reduce((acc, assignment) => {
@@ -485,7 +522,7 @@ export async function generateAndSaveRoster(
     }, {} as Record<string, Array<{ staffId: string; dateISO: string; shiftType: string }>>);
     
     let totalCompliance = 0;
-    let staffWithPatterns = 0;
+    let staffWithPatternsCount = 0;
     
     // Calculate compliance for each staff member
     for (const [staffId, assignments] of Object.entries(grouped)) {
@@ -536,7 +573,7 @@ export async function generateAndSaveRoster(
       
       const compliancePct = shifts.length > 0 ? (matches / shifts.length * 100) : 0;
       totalCompliance += compliancePct;
-      staffWithPatterns++;
+      staffWithPatternsCount++;
       
       const icon = compliancePct >= 95 ? '✅' : compliancePct >= 80 ? '⚠️' : '❌';
       console.log(
@@ -545,21 +582,22 @@ export async function generateAndSaveRoster(
     }
     
     // Log summary statistics
-    const avgCompliance = staffWithPatterns > 0 ? (totalCompliance / staffWithPatterns) : 0;
+    const avgCompliance = staffWithPatternsCount > 0 ? (totalCompliance / staffWithPatternsCount) : 0;
     console.log("\n📈 SUMMARY:");
     console.log(`   • Total staff scheduled: ${Object.keys(grouped).length}`);
-    console.log(`   • Staff with patterns: ${staffWithPatterns}`);
+    console.log(`   • Staff with patterns: ${staffWithPatternsCount}`);
     console.log(`   • Average pattern compliance: ${avgCompliance.toFixed(1)}%`);
     console.log(`   • Total assignments generated: ${result.assignments.length}`);
     
     console.groupEnd();
     
-    logger.info('Pattern compliance diagnostics', {
-      totalStaff: Object.keys(grouped).length,
-      staffWithPatterns,
-      avgCompliance: avgCompliance.toFixed(1),
-      totalAssignments: result.assignments.length
-    });
+      logger.info('Pattern compliance diagnostics', {
+        totalStaff: Object.keys(grouped).length,
+        staffWithPatterns: staffWithPatternsCount,
+        avgCompliance: avgCompliance.toFixed(1),
+        totalAssignments: result.assignments.length
+      });
+    }
   } else {
     // COVERAGE-FIRST MODE: Use traditional corrective generator
     logger.info('📊 Coverage-first mode - using corrective generator');
