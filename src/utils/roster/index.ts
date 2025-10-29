@@ -9,4 +9,9 @@
  * @see src/services/roster/generation.ts
  */
 
+if (import.meta?.env?.DEV) {
+  // eslint-disable-next-line no-console
+  console.warn('[DEPRECATED] Import from "@/services/roster" instead of "@/utils/roster".');
+}
+
 export { generateAndSaveRoster } from '@/services/roster/generation';
