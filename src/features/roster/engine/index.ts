@@ -385,6 +385,80 @@ export {
  */
 
 // ============================================================================
+// RE-EXPORTS: ROSTER HELPERS
+// ============================================================================
+
+export {
+  // Staffing calculators
+  calculateOptimalStaffing,
+  validateStaffingAgainstRequirements,
+  type StaffingCalculation,
+  type StaffingRecommendation,
+  
+  // Overtime assignments
+  createOTCycleEntry,
+  createCommonOTPatterns,
+  validateOTRequest,
+  buildMixedCycleExample,
+  type OTAssignmentRequest,
+  
+  // Validation utilities
+  validateStaffingRequirements,
+  formatValidationReport,
+  type StaffingValidationReport,
+  
+  // Utilization analysis
+  analyzeStaffUtilization,
+  calculateProjectedUtilization,
+  type StaffUtilizationMetrics,
+  type UtilizationAnalysisReport
+} from '@/services/roster/helpers/index';
+
+/**
+ * Roster helper utilities for staffing, validation, and analysis
+ * 
+ * STAFFING CALCULATORS:
+ * - calculateOptimalStaffing: Compute optimal staff distribution across shifts
+ * - validateStaffingAgainstRequirements: Verify staff pool meets coverage needs
+ * 
+ * OVERTIME ASSIGNMENTS:
+ * - createOTCycleEntry: Create variable OT shift entries with custom hours
+ * - createCommonOTPatterns: Generate standard OT patterns (morning, evening, etc.)
+ * - validateOTRequest: Validate OT assignment requests before scheduling
+ * - buildMixedCycleExample: Build example roster with mixed regular/OT shifts
+ * 
+ * VALIDATION UTILITIES:
+ * - validateStaffingRequirements: Validate coverage requirements format/logic
+ * - formatValidationReport: Format validation results for display
+ * 
+ * UTILIZATION ANALYSIS:
+ * - analyzeStaffUtilization: Analyze staff workload distribution and balance
+ * - calculateProjectedUtilization: Project future utilization based on patterns
+ * 
+ * @example
+ * ```ts
+ * import { 
+ *   calculateOptimalStaffing,
+ *   createOTCycleEntry,
+ *   validateStaffingRequirements,
+ *   analyzeStaffUtilization 
+ * } from '@/features/roster/engine';
+ * 
+ * // Calculate optimal staffing
+ * const optimal = calculateOptimalStaffing(requirements, availableStaff);
+ * 
+ * // Create OT assignment
+ * const otEntry = createOTCycleEntry(0, 'staff-123', { otHours: 4, otStartLocalTime: '10:00' });
+ * 
+ * // Validate requirements
+ * const validation = validateStaffingRequirements(requirements);
+ * 
+ * // Analyze utilization
+ * const utilization = analyzeStaffUtilization(assignments, staff);
+ * ```
+ */
+
+// ============================================================================
 // LEGACY COMPATIBILITY NOTES
 // ============================================================================
 
