@@ -42,17 +42,18 @@ function normalizePatternSequence(sequence: unknown): ShiftCode[] {
 }
 
 /**
- * Load site-wide patterns from public.site_patterns table
+ * Load shift patterns from public.site_patterns table
+ * Note: Table name is "site_patterns" for legacy reasons but represents "Shift Patterns" in UI
  * @param tenantId - Tenant identifier for filtering (future)
  * @returns Array of canonical PatternTemplate objects
  */
 export async function loadSitePatterns(tenantId: string): Promise<PatternTemplate[]> {
-  console.log('📦 Loading site patterns for tenant:', tenantId);
+  console.log('📦 Loading shift patterns for tenant:', tenantId);
   
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.warn('⚠️ No authenticated user, cannot load site patterns');
+      console.warn('⚠️ No authenticated user, cannot load shift patterns');
       return [];
     }
 
@@ -64,7 +65,7 @@ export async function loadSitePatterns(tenantId: string): Promise<PatternTemplat
       .eq('created_by', user.id);
 
     if (error) {
-      console.error('❌ Error loading site patterns:', error);
+      console.error('❌ Error loading shift patterns:', error);
       toast({
         title: "Error loading patterns",
         description: error.message,
@@ -74,11 +75,11 @@ export async function loadSitePatterns(tenantId: string): Promise<PatternTemplat
     }
 
     if (!data) {
-      console.log('✓ No site patterns found');
+      console.log('✓ No shift patterns found');
       return [];
     }
 
-    console.log(`✓ Found ${data.length} site patterns in DB`);
+    console.log(`✓ Found ${data.length} shift patterns in DB`);
 
     // Map DB rows to PatternTemplate
     const templates: PatternTemplate[] = [];
@@ -110,11 +111,11 @@ export async function loadSitePatterns(tenantId: string): Promise<PatternTemplat
       });
     }
 
-    console.log(`✓ Loaded ${templates.length} valid site patterns`);
+    console.log(`✓ Loaded ${templates.length} valid shift patterns`);
     return templates;
 
   } catch (err) {
-    console.error('❌ Unexpected error loading site patterns:', err);
+    console.error('❌ Unexpected error loading shift patterns:', err);
     toast({
       title: "Failed to load patterns",
       description: "An unexpected error occurred",
@@ -206,7 +207,7 @@ export async function loadCustomPatterns(tenantId: string): Promise<PatternTempl
 }
 
 /**
- * Load all patterns (site + custom) for a tenant
+ * Load all patterns (shift patterns + custom) for a tenant
  */
 export async function loadAllPatterns(tenantId: string): Promise<PatternTemplate[]> {
   console.log('📦 Loading all patterns for tenant:', tenantId);
@@ -217,7 +218,7 @@ export async function loadAllPatterns(tenantId: string): Promise<PatternTemplate
   ]);
 
   const all = [...sitePatterns, ...customPatterns];
-  console.log(`✓ Total patterns loaded: ${all.length} (${sitePatterns.length} site, ${customPatterns.length} custom)`);
+  console.log(`✓ Total patterns loaded: ${all.length} (${sitePatterns.length} shift, ${customPatterns.length} custom)`);
   
   return all;
 }

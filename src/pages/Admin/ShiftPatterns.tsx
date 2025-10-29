@@ -36,7 +36,7 @@ export default function ShiftPatterns() {
   }, []);
 
   const loadPatterns = async () => {
-    logger.info('Loading site patterns');
+    logger.info('Loading shift patterns');
     setLoading(true);
     try {
       const data = await listPatterns(tenantId);

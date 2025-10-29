@@ -43,7 +43,7 @@ A **pattern binding** assigns a pattern to a specific staff member with a person
 
 **Resolution priority:**
 1. **Custom pattern binding** (if staff has a personal pattern assigned)
-2. **Site default pattern** (fallback for all staff at a site)
+2. **Shift pattern default** (fallback for all staff at a site)
 
 ```typescript
 const { template, binding } = await resolvePatternForStaff(
@@ -304,7 +304,9 @@ const result = await generatePatternLockedDuties({
 
 ## Database Schema
 
-### Site Patterns Table
+### Shift Patterns Table
+
+**Note:** The database table is named `site_patterns` for legacy reasons, but represents "Shift Patterns" in UI terminology.
 
 ```sql
 CREATE TABLE public.site_patterns (
@@ -350,13 +352,13 @@ CREATE TABLE public.staff_pattern_bindings (
 ### Loaders
 
 ```typescript
-// Load all site patterns for a tenant
+// Load all shift patterns for a tenant
 const sitePatterns = await loadSitePatterns(tenantId);
 
 // Load all custom patterns for a tenant
 const customPatterns = await loadCustomPatterns(tenantId);
 
-// Load both site and custom patterns
+// Load both shift and custom patterns
 const allPatterns = await loadAllPatterns(tenantId);
 ```
 

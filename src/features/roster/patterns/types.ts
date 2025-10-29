@@ -3,6 +3,9 @@
  * 
  * A "pattern" is the source of truth for each staff member: a repeating 
  * sequence of shift codes anchored at a personal start date.
+ * 
+ * Note: The database table is named "site_patterns" for legacy reasons,
+ * but this represents "Shift Patterns" in all UI-facing terminology.
  */
 
 // ============================================================================

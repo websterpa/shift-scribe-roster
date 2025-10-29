@@ -82,7 +82,7 @@ export async function getStaffPatternBinding(
 
 /**
  * Resolve which pattern template applies to a staff member
- * Priority: custom pattern binding > site default pattern
+ * Priority: custom pattern binding > shift pattern default
  * 
  * @param staffId - Staff member ID
  * @param tenantId - Tenant ID for filtering
@@ -133,11 +133,11 @@ export async function resolvePatternForStaff(
       return { template, binding };
     }
     
-    console.warn('⚠️ Custom pattern not found, falling back to site pattern');
+    console.warn('⚠️ Custom pattern not found, falling back to shift pattern');
   }
 
-  // Step 2: Fall back to site default pattern
-  console.log('🔍 Looking for site default pattern');
+  // Step 2: Fall back to shift pattern default
+  console.log('🔍 Looking for shift pattern default');
   const sitePatterns = await loadSitePatterns(tenantId);
   
   // Filter by site_id if provided
@@ -146,24 +146,24 @@ export async function resolvePatternForStaff(
     : sitePatterns;
 
   if (candidatePatterns.length === 0) {
-    console.error('❌ No site patterns found');
+    console.error('❌ No shift patterns found');
     toast({
       title: "No Pattern Assigned",
-      description: `No pattern found for ${staffName}. Please assign a pattern in Pattern Management.`,
+      description: `No pattern found for ${staffName}. Please assign a pattern in Shift Patterns.`,
       variant: "destructive",
     });
     throw new Error(`No pattern found for staff ${staffId}`);
   }
 
-  // Use the first available site pattern
+  // Use the first available shift pattern
   const template = candidatePatterns[0];
   
   // Validate template has non-empty sequence
   if (template.pattern_sequence.length === 0) {
-    console.error('❌ Site pattern has empty sequence:', template.id);
+    console.error('❌ Shift pattern has empty sequence:', template.id);
     toast({
       title: "Invalid Pattern",
-      description: `Site pattern "${template.pattern_name}" has no shift codes`,
+      description: `Shift pattern "${template.pattern_name}" has no shift codes`,
       variant: "destructive",
     });
     throw new Error(`Pattern ${template.id} has empty sequence`);
@@ -176,7 +176,7 @@ export async function resolvePatternForStaff(
     pattern_start_date: new Date().toISOString().split('T')[0], // Today as YYYY-MM-DD
   };
 
-  console.log('✅ Resolved to site default pattern:', template.pattern_name);
+  console.log('✅ Resolved to shift pattern default:', template.pattern_name);
   return { template, binding: defaultBinding };
 }
 
