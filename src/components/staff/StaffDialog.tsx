@@ -37,7 +37,11 @@ interface StaffMember {
   pattern_offset?: number;
 }
 
-interface SitePattern {
+/**
+ * Shift Pattern interface for staff assignment
+ * Note: Database table is 'public.site_patterns' but internally referred to as 'ShiftPattern'
+ */
+interface ShiftPattern {
   id: string;
   name: string;
   system: string;
@@ -74,7 +78,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
 }) => {
   const { user, isAuthenticated } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
-  const [patterns, setPatterns] = useState<SitePattern[]>([]);
+  const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
   const [formData, setFormData] = useState<Partial<StaffMember>>({
     employee_id: '',
     first_name: '',
@@ -116,7 +120,7 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
       }
       
       // Cast sequence from Json to string[]
-      const typedPatterns: SitePattern[] = (data || []).map(p => ({
+      const typedPatterns: ShiftPattern[] = (data || []).map(p => ({
         id: p.id,
         name: p.name,
         system: p.system,

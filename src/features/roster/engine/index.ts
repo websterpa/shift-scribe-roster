@@ -315,7 +315,8 @@ export {
   type PatternLockedConfig,
   
   // Pattern loaders
-  loadSitePatterns,
+  loadShiftPatterns,
+  loadSitePatterns, // deprecated alias
   loadCustomPatterns,
   loadAllPatterns,
   

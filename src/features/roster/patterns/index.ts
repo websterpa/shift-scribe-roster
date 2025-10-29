@@ -30,7 +30,8 @@ export type {
 // ============================================================================
 
 export {
-  loadSitePatterns,
+  loadShiftPatterns,
+  loadSitePatterns, // deprecated alias
   loadCustomPatterns,
   loadAllPatterns,
 } from './loaders';

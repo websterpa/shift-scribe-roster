@@ -43,11 +43,11 @@ function normalizePatternSequence(sequence: unknown): ShiftCode[] {
 
 /**
  * Load shift patterns from public.site_patterns table
- * Note: Table name is "site_patterns" for legacy reasons but represents "Shift Patterns" in UI
+ * Note: Database table is 'public.site_patterns' for legacy reasons but represents "Shift Patterns" in UI
  * @param tenantId - Tenant identifier for filtering (future)
  * @returns Array of canonical PatternTemplate objects
  */
-export async function loadSitePatterns(tenantId: string): Promise<PatternTemplate[]> {
+export async function loadShiftPatterns(tenantId: string): Promise<PatternTemplate[]> {
   console.log('📦 Loading shift patterns for tenant:', tenantId);
   
   try {
@@ -212,13 +212,19 @@ export async function loadCustomPatterns(tenantId: string): Promise<PatternTempl
 export async function loadAllPatterns(tenantId: string): Promise<PatternTemplate[]> {
   console.log('📦 Loading all patterns for tenant:', tenantId);
   
-  const [sitePatterns, customPatterns] = await Promise.all([
-    loadSitePatterns(tenantId),
+  const [shiftPatterns, customPatterns] = await Promise.all([
+    loadShiftPatterns(tenantId),
     loadCustomPatterns(tenantId),
   ]);
 
-  const all = [...sitePatterns, ...customPatterns];
-  console.log(`✓ Total patterns loaded: ${all.length} (${sitePatterns.length} shift, ${customPatterns.length} custom)`);
+  const all = [...shiftPatterns, ...customPatterns];
+  console.log(`✓ Total patterns loaded: ${all.length} (${shiftPatterns.length} shift, ${customPatterns.length} custom)`);
   
   return all;
 }
+
+/**
+ * @deprecated Use loadShiftPatterns instead
+ * Kept for backward compatibility during migration
+ */
+export const loadSitePatterns = loadShiftPatterns;

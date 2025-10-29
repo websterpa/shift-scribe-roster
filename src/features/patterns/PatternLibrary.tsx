@@ -13,7 +13,11 @@ import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { toast } from '@/hooks/use-toast';
 import { Clock, Users, Calendar, UserPlus, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
 
-interface SitePattern {
+/**
+ * Shift Pattern interface for pattern library
+ * Note: Database table is 'public.site_patterns' but internally referred to as 'ShiftPattern'
+ */
+interface ShiftPattern {
   id: string;
   name: string;
   description?: string;
@@ -44,7 +48,7 @@ const getShiftCodeColor = (code: string): string => {
 };
 
 const PatternCard: React.FC<{
-  pattern: SitePattern;
+  pattern: ShiftPattern;
   onAssign: (patternId: string) => void;
 }> = ({ pattern, onAssign }) => {
   const [expanded, setExpanded] = useState(false);
@@ -298,11 +302,11 @@ const StaffAssignmentDialog: React.FC<{
 export const PatternLibrary: React.FC = () => {
   const { user } = useSupabaseAuth();
   const { isAdmin, loading: adminLoading } = useAdminAuth();
-  const [patterns, setPatterns] = useState<SitePattern[]>([]);
+  const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterSystem, setFilterSystem] = useState<'all' | '8h' | '12h'>('all');
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedPattern, setSelectedPattern] = useState<SitePattern | null>(null);
+  const [selectedPattern, setSelectedPattern] = useState<ShiftPattern | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -321,7 +325,7 @@ export const PatternLibrary: React.FC = () => {
       if (error) throw error;
 
       // Map and normalize patterns
-      const normalized: SitePattern[] = (data || []).map(row => ({
+      const normalized: ShiftPattern[] = (data || []).map(row => ({
         id: row.id,
         name: row.name,
         description: row.description || undefined,

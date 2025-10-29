@@ -2,7 +2,7 @@ import type { ShiftCode } from "@/utils/constraints";
 import { createLogger } from "@/utils/errorLogger";
 import { calculateRestHours, DEFAULT_SHIFT_TIMES, DEFAULT_WTD_RULES, validateStaffWTD, type ShiftTimes, type WTDRules } from "../constraints/wtdRules";
 import { loadTuning } from "@/features/roster/engine/tuning";
-import { loadSitePatterns, expandPatternOverRange, type PatternTemplate } from "@/features/roster/patterns";
+import { loadShiftPatterns, expandPatternOverRange, type PatternTemplate } from "@/features/roster/patterns";
 import { getTenantId } from "@/features/tenant/useTenant";
 import { toast } from "@/hooks/use-toast";
 

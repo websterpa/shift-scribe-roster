@@ -6,7 +6,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { PatternTemplate, StaffPatternBinding } from "./types";
-import { loadSitePatterns, loadCustomPatterns } from "./loaders";
+import { loadShiftPatterns, loadCustomPatterns } from "./loaders";
 
 /**
  * Get a staff member's pattern binding (if they have a custom pattern assigned)
@@ -138,12 +138,12 @@ export async function resolvePatternForStaff(
 
   // Step 2: Fall back to shift pattern default
   console.log('🔍 Looking for shift pattern default');
-  const sitePatterns = await loadSitePatterns(tenantId);
+  const shiftPatterns = await loadShiftPatterns(tenantId);
   
   // Filter by site_id if provided
   const candidatePatterns = siteId
-    ? sitePatterns.filter(p => p.site_id === siteId)
-    : sitePatterns;
+    ? shiftPatterns.filter(p => p.site_id === siteId)
+    : shiftPatterns;
 
   if (candidatePatterns.length === 0) {
     console.error('❌ No shift patterns found');

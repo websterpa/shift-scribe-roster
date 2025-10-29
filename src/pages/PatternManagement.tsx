@@ -161,7 +161,7 @@ export default function PatternManagement() {
 
     try {
       let savedPatternId: string | null = null;
-      let sitePatternId: string | null = null;
+      let shiftPatternId: string | null = null;
 
       if (editingPattern?.id) {
         // Update existing pattern in custom_patterns
@@ -232,10 +232,10 @@ export default function PatternManagement() {
           throw new Error(`Failed to create pattern for staff assignment: ${siteError.message}`);
         }
 
-        sitePatternId = siteData?.id || null;
+        shiftPatternId = siteData?.id || null;
         console.log('✅ Pattern saved to both custom_patterns and site_patterns:', {
           customId: savedPatternId,
-          siteId: sitePatternId
+          shiftPatternId: shiftPatternId
         });
 
         toast({
@@ -249,9 +249,9 @@ export default function PatternManagement() {
       await loadCustomPatterns();
 
       // Open staff assignment dialog for newly created patterns
-      // Use site_patterns ID for staff assignment (required for FK constraint)
-      if (sitePatternId && !editingPattern?.id) {
-        const assignmentId = sitePatternId;
+      // Use shift pattern ID for staff assignment (required for FK constraint)
+      if (shiftPatternId && !editingPattern?.id) {
+        const assignmentId = shiftPatternId;
         console.log('👥 Opening staff assignment for newly created pattern:', assignmentId);
         const newPattern: Pattern = {
           id: assignmentId!,
