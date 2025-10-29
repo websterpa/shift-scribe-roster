@@ -38,6 +38,7 @@ export async function generateAndSaveRoster(
   const versionNameToUse = versionName || config.versionName || config.config_name;
   const shiftSystem = config.shift_type || '8h'; // Driven by wizard UI selection
   
+  console.log('[RosterEngine] using helpers from services/roster/helpers');
   logger.info('generateAndSaveRoster called', { configId, monthISO, shiftSystem });
   
   if (!configId || !monthISO) {
