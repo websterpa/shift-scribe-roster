@@ -60,3 +60,43 @@ export {
 export {
   fetchStaffMembers
 } from './fetchStaffMembers';
+
+// ============================================================================
+// CYCLE GENERATION & VALIDATION
+// ============================================================================
+
+export {
+  generateEnhancedRosterCycle,
+  validateEnhancedCycle,
+  type CycleValidationResult
+} from './enhancedCycleIntegration';
+
+export {
+  generateShiftCycle,
+  validateShiftCycle,
+  generateCycleForRoster,
+  type ShiftCycleValidation
+} from './shiftCycleGenerator';
+
+// ============================================================================
+// ROSTER GENERATION (LEGACY)
+// ============================================================================
+
+export {
+  generateRoster,
+  getDefaultRatePolicy,
+  getDefaultRestRules,
+  getDefaultGeneratorConfig,
+  type GeneratorConfig,
+  type GenerateParams,
+  type GenerateSummary
+} from './rosterGeneration';
+
+// ============================================================================
+// SHIFT CODE NORMALIZATION
+// ============================================================================
+
+export {
+  normalizeShiftCode,
+  type Token
+} from './normalizeShift';

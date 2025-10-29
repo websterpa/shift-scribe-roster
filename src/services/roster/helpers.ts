@@ -15,29 +15,8 @@
 export * from './helpers/index';
 
 // ============================================================================
-// REMAINING UTILS (Not yet migrated)
+// MIGRATION COMPLETE
 // ============================================================================
 
-// TODO: Phase 2c - migrate these remaining helpers from utils/roster
-
-export { 
-  generateEnhancedRosterCycle,
-  validateEnhancedCycle,
-  type CycleValidationResult 
-} from '@/utils/roster/enhancedCycleIntegration';
-
-export { 
-  generateShiftCycle,
-  validateShiftCycle 
-} from '@/utils/roster/shiftCycleGenerator';
-
-export { 
-  generateRoster,
-  getDefaultRatePolicy,
-  getDefaultRestRules,
-  getDefaultGeneratorConfig 
-} from '@/utils/roster/rosterGeneration';
-
-export { 
-  normalizeShiftCode 
-} from '@/utils/roster/normalizeShift';
+// All roster helpers have been migrated to services/roster/helpers/*
+// This module now serves as a stable compatibility facade.
