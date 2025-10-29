@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calculator, Info, TrendingUp, AlertTriangle } from 'lucide-react';
-import { calculateOptimalStaffing, StaffingRecommendation, validateStaffingAgainstRequirements } from '@/utils/roster/staffingCalculator';
+import { calculateOptimalStaffing, StaffingRecommendation, validateStaffingAgainstRequirements } from '@/services/roster/helpers';
 import { fetchStaffMembers } from '@/utils/roster/staffHelpers';
 import { StaffMember } from '@/types/roster';
 import { toast } from '@/hooks/use-toast';

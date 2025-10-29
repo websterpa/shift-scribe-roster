@@ -19,7 +19,7 @@ import {
   analyzeStaffUtilization, 
   UtilizationAnalysisReport,
   StaffUtilizationMetrics
-} from '@/utils/roster/staffUtilizationAnalysis';
+} from '@/services/roster/helpers';
 import { toast } from '@/hooks/use-toast';
 
 export function StaffUtilizationDashboard() {

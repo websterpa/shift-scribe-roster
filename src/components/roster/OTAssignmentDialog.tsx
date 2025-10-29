@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Clock, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { OTOptions } from '@/utils/shiftWindowResolver';
-import { validateOTRequest } from '@/utils/roster/otAssignmentHelper';
+import { validateOTRequest } from '@/services/roster/helpers';
 
 interface StaffMember {
   id: string;

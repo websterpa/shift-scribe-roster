@@ -12,7 +12,7 @@
 // MIGRATED HELPERS - Now in services/roster/helpers/
 // ============================================================================
 
-export * from './helpers';
+export * from './helpers/index';
 
 // ============================================================================
 // REMAINING UTILS (Not yet migrated)

@@ -4,7 +4,7 @@ import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, AlertTriangle, Lightbulb, Users } from 'lucide-react';
-import { StaffingValidationReport } from '@/utils/roster/staffingValidation';
+import { StaffingValidationReport } from '@/services/roster/helpers';
 
 interface StaffingValidationDisplayProps {
   report: StaffingValidationReport | null;

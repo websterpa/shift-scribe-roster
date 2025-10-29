@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Users, Plus, AlertCircle } from 'lucide-react';
 import { OTAssignmentDialog } from './OTAssignmentDialog';
-import { createOTCycleEntry, createCommonOTPatterns } from '@/utils/roster/otAssignmentHelper';
+import { createOTCycleEntry, createCommonOTPatterns } from '@/services/roster/helpers';
 import { OTOptions } from '@/utils/shiftWindowResolver';
 import { toast } from '@/hooks/use-toast';
 
