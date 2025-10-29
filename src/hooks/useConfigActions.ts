@@ -35,6 +35,23 @@ export function useConfigActions() {
       return;
     }
 
+    // Validate and auto-correct required_shifts to match framework
+    const correctedFormData = { ...formData };
+    const expectedShifts = formData.shift_type === '12h' ? ['D', 'N'] : ['E', 'L', 'N'];
+    const currentShifts = formData.required_shifts || [];
+    
+    const needsCorrection = 
+      (formData.shift_type === '8h' && currentShifts.includes('D')) ||
+      (formData.shift_type === '12h' && !currentShifts.includes('D'));
+    
+    if (needsCorrection) {
+      correctedFormData.required_shifts = expectedShifts;
+      console.warn(
+        '⚠️ useConfigActions: Auto-corrected required_shifts to match framework:',
+        { framework: formData.shift_type, from: currentShifts, to: expectedShifts }
+      );
+    }
+
     try {
       setSaving(true);
       console.log('📤 useConfigActions: Submitting config to database...');
@@ -43,7 +60,7 @@ export function useConfigActions() {
         console.log('🔄 useConfigActions: Updating existing config');
         const { error } = await supabase
           .from('roster_config')
-          .update(formData)
+          .update(correctedFormData)
           .eq('id', configId);
 
         if (error) {
@@ -56,7 +73,7 @@ export function useConfigActions() {
         console.log('➕ useConfigActions: Creating new config');
         const { data, error } = await supabase
           .from('roster_config')
-          .insert(formData)
+          .insert(correctedFormData)
           .select()
           .single();
 

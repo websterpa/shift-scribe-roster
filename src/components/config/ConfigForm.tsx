@@ -18,7 +18,17 @@ export const ConfigForm = ({ formData, onFormDataChange }: ConfigFormProps) => {
 
   const handleFieldChange = (field: keyof ConfigFormData, value: any) => {
     console.log(`📝 ConfigForm: ${field} changed:`, value);
-    onFormDataChange({ ...formData, [field]: value });
+    
+    const updatedData = { ...formData, [field]: value };
+    
+    // Auto-update required_shifts when shift_type changes
+    if (field === 'shift_type') {
+      const newShiftType = value as '8h' | '12h';
+      updatedData.required_shifts = newShiftType === '12h' ? ['D', 'N'] : ['E', 'L', 'N'];
+      console.log(`🔄 ConfigForm: Auto-updated required_shifts to:`, updatedData.required_shifts);
+    }
+    
+    onFormDataChange(updatedData);
   };
 
   return (

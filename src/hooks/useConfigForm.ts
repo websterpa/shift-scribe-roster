@@ -17,6 +17,7 @@ export interface ConfigFormData {
   default_ot_start_local_time?: string;
   pattern?: string[];
   patternLocked?: boolean; // If true, use pattern-based roster generation
+  required_shifts?: string[]; // Auto-set based on shift_type: ['E','L','N'] for 8h, ['D','N'] for 12h
   staffing_requirements?: {
     day_shift_staff?: number;
     night_shift_staff?: number;
@@ -44,6 +45,7 @@ export function useConfigForm() {
     default_ot_start_local_time: '10:00',
     pattern: [],
     patternLocked: true, // Default to pattern-based generation
+    required_shifts: ['E', 'L', 'N'], // Default to 8h shifts
     staffing_requirements: {
       day_shift_staff: 2,
       night_shift_staff: 2,
@@ -110,6 +112,15 @@ export function useConfigForm() {
         pattern = data.pattern.filter((item): item is string => typeof item === 'string');
       }
       
+      // Parse required_shifts from database or derive from shift_type
+      let requiredShifts: string[] = [];
+      if (data.required_shifts && Array.isArray(data.required_shifts)) {
+        requiredShifts = data.required_shifts.filter((item): item is string => typeof item === 'string');
+      } else {
+        // Auto-derive from shift_type if not present in DB
+        requiredShifts = data.shift_type === '12h' ? ['D', 'N'] : ['E', 'L', 'N'];
+      }
+      
       setFormData({
         config_name: data.config_name,
         cycle_length_weeks: data.cycle_length_weeks,
@@ -123,6 +134,7 @@ export function useConfigForm() {
         default_ot_start_local_time: data.default_ot_start_local_time || undefined,
         pattern: pattern,
         patternLocked: true, // Default to pattern-based generation
+        required_shifts: requiredShifts,
         staffing_requirements: staffingRequirements
       });
     } catch (error) {
