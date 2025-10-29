@@ -1,4 +1,4 @@
-import { checkNightReadiness } from "@/utils/roster/nightReadinessCheck";
+import { checkNightReadiness } from "@/services/roster/helpers/nightReadinessCheck";
 import { StaffMember } from "@/types/roster";
 
 const createStaff = (overrides: Partial<StaffMember> = {}): StaffMember => ({

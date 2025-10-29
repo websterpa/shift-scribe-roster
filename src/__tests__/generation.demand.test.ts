@@ -1,4 +1,4 @@
-import { buildDemand } from "@/utils/roster/buildDemand";
+import { buildDemand } from "@/services/roster/helpers/buildDemand";
 
 describe("buildDemand", () => {
   test("8h includes Night", () => {

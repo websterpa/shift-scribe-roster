@@ -1,4 +1,4 @@
-import { nightExpectations, validateRosterResults } from "@/utils/roster/validateConfig";
+import { nightExpectations, validateRosterResults } from "@/services/roster/helpers/validateConfig";
 
 describe("nightExpectations", () => {
   test("expects nights if 12h system", () => {

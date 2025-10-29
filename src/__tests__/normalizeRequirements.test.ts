@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { normalizeRequirements } from '@/utils/roster/normalizeRequirements';
+import { normalizeRequirements } from '@/services/roster/helpers/normalizeRequirements';
 
 describe('@nights normalizeRequirements', () => {
   test('preserves N token from modern format', () => {

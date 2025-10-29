@@ -31,7 +31,7 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 // Mock the roster generator
-vi.mock('@/utils/roster/generateAndSaveRoster', () => ({
+vi.mock('@/services/roster/generation', () => ({
   generateAndSaveRoster: vi.fn(() => Promise.resolve({
     versionId: 'test-version-id',
     totalAssignments: 0,

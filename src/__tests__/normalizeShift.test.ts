@@ -1,4 +1,4 @@
-import { normalizeShiftCode } from "@/utils/roster/normalizeShift";
+import { normalizeShiftCode } from "@/services/roster/helpers/normalizeShift";
 
 test("normalizes readable DB names to tokens", () => {
   expect(normalizeShiftCode("Day")).toBe("D");

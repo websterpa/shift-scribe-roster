@@ -17,7 +17,7 @@ jest.mock("@/hooks/useRosterGenerator", () => ({
 }));
 
 // Mock the roster generation services
-jest.mock("@/utils/roster/rosterGeneration", () => ({
+jest.mock("@/services/roster/generation", () => ({
   generateAndSaveRoster: jest.fn(),
   fetchStaffMembers: jest.fn().mockResolvedValue([])
 }));

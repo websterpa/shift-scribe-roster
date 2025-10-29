@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateRoster, type GeneratorConfig } from "../../utils/roster/rosterGeneration";
+import { generateRoster, type GeneratorConfig } from "@/services/roster/helpers/rosterGeneration";
 import { createClient } from "@supabase/supabase-js";
 
 // NOTE: We call internal parse via generate with a stub Supabase by passing a prepared cfg row.

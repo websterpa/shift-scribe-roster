@@ -3,7 +3,7 @@
  * Comprehensive WTD compliance tests: 11h rest, max consecutive days, nights cap
  */
 import { describe, it, expect } from 'vitest';
-import { hasDailyRest, enforceRestRequirement } from '@/utils/roster/restValidation';
+import { hasDailyRest, enforceRestRequirement } from '@/services/roster/helpers/restValidation';
 
 describe('WTD Rules: 11-hour Daily Rest', () => {
   it('detects violation: 8 hours between shifts', () => {

@@ -1,4 +1,4 @@
-import { resolveShiftWindow } from "@/utils/roster/shiftWindows";
+import { resolveShiftWindow } from "@/services/roster/helpers/shiftWindows";
 
 describe("resolveShiftWindow", () => {
   test("Night anchors overnight from site start", () => {

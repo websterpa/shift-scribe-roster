@@ -100,3 +100,48 @@ export {
   normalizeShiftCode,
   type Token
 } from './normalizeShift';
+
+// ============================================================================
+// ROSTER CONFIGURATION VALIDATION
+// ============================================================================
+
+export {
+  nightExpectations,
+  validateRosterResults
+} from './validateConfig';
+
+// ============================================================================
+// DEMAND BUILDING & SHIFT WINDOWS
+// ============================================================================
+
+export {
+  buildDemand
+} from './buildDemand';
+
+export {
+  resolveShiftWindow
+} from './shiftWindows';
+
+// ============================================================================
+// NIGHT READINESS & REQUIREMENTS
+// ============================================================================
+
+export {
+  checkNightReadiness
+} from './nightReadinessCheck';
+
+export {
+  normalizeRequirements,
+  printRequirementsSummary,
+  type DayReq,
+  type NormalizedRequirements
+} from './normalizeRequirements';
+
+// ============================================================================
+// REST VALIDATION
+// ============================================================================
+
+export {
+  hasDailyRest,
+  enforceRestRequirement
+} from './restValidation';
