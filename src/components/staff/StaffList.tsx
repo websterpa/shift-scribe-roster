@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
-import { Plus, User, Eye, EyeOff } from 'lucide-react';
+import { Plus, User, Eye, EyeOff, Shuffle } from 'lucide-react';
 import { useStaffData } from '@/hooks/useStaffData';
 import { StaffDialog } from './StaffDialog';
 import { StaffTable } from './StaffTable';
@@ -11,6 +11,7 @@ import { StaffActions } from './StaffActions';
 import { toast } from '@/hooks/use-toast';
 import { StaffMember } from '@/types/roster';
 import { supabase } from '@/integrations/supabase/client';
+import { autoDistributePatternOffsets } from '@/utils/patternOffsetDistributor';
 
 const StaffList = () => {
   console.log('🔄 StaffList component rendered');
@@ -19,11 +20,52 @@ const StaffList = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'temporarily_unavailable' | 'inactive'>('all');
+  const [isDistributing, setIsDistributing] = useState(false);
 
   const handleAddStaff = () => {
     console.log('➕ StaffList: Add staff clicked');
     setEditingStaff(undefined);
     setIsDialogOpen(true);
+  };
+
+  const handleAutoDistributeOffsets = async () => {
+    console.log('🔄 StaffList: Auto-distribute offsets clicked');
+    
+    if (!confirm('This will automatically distribute pattern offsets among staff sharing the same pattern. Continue?')) {
+      return;
+    }
+
+    setIsDistributing(true);
+    
+    try {
+      // Convert StaffMember to the format expected by autoDistributePatternOffsets
+      const staffForDistribution = staffMembers.map(s => ({
+        id: s.id,
+        pattern_id: s.pattern_id,
+        pattern_offset: s.pattern_offset,
+        first_name: s.first_name,
+        last_name: s.last_name,
+      }));
+
+      await autoDistributePatternOffsets(staffForDistribution, supabase, false);
+
+      console.log('✅ StaffList: Pattern offsets distributed successfully');
+      toast({
+        title: "Pattern Offsets Distributed",
+        description: "Staff pattern offsets have been automatically distributed for balanced rotation.",
+      });
+
+      refreshStaff();
+    } catch (error: any) {
+      console.error('❌ StaffList: Error distributing offsets:', error);
+      toast({
+        title: "Error distributing offsets",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDistributing(false);
+    }
   };
 
   const handleEditStaff = (staff: StaffMember) => {
@@ -149,6 +191,14 @@ const StaffList = () => {
               </Button>
             )}
           </div>
+          <Button 
+            onClick={handleAutoDistributeOffsets}
+            variant="outline"
+            disabled={isDistributing}
+          >
+            <Shuffle className="h-4 w-4 mr-2" />
+            {isDistributing ? 'Distributing...' : 'Auto-Distribute Offsets'}
+          </Button>
           <Button onClick={handleAddStaff}>
             <Plus className="h-4 w-4 mr-2" />
             Add Staff Member

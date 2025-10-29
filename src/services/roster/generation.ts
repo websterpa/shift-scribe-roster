@@ -396,6 +396,11 @@ export async function generateAndSaveRoster(
     
     // Import pattern allocation utilities
     const { patternAllocator } = await import('@/features/roster/engine2/allocators/patternAllocator');
+    const { autoDistributePatternOffsets } = await import('@/utils/patternOffsetDistributor');
+    
+    // Auto-distribute offsets for staff without manual offsets (respects manually-set values)
+    logger.info('🔄 Auto-distributing pattern offsets for balanced team rotation');
+    await autoDistributePatternOffsets(dedupedStaffList, supabase, true);
     
     // Step 3: Generate duties from rotated patterns using pattern allocator
     const rosterStart = new Date(days[0] + 'T00:00:00');

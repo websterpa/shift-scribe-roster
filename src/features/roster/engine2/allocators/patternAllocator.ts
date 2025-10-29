@@ -252,5 +252,10 @@ function generateStaffAssignments(
     assignedShifts: assignments.map(a => a.shift_code).join(','),
   });
 
+  // Log offset application for diagnostics
+  if (offset > 0) {
+    console.info(`[PatternAllocator] Auto-offset applied: ${offset} days for ${member.first_name} ${member.last_name}`);
+  }
+
   return assignments;
 }
