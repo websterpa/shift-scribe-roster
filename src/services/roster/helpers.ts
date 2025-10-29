@@ -1,73 +1,39 @@
 /**
  * COMPATIBILITY ADAPTERS
  * 
- * Thin wrappers around src/utils/roster/* helpers to maintain backward compatibility
- * while we transition to the new services layer architecture.
- * 
- * TODO: Phase 2b - Migrate these helpers into services/roster/helpers with proper
- * domain separation and type safety improvements.
+ * Thin wrappers to maintain backward compatibility while we transition
+ * to the new services layer architecture. Canonical versions now live
+ * in src/services/roster/helpers/* subdirectory.
  * 
  * @module services/roster/helpers
  */
 
 // ============================================================================
-// STAFFING CALCULATION & VALIDATION
+// MIGRATED HELPERS - Now in services/roster/helpers/
 // ============================================================================
 
-// TODO: migrate helper to services/roster/helpers in Phase 2b
-export { 
-  calculateOptimalStaffing,
-  validateStaffingAgainstRequirements,
-  type StaffingRecommendation 
-} from '@/utils/roster/staffingCalculator';
-
-// TODO: migrate helper to services/roster/helpers in Phase 2b
-export { 
-  type StaffingValidationReport 
-} from '@/utils/roster/staffingValidation';
+export * from './helpers';
 
 // ============================================================================
-// STAFF DATA ACCESS
+// REMAINING UTILS (Not yet migrated)
 // ============================================================================
 
-// TODO: migrate helper to services/roster/helpers in Phase 2b
+// TODO: Phase 2c - migrate these helpers from utils/roster
 export { 
   fetchStaffMembers 
 } from '@/utils/roster/staffHelpers';
 
-// ============================================================================
-// CYCLE INTEGRATION
-// ============================================================================
-
-// TODO: migrate helper to services/roster/helpers in Phase 2b
 export { 
   generateEnhancedRosterCycle,
   validateEnhancedCycle,
   type CycleValidationResult 
 } from '@/utils/roster/enhancedCycleIntegration';
 
-// TODO: migrate helper to services/roster/helpers in Phase 2b
 export { 
   generateShiftCycle,
   validateShiftCycle 
 } from '@/utils/roster/shiftCycleGenerator';
 
-// ============================================================================
-// OT ASSIGNMENT HELPERS
-// ============================================================================
-
-// TODO: migrate helper to services/roster/helpers in Phase 2b
-export { 
-  validateOTRequest,
-  createOTCycleEntry,
-  createCommonOTPatterns 
-} from '@/utils/roster/otAssignmentHelper';
-
-// ============================================================================
-// ROSTER GENERATION UTILITIES
-// ============================================================================
-
-// TODO: migrate helper to services/roster/helpers in Phase 2b
 export { 
   generateRoster,
   getDefaultRatePolicy,
@@ -75,21 +41,6 @@ export {
   getDefaultGeneratorConfig 
 } from '@/utils/roster/rosterGeneration';
 
-// ============================================================================
-// UTILIZATION ANALYSIS
-// ============================================================================
-
-// TODO: migrate helper to services/roster/helpers in Phase 2b
-export { 
-  type UtilizationAnalysisReport,
-  type StaffUtilizationMetrics 
-} from '@/utils/roster/staffUtilizationAnalysis';
-
-// ============================================================================
-// NORMALIZATION UTILITIES
-// ============================================================================
-
-// TODO: migrate helper to services/roster/helpers in Phase 2b
 export { 
   normalizeShiftCode 
 } from '@/utils/roster/normalizeShift';
