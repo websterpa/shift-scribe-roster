@@ -12,6 +12,10 @@ import { remapToFramework } from "@/features/roster/shiftMap";
 import { toast } from "@/hooks/use-toast";
 import { createLogger } from "@/utils/errorLogger";
 import { safeSelect, safeInsert } from "@/integrations/supabase/safeQuery";
+import { 
+  assignmentsToShiftRecords, 
+  validateWTDCompliance 
+} from "@/engine/validators/wtd";
 
 const logger = createLogger('GenerateAndSaveRoster');
 
@@ -830,6 +834,54 @@ export async function generateAndSaveRoster(
       totalAssignments: assignmentsToInsert.length,
       coverageRate: complianceRate.toFixed(1),
       expectedSlots: expectedAssignments
+    });
+
+    // ⚖️ WTD VALIDATION: Check Working Time Directive compliance
+    console.group('⚖️ WTD COMPLIANCE VALIDATION');
+    const wtdResults: Record<string, any> = {};
+    
+    for (const [staffId, staffAssignments] of Object.entries(byStaff)) {
+      const staffMember = correctiveStaff.find(s => s.id === staffId);
+      const staffName = staffMember?.name || staffId;
+      
+      // Convert assignments to ShiftRecord format
+      const shiftRecords = assignmentsToShiftRecords(staffAssignments);
+      
+      // Run WTD validation
+      const wtdValidation = validateWTDCompliance(shiftRecords);
+      
+      wtdResults[staffId] = {
+        name: staffName,
+        ...wtdValidation
+      };
+      
+      // Log results
+      const statusIcon = wtdValidation.compliant ? '✅' : '⚠️';
+      console.log(`${statusIcon} ${staffName}:`);
+      console.log(`   • WTD Compliant: ${wtdValidation.compliant ? 'Yes' : 'No'}`);
+      console.log(`   • Avg hours/week: ${wtdValidation.avgHoursPerWeek}h (limit: 48h)`);
+      console.log(`   • Rest violations: ${wtdValidation.restViolations.length}`);
+      
+      if (wtdValidation.restViolations.length > 0) {
+        wtdValidation.restViolations.forEach((violation, i) => {
+          console.warn(`     ${i + 1}. ${violation}`);
+        });
+      }
+    }
+    
+    // Calculate overall compliance
+    const compliantStaff = Object.values(wtdResults).filter((r: any) => r.compliant).length;
+    const totalStaffChecked = Object.keys(wtdResults).length;
+    const overallCompliance = (compliantStaff / totalStaffChecked) * 100;
+    
+    console.log(`\n📋 Overall WTD Compliance: ${overallCompliance.toFixed(1)}%`);
+    console.log(`   • Compliant staff: ${compliantStaff}/${totalStaffChecked}`);
+    console.groupEnd();
+    
+    logger.info('WTD validation complete', {
+      overallCompliance: overallCompliance.toFixed(1),
+      compliantStaff,
+      totalStaff: totalStaffChecked
     });
   }
 
