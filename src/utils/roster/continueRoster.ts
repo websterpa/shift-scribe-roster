@@ -1,7 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { generateAndSaveRoster } from "@/services/roster/generation";
-import { fetchStaffMembers } from "./staffHelpers";
+import { fetchStaffMembers } from "@/services/roster/helpers";
 import { createLogger } from "../errorLogger";
 
 const logger = createLogger('ContinueRoster');

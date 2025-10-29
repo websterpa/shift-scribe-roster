@@ -18,10 +18,7 @@ export * from './helpers/index';
 // REMAINING UTILS (Not yet migrated)
 // ============================================================================
 
-// TODO: Phase 2c - migrate these helpers from utils/roster
-export { 
-  fetchStaffMembers 
-} from '@/utils/roster/staffHelpers';
+// TODO: Phase 2c - migrate these remaining helpers from utils/roster
 
 export { 
   generateEnhancedRosterCycle,

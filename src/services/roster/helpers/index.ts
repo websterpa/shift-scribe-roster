@@ -52,3 +52,11 @@ export {
   type StaffUtilizationMetrics,
   type UtilizationAnalysisReport
 } from './utilizationAnalysis';
+
+// ============================================================================
+// STAFF DATA FETCHING
+// ============================================================================
+
+export {
+  fetchStaffMembers
+} from './fetchStaffMembers';

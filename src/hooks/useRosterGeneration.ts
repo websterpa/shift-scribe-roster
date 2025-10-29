@@ -3,7 +3,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAllConfigs, fetchConfigById } from '@/utils/configHelpers';
 import { generateAndSaveRoster } from '@/services/roster/generation';
-import { fetchStaffMembers } from '@/utils/roster/staffHelpers';
+import { fetchStaffMembers } from '@/services/roster/helpers';
 import { ConfigItem, StaffMember } from '@/types/roster';
 import { createLogger } from '@/utils/errorLogger';
 import { useSearchParams } from 'react-router-dom';

@@ -28,10 +28,10 @@ export {
 
 export {
   fetchStaffMembers
-} from "./roster/staffHelpers";
+} from "@/services/roster/helpers";
 
 // Types are now exported from types/roster.ts
-export type { 
+export type {
   StaffMember, 
   RosterConfig, 
   Assignment 
