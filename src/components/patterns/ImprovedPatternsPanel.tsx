@@ -282,7 +282,7 @@ export function ImprovedPatternsPanel({ isOpen, onClose, onPatternSelected }: Im
           {viewMode === 'library' ? (
             <Tabs defaultValue="patterns" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="patterns">Pattern Library</TabsTrigger>
+                <TabsTrigger value="patterns">Shift Patterns</TabsTrigger>
                 <TabsTrigger value="testing" className="flex items-center gap-2">
                   <TestTube className="h-4 w-4" />
                   Testing Suite

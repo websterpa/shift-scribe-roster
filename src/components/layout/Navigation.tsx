@@ -17,7 +17,7 @@ const Navigation = () => {
     { path: '/leave-requests', label: 'Leave Requests', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
     { path: '/reports', label: 'Reports', icon: BarChart3, gradient: 'from-emerald-500 to-green-600' },
     { path: '/help', label: 'Help & Support', icon: HelpCircle, gradient: 'from-teal-500 to-cyan-600' },
-    { path: '/admin/pattern-library', label: 'Pattern Library', icon: ListTree, gradient: 'from-violet-500 to-purple-600', adminOnly: true },
+    { path: '/admin/pattern-library', label: 'Shift Patterns', icon: ListTree, gradient: 'from-violet-500 to-purple-600', adminOnly: true },
     { path: '/admin/rls-setup', label: 'Admin: RLS Setup', icon: Shield, gradient: 'from-red-500 to-rose-600', adminOnly: true }
   ];
 

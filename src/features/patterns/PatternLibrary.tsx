@@ -361,7 +361,7 @@ export const PatternLibrary: React.FC = () => {
 
   // Show loading while checking admin status
   if (loading || adminLoading) {
-    return <LoadingState message="Loading pattern library..." />;
+    return <LoadingState message="Loading shift patterns..." />;
   }
 
   // Restrict access to admin users only
@@ -371,7 +371,7 @@ export const PatternLibrary: React.FC = () => {
         <Alert variant="destructive">
           <ShieldAlert className="h-4 w-4" />
           <AlertDescription>
-            Access Denied: Pattern Library is restricted to administrators only.
+            Access Denied: Shift Patterns is restricted to administrators only.
             Please contact your system administrator if you need access.
           </AlertDescription>
         </Alert>
@@ -383,7 +383,7 @@ export const PatternLibrary: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Pattern Library</h2>
+          <h2 className="text-2xl font-bold">Shift Patterns</h2>
           <p className="text-muted-foreground">
             View and assign shift patterns to staff members
           </p>

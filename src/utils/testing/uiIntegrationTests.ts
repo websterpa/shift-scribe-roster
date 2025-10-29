@@ -12,11 +12,11 @@ export interface UITestResult {
 }
 
 /**
- * Switches to the Pattern Library tab
+ * Switches to the Shift Patterns tab
  */
 async function switchToPatternLibrary(): Promise<void> {
   const patternLibraryTab = Array.from(document.querySelectorAll('[role="tab"]')).find(
-    tab => tab.textContent?.includes('Pattern Library')
+    tab => tab.textContent?.includes('Shift Patterns')
   ) as HTMLElement;
   
   if (patternLibraryTab) {
@@ -46,7 +46,7 @@ export async function testPatternSelectionUI(): Promise<UITestResult> {
   logger.info('Testing pattern selection UI');
   
   try {
-    // Switch to Pattern Library tab first
+    // Switch to Shift Patterns tab first
     await switchToPatternLibrary();
     
     // Test if pattern selector elements exist (including placeholder during loading)
@@ -99,7 +99,7 @@ export async function testCustomPatternBuilderUI(): Promise<UITestResult> {
   logger.info('Testing custom pattern builder UI');
 
   try {
-    // Switch to Pattern Library tab and open Create Pattern view
+    // Switch to Shift Patterns tab and open Create Pattern view
     await switchToPatternLibrary();
     await openCreatePatternView();
     
@@ -156,7 +156,7 @@ export async function testPatternCardsUI(): Promise<UITestResult> {
   logger.info('Testing pattern cards UI');
 
   try {
-    // Switch to Pattern Library tab first
+    // Switch to Shift Patterns tab first
     await switchToPatternLibrary();
     
     // Look for pattern cards with correct data-testid or placeholder

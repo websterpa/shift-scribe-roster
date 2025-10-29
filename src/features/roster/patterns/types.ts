@@ -78,7 +78,7 @@ export interface ResolvedShift {
 }
 
 // ============================================================================
-// PATTERN LIBRARY (Database-aligned canonical types)
+// SHIFT PATTERNS (Database-aligned canonical types)
 // ============================================================================
 
 /**
