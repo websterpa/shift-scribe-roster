@@ -16,6 +16,8 @@ import {
   assignmentsToShiftRecords, 
   validateWTDCompliance 
 } from "@/engine/validators/wtd";
+import { autoApplyCorrections } from '@/engine/corrective/autoApply';
+import { balanceRoster } from '@/engine/balancer/fairness';
 
 const logger = createLogger('GenerateAndSaveRoster');
 
@@ -972,10 +974,6 @@ export async function generateAndSaveRoster(
     if (fetchError) {
       logger.warn('Failed to fetch assignments for automation', { error: fetchError });
     } else if (currentAssignments && currentAssignments.length > 0) {
-      // Import automation functions
-      const { autoApplyCorrections } = await import('@/engine/corrective/autoApply');
-      const { balanceRoster } = await import('@/engine/balancer/fairness');
-      
       // Convert to engine format
       let engineAssignments: any[] = currentAssignments.map((a: any) => ({
         staffId: a.staff_id,
