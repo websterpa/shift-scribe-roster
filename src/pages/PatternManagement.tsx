@@ -214,6 +214,7 @@ export default function PatternManagement() {
           .insert({
             site_id: 'default', // Default site ID
             created_by: user.id,
+            tenant_id: '00000000-0000-0000-0000-000000000001',
             name: patternData.name,
             system: patternData.shift_type,
             sequence: patternData.pattern,

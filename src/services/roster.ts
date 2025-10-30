@@ -11,6 +11,7 @@ export function isUUID(v?: string | null): v is string {
 
 export type CreateRosterVersionInput = {
   config_id: string;           // must be uuid
+  tenant_id: string;           // must be uuid - required for tenant isolation
   version_name?: string | null;
   // do NOT include id from client - DB will generate it
 };
@@ -43,15 +44,14 @@ export async function createRosterVersion(input: CreateRosterVersionInput) {
     : 1;
 
   // IMPORTANT: do NOT pass "id" — let DB default (gen_random_uuid()) generate it
-  // TODO(tenant): Include tenant_id in insert when roster_versions table has tenant_id column
   const { data, error } = await safeInsert<any>(
     supabase
       .from("roster_versions")
       .insert({
         config_id: input.config_id,
+        tenant_id: input.tenant_id,
         version_number: nextVersionNumber,
         version_name: input.version_name ?? `Version ${nextVersionNumber}`,
-        // tenant_id: getTenantId(), // Uncomment when column exists
       })
       .select("id, config_id, version_number, version_name, generated_at")
       .single(),

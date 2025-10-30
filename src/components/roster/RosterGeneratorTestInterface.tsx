@@ -72,6 +72,7 @@ export function RosterGeneratorTestInterface() {
         .from('roster_versions')
         .insert({
           config_id: configData.id,
+          tenant_id: '00000000-0000-0000-0000-000000000001',
           version_name: 'Engine2 Test Version',
           version_number: 1
         })

@@ -102,10 +102,11 @@ export async function generateAndSavePatternLockedRoster(
     tenantId
   );
 
-  // Add version_id to each assignment
+  // Add version_id to each assignment (tenant_id already present from adaptPatternAssignments)
   const assignmentsWithVersion = assignments.map(a => ({
     ...a,
     version_id: versionId,
+    tenant_id: tenantId, // Ensure tenant_id is explicitly set
   }));
 
   console.log(`💾 Inserting ${assignmentsWithVersion.length} assignments into roster_assignments`);
