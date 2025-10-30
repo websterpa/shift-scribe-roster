@@ -63,6 +63,12 @@ export interface RosterDiagnostics {
     appliedCount: number;
     historicalDataPoints: number;
   };
+  perfMetrics?: {
+    fetchMs: number;
+    genMs: number;
+    insertMs: number;
+    totalMs: number;
+  };
 }
 
 export interface RosterWithChecks {
@@ -212,10 +218,13 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
 export async function generateRosterWithChecks(
   input: GenerateRosterInput
 ): Promise<RosterWithChecks> {
+  const startTotal = performance.now();
   console.log('🚀 [AtlasGenerator] Starting roster generation with validation checks');
   
   // 1. Generate base roster
+  const startGen = performance.now();
   const roster = await generateRoster(input);
+  const genMs = Math.round(performance.now() - startGen);
   
   if (roster.length === 0) {
     console.warn('⚠️ [AtlasGenerator] No assignments generated');
@@ -428,14 +437,20 @@ export async function generateRosterWithChecks(
   
   // 10. Persist roster to database with tenant isolation
   console.log('💾 [AtlasGenerator] Persisting roster to database...');
+  const startInsert = performance.now();
   const version = await saveRoster({
     tenantId: input.tenantId,
     roster: balancedRoster,
     configId: input.configId,
     label: input.label || 'Auto-Generated'
   });
+  const insertMs = Math.round(performance.now() - startInsert);
+  
+  const totalMs = Math.round(performance.now() - startTotal);
+  const fetchMs = Math.round(totalMs - genMs - insertMs); // Data fetch is remainder
   
   console.log(`✅ [AtlasGenerator] Roster saved as version ${version.version_number}`);
+  console.log(`⚡ Performance: Fetch ${fetchMs}ms | Generate ${genMs}ms | Insert ${insertMs}ms | Total ${totalMs}ms`);
   
   return {
     version,
@@ -450,6 +465,12 @@ export async function generateRosterWithChecks(
       fairnessBalancing: {
         appliedCount: fatiguePreventionCount,
         historicalDataPoints: historicalRoster.length
+      },
+      perfMetrics: {
+        fetchMs,
+        genMs,
+        insertMs,
+        totalMs
       }
     }
   };

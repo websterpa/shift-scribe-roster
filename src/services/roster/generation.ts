@@ -38,7 +38,19 @@ export async function generateAndSaveRoster(
   patternLocked?: boolean;
   autoCorrectionsApplied?: number;
   aiBalancingApplied?: number;
+  perfMetrics?: {
+    fetchMs: number;
+    genMs: number;
+    insertMs: number;
+    totalMs: number;
+  };
 }> {
+  const perfStart = performance.now();
+  let genStartTime = 0;
+  let genEndTime = 0;
+  let insertStartTime = 0;
+  let insertEndTime = 0;
+  
   // Extract config properties - handle both new and legacy formats
   const configId = config.configId || config.id;
   const monthISO = config.monthISO || config.start_date?.substring(0, 7);
@@ -433,6 +445,7 @@ export async function generateAndSaveRoster(
       staffCount: dedupedStaffList.length,
     });
     
+    genStartTime = performance.now();
     const patternAssignments = await patternAllocator({
       rosterStart,
       rosterEnd,
@@ -447,6 +460,7 @@ export async function generateAndSaveRoster(
       })),
       supabase,
     });
+    genEndTime = performance.now();
     
     logger.info(`Pattern allocation complete`, {
       assignmentsCount: patternAssignments.length,
@@ -766,6 +780,7 @@ export async function generateAndSaveRoster(
   }
 
   if (assignmentsToInsert.length > 0) {
+    insertStartTime = performance.now();
     const { error: insertError } = await safeInsert<any>(
       supabase
         .from('roster_assignments')
@@ -776,6 +791,8 @@ export async function generateAndSaveRoster(
     if (insertError) {
       return Promise.reject(insertError);
     }
+    
+    insertEndTime = performance.now();
 
     // 📊 POST-GENERATION DIAGNOSTICS: Assignment Distribution (Always enabled)
     console.group('📊 POST-GENERATION DIAGNOSTICS');
@@ -1072,6 +1089,13 @@ export async function generateAndSaveRoster(
   // Calculate total variance as sum of E, L, N variances
   const totalVariance = result.fairness.variance.E + result.fairness.variance.L + result.fairness.variance.N;
 
+  const totalMs = Math.round(performance.now() - perfStart);
+  const insertMs = Math.round(insertEndTime - insertStartTime);
+  const genMs = Math.round(genEndTime - genStartTime);
+  const fetchMs = Math.round(totalMs - genMs - insertMs);
+  
+  console.log(`⚡ Performance: Fetch ${fetchMs}ms | Generate ${genMs}ms | Insert ${insertMs}ms | Total ${totalMs}ms`);
+
   return {
     versionId: versionData.id,
     totalAssignments: assignmentsToInsert.length,
@@ -1082,6 +1106,12 @@ export async function generateAndSaveRoster(
     patternLocked: config.patternLocked ?? false, // Pass through pattern-locked mode flag
     autoCorrectionsApplied,
     aiBalancingApplied,
+    perfMetrics: {
+      fetchMs,
+      genMs,
+      insertMs,
+      totalMs
+    }
   };
 }
 

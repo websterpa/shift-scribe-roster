@@ -270,6 +270,34 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
           )}
         </CardContent>
       </Card>
+
+      {/* Performance Metrics Footer */}
+      {diagnostics.perfMetrics && (
+        <Card className="bg-muted/30">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span className="font-medium">Performance Metrics</span>
+              </div>
+              <div className="flex gap-6 font-mono text-xs">
+                <span>
+                  Fetch: <span className="font-semibold text-foreground">{diagnostics.perfMetrics.fetchMs}ms</span>
+                </span>
+                <span>
+                  Generate: <span className="font-semibold text-foreground">{diagnostics.perfMetrics.genMs}ms</span>
+                </span>
+                <span>
+                  Insert: <span className="font-semibold text-foreground">{diagnostics.perfMetrics.insertMs}ms</span>
+                </span>
+                <span className="text-foreground">
+                  Total: <span className="font-bold">{diagnostics.perfMetrics.totalMs}ms</span>
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
