@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeShiftCode } from "@/services/roster/helpers/normalizeShift";
 
@@ -95,6 +96,9 @@ export default function TeamLaneRoster({ versionId }: Props) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [holidays, setHolidays] = React.useState<Set<string>>(new Set());
+  
+  // Virtual scrolling reference
+  const parentRef = useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     let alive = true;
@@ -215,67 +219,112 @@ export default function TeamLaneRoster({ versionId }: Props) {
     return { hrs: isFinite(hrs) ? hrs : null, dot, label };
   }
 
+  // Flatten team/staff structure for virtual scrolling
+  const flattenedRows = React.useMemo(() => {
+    const result: Array<{ team: string; staffKey: string; list: Assignment[]; isFirstInTeam: boolean }> = [];
+    Array.from(teamMap.entries()).forEach(([team, staffMap]) => {
+      const staffEntries = Array.from(staffMap.entries());
+      staffEntries.forEach(([staffKey, list], idx) => {
+        result.push({ team, staffKey, list, isFirstInTeam: idx === 0 });
+      });
+    });
+    return result;
+  }, [teamMap]);
+
+  // OPTIMIZATION: Virtual scrolling for large team/staff lists
+  const rowVirtualizer = useVirtualizer({
+    count: flattenedRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50, // Estimated row height
+    overscan: 10,
+  });
+
+  console.log('📊 Virtual scrolling (TeamLaneRoster):', {
+    totalRows: flattenedRows.length,
+    virtualItems: rowVirtualizer.getVirtualItems().length,
+  });
+
   return (
-    <div className="overflow-x-auto rounded-lg border bg-white shadow">
-      <table className="min-w-[1100px] text-sm">
-        <thead>
-          <tr className="bg-slate-50">
-            <th className="p-2 text-left">Team</th>
-            <th className="p-2 text-left">Staff</th>
-            {allDays.map(d => (
-              <th key={d} className="p-2 text-left">
-                <div className="text-xs text-slate-500">{new Date(d).getDate()}</div>
-              </th>
-            ))}
-            <th className="p-2 text-left">Fairness</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from(teamMap.entries()).map(([team, staffMap]) => {
-            const staffEntries = Array.from(staffMap.entries());
-            return staffEntries.map(([staffKey, list], idx) => {
-              const [, name] = staffKey.split("|");
-              const fairness = fairnessByStaff.get(staffKey)!;
+    <div className="rounded-lg border bg-white shadow">
+      <div 
+        ref={parentRef}
+        className="overflow-auto max-h-[700px]"
+        style={{ contain: 'strict' }}
+      >
+        <table className="min-w-[1100px] text-sm">
+          <thead className="sticky top-0 bg-slate-50 z-10">
+            <tr>
+              <th className="p-2 text-left">Team</th>
+              <th className="p-2 text-left">Staff</th>
+              {allDays.map(d => (
+                <th key={d} className="p-2 text-left">
+                  <div className="text-xs text-slate-500">{new Date(d).getDate()}</div>
+                </th>
+              ))}
+              <th className="p-2 text-left">Fairness</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colSpan={allDays.length + 3} style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const { team, staffKey, list, isFirstInTeam } = flattenedRows[virtualRow.index];
+                  const [, name] = staffKey.split("|");
+                  const fairness = fairnessByStaff.get(staffKey)!;
 
-              return (
-                <tr key={`${team}-${staffKey}`} className={`border-t ${idx===0 ? "border-slate-300" : "border-slate-100"}`}>
-                  <td className="p-2 font-semibold">{idx===0 ? team : ""}</td>
-                  <td className="p-2 whitespace-nowrap">{name}</td>
+                  return (
+                    <tr
+                      key={virtualRow.key}
+                      className={`border-t ${isFirstInTeam ? "border-slate-300" : "border-slate-100"}`}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                        display: 'table',
+                        tableLayout: 'fixed',
+                      }}
+                    >
+                      <td className="p-2 font-semibold">{isFirstInTeam ? team : ""}</td>
+                      <td className="p-2 whitespace-nowrap">{name}</td>
 
-                  {allDays.map(d => {
-                    const token = chooseTokenForDay(list, d);
-                    const color = tokenClass(token);
-                    const restDot = restDotBetween(list, d);
-                    return (
-                      <td key={d} className="p-2 align-top min-w-[80px]">
-                        <div className={`inline-flex px-2 py-1 rounded ${color}`} title={token==="R" ? "Rest Day" : `Shift ${token}`}>
-                          {token}
+                      {allDays.map(d => {
+                        const token = chooseTokenForDay(list, d);
+                        const color = tokenClass(token);
+                        const restDot = restDotBetween(list, d);
+                        return (
+                          <td key={d} className="p-2 align-top min-w-[80px]">
+                            <div className={`inline-flex px-2 py-1 rounded ${color}`} title={token==="R" ? "Rest Day" : `Shift ${token}`}>
+                              {token}
+                            </div>
+                            {restDot && (
+                              <div className="mt-1 flex items-center gap-1" title={`${restDot.label}${restDot.hrs!=null ? ` (${restDot.hrs.toFixed(1)}h)` : ""}`}>
+                                <span className={`inline-block w-2 h-2 rounded-full ${restDot.dot}`} />
+                                <span className="text-[10px] text-slate-500">{restDot.hrs!=null ? `${restDot.hrs.toFixed(1)}h` : ""}</span>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      <td className="p-2 align-top">
+                        <div className="text-xs text-slate-700 space-y-1">
+                          <div><span className="text-slate-500">Shifts:</span> {fairness.shifts}</div>
+                          <div><span className="text-slate-500">Nights:</span> {fairness.nights}</div>
+                          <div><span className="text-slate-500">Weekends:</span> {fairness.weekends}</div>
+                          <div><span className="text-slate-500">PHs:</span> {fairness.publicHolidays}</div>
+                          <div><span className="text-slate-500">OT hrs:</span> {fairness.overtimeHours}</div>
                         </div>
-                        {restDot && (
-                          <div className="mt-1 flex items-center gap-1" title={`${restDot.label}${restDot.hrs!=null ? ` (${restDot.hrs.toFixed(1)}h)` : ""}`}>
-                            <span className={`inline-block w-2 h-2 rounded-full ${restDot.dot}`} />
-                            <span className="text-[10px] text-slate-500">{restDot.hrs!=null ? `${restDot.hrs.toFixed(1)}h` : ""}</span>
-                          </div>
-                        )}
                       </td>
-                    );
-                  })}
-
-                  <td className="p-2 align-top">
-                    <div className="text-xs text-slate-700 space-y-1">
-                      <div><span className="text-slate-500">Shifts:</span> {fairness.shifts}</div>
-                      <div><span className="text-slate-500">Nights:</span> {fairness.nights}</div>
-                      <div><span className="text-slate-500">Weekends:</span> {fairness.weekends}</div>
-                      <div><span className="text-slate-500">PHs:</span> {fairness.publicHolidays}</div>
-                      <div><span className="text-slate-500">OT hrs:</span> {fairness.overtimeHours}</div>
-                    </div>
-                  </td>
-                </tr>
-              );
-            });
-          })}
-        </tbody>
-      </table>
+                    </tr>
+                  );
+                })}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       {/* Legend */}
       <div className="p-3 border-t text-xs text-slate-600 flex flex-wrap items-center gap-4">

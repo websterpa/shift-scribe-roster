@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Table, TableBody } from '@/components/ui/table';
 import { RosterCalendarHeader } from './RosterCalendarHeader';
@@ -41,6 +42,9 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<{ name: string; role: string; maxHours: number; optedOut: boolean } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  
+  // Virtual scrolling reference
+  const parentRef = useRef<HTMLDivElement>(null);
 
   // Build violation map for quick lookup: staffName -> date -> violation
   const violationMap = new Map<string, Map<string, { gap: number; message: string }>>();
@@ -148,6 +152,21 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
     return sum + (assignment?.hours || 0);
   }, 0) : 0;
 
+  // OPTIMIZATION: Virtual scrolling for large staff lists
+  // Only renders visible rows + overscan for smooth scrolling
+  const rowVirtualizer = useVirtualizer({
+    count: staff.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 45, // Estimated row height in pixels
+    overscan: 5, // Number of items to render outside visible area
+  });
+  
+  console.log('📊 Virtual scrolling stats:', {
+    totalStaff: staff.length,
+    virtualItems: rowVirtualizer.getVirtualItems().length,
+    totalSize: rowVirtualizer.getTotalSize(),
+  });
+
   return (
     <>
       <ComplianceSummary
@@ -168,38 +187,61 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
         />
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div 
+          ref={parentRef}
+          className="overflow-x-auto overflow-y-auto max-h-[600px]"
+          style={{ contain: 'strict' }}
+        >
           <Table>
             <RosterCalendarHeader currentWeekDates={currentWeekDates} />
             <TableBody>
-              {staff.map((staffMember) => {
-                const staffAssignments = assignmentMap.get(staffMember.name);
-                const staffViolations = violationMap.get(staffMember.name);
-                const complianceScore = getStaffComplianceScore(staffMember.name);
-                const weekHours = currentWeekDates.reduce((sum, date) => {
-                  const assignment = staffAssignments?.get(date);
-                  return sum + (assignment?.hours || 0);
-                }, 0);
-                const weekCost = currentWeekDates.reduce((sum, date) => {
-                  const assignment = staffAssignments?.get(date);
-                  return sum + (assignment?.cost || 0);
-                }, 0);
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const staffMember = staff[virtualRow.index];
+                  const staffAssignments = assignmentMap.get(staffMember.name);
+                  const staffViolations = violationMap.get(staffMember.name);
+                  const complianceScore = getStaffComplianceScore(staffMember.name);
+                  const weekHours = currentWeekDates.reduce((sum, date) => {
+                    const assignment = staffAssignments?.get(date);
+                    return sum + (assignment?.hours || 0);
+                  }, 0);
+                  const weekCost = currentWeekDates.reduce((sum, date) => {
+                    const assignment = staffAssignments?.get(date);
+                    return sum + (assignment?.cost || 0);
+                  }, 0);
 
-                return (
-                  <RosterStaffRow
-                    key={staffMember.name}
-                    staffMember={staffMember}
-                    currentWeekDates={currentWeekDates}
-                    staffAssignments={staffAssignments}
-                    staffViolations={staffViolations}
-                    weekHours={weekHours}
-                    weekCost={weekCost}
-                    heatmapEnabled={heatmapEnabled}
-                    complianceScore={complianceScore}
-                    onStaffClick={() => handleStaffClick(staffMember)}
-                  />
-                );
-              })}
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <RosterStaffRow
+                        staffMember={staffMember}
+                        currentWeekDates={currentWeekDates}
+                        staffAssignments={staffAssignments}
+                        staffViolations={staffViolations}
+                        weekHours={weekHours}
+                        weekCost={weekCost}
+                        heatmapEnabled={heatmapEnabled}
+                        complianceScore={complianceScore}
+                        onStaffClick={() => handleStaffClick(staffMember)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </TableBody>
           </Table>
         </div>
