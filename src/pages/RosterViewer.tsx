@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Calendar, Users, Clock, Printer, Download, BarChart, AlertTriangle, Save, FileDown } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, Clock, Printer, Download, BarChart, AlertTriangle, Save, FileDown, Lightbulb } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { RosterViewerHeader } from '@/components/roster/RosterViewerHeader';
 import { RosterCalendarTable } from '@/components/roster/RosterCalendarTable';
 import { RosterPrintView } from '@/components/roster/RosterPrintView';
 import { RosterDiagnosticsPanel } from '@/components/roster/RosterDiagnosticsPanel';
+import { CorrectivePanel } from '@/components/roster/CorrectivePanel';
 import { checkRestPeriods, checkWeeklyAverage } from '@/engine/validators/wtd';
 import { summariseDiagnostics } from '@/engine/diagnostics';
 import type { RosterDiagnostics, RosterAssignment as EngineRosterAssignment } from '@/engine/generateRoster';
@@ -459,7 +460,7 @@ const RosterViewer = () => {
       )}
 
       <Tabs defaultValue="calendar" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Calendar View
@@ -467,6 +468,10 @@ const RosterViewer = () => {
           <TabsTrigger value="diagnostics" className="flex items-center gap-2">
             <BarChart className="h-4 w-4" />
             Diagnostics
+          </TabsTrigger>
+          <TabsTrigger value="corrective" className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Corrective
           </TabsTrigger>
           <TabsTrigger value="print" className="flex items-center gap-2">
             <Printer className="h-4 w-4" />
@@ -491,6 +496,25 @@ const RosterViewer = () => {
                 <h3 className="text-lg font-medium mb-2">No Diagnostics Available</h3>
                 <p className="text-muted-foreground">
                   Diagnostics data is not available for this roster. This may be an older roster generated before diagnostics tracking was implemented.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="corrective" className="space-y-6">
+          {diagnostics ? (
+            <CorrectivePanel 
+              assignments={rosterData.assignments}
+              diagnostics={diagnostics}
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Lightbulb className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No Diagnostics Available</h3>
+                <p className="text-muted-foreground">
+                  Corrective suggestions require diagnostics data. This may be an older roster generated before diagnostics tracking was implemented.
                 </p>
               </CardContent>
             </Card>
