@@ -82,17 +82,30 @@ export async function saveRoster(input: SaveRosterInput): Promise<RosterVersion>
     cost: assignment.cost
   }));
 
-  // Batch insert assignments
-  const { error: assignmentError } = await supabase
-    .from('roster_assignments')
-    .insert(assignments);
+  // OPTIMIZATION: Batch insert assignments in chunks of 500 to handle large rosters
+  // This prevents timeout errors and reduces memory pressure
+  const batchSize = 500;
+  const totalBatches = Math.ceil(assignments.length / batchSize);
+  
+  console.log(`[persistRoster] Inserting ${assignments.length} assignments in ${totalBatches} batches`);
+  
+  for (let i = 0; i < assignments.length; i += batchSize) {
+    const chunk = assignments.slice(i, i + batchSize);
+    const batchNum = Math.floor(i / batchSize) + 1;
+    
+    const { error: batchError } = await supabase
+      .from('roster_assignments')
+      .insert(chunk);
 
-  if (assignmentError) {
-    console.error('[persistRoster] Failed to insert assignments:', assignmentError);
-    throw new Error(`Failed to save roster assignments: ${assignmentError.message}`);
+    if (batchError) {
+      console.error(`[persistRoster] Failed to insert batch ${batchNum}/${totalBatches}:`, batchError);
+      throw new Error(`Failed to save roster assignments (batch ${batchNum}): ${batchError.message}`);
+    }
+    
+    console.log(`[persistRoster] Saved batch ${batchNum}/${totalBatches} (${chunk.length} assignments)`);
   }
 
-  console.log(`[persistRoster] Successfully saved ${assignments.length} assignments`);
+  console.log(`[persistRoster] Successfully saved ${assignments.length} assignments in ${totalBatches} batches`);
 
   return version as RosterVersion;
 }

@@ -364,25 +364,37 @@ export async function generateAndSaveRoster(
     // This rotates unpopular shifts across staff over multiple periods
     const rotationOffset = currentCycleIndex % 8; // Assume max pattern length ~8
     
-    for (const staff of dedupedStaffList) {
-      if (staff.pattern_id) {
-        // Fetch pattern length to apply proper rotation
-        const { data: patternData } = await supabase
-          .from('site_patterns')
-          .select('sequence')
-          .eq('id', staff.pattern_id)
-          .maybeSingle();
-        
-        if (patternData?.sequence) {
-          const patternLength = Array.isArray(patternData.sequence) 
-            ? patternData.sequence.length 
-            : 8;
+    // OPTIMIZATION: Parallelize pattern fetching and staff updates
+    const staffForRotation = dedupedStaffList.filter(s => s.pattern_id);
+    
+    if (staffForRotation.length > 0) {
+      // Bulk fetch all patterns at once
+      const uniquePatternIds = [...new Set(staffForRotation.map(s => s.pattern_id!))];
+      const { data: patternsData } = await supabase
+        .from('site_patterns')
+        .select('id, sequence')
+        .in('id', uniquePatternIds);
+      
+      const patternLengthMap = new Map<string, number>();
+      if (patternsData) {
+        patternsData.forEach(p => {
+          const length = Array.isArray(p.sequence) ? p.sequence.length : 8;
+          patternLengthMap.set(p.id, length);
+        });
+      }
+      
+      console.log(`📦 Bulk loaded ${patternLengthMap.size} pattern lengths for rotation`);
+      
+      // Parallelize staff offset updates
+      await Promise.all(
+        staffForRotation.map(async (staff) => {
+          const patternLength = patternLengthMap.get(staff.pattern_id!) || 8;
           
           // Calculate rotated offset
           const baseOffset = staff.pattern_offset ?? 0;
           const rotatedOffset = (baseOffset + rotationOffset) % patternLength;
           
-          // Update staff pattern offset in database for this generation
+          // Update staff pattern offset in database
           await supabase
             .from('staff_profiles')
             .update({ pattern_offset: rotatedOffset })
@@ -397,8 +409,10 @@ export async function generateAndSaveRoster(
             final: rotatedOffset,
             patternLength,
           });
-        }
-      }
+        })
+      );
+      
+      console.log(`✅ Parallelized rotation for ${staffForRotation.length} staff members`);
     }
     
     // Import pattern allocation utilities
@@ -561,6 +575,33 @@ export async function generateAndSaveRoster(
       adherencePct: number;
     }> = [];
     
+    // OPTIMIZATION: Bulk fetch all patterns at once instead of sequential queries
+    const uniquePatternIds = [...new Set(
+      dedupedStaffList
+        .map(s => s.pattern_id)
+        .filter((id): id is string => !!id)
+    )];
+    
+    const patternsMap = new Map<string, { sequence: string[]; name: string }>();
+    
+    if (uniquePatternIds.length > 0) {
+      const { data: patternsData } = await supabase
+        .from('site_patterns')
+        .select('id, sequence, name')
+        .in('id', uniquePatternIds);
+      
+      if (patternsData) {
+        patternsData.forEach(p => {
+          const sequence = Array.isArray(p.sequence)
+            ? p.sequence.filter((s): s is string => typeof s === 'string')
+            : [];
+          patternsMap.set(p.id, { sequence, name: p.name });
+        });
+      }
+    }
+    
+    console.log(`📦 Bulk loaded ${patternsMap.size} patterns for compliance check`);
+    
     // Calculate compliance for each staff member
     for (const [staffId, assignments] of Object.entries(grouped)) {
       const staff = dedupedStaffList.find(s => s.id === staffId);
@@ -574,21 +615,16 @@ export async function generateAndSaveRoster(
         continue;
       }
       
-      // Fetch pattern sequence
-      const { data: patternData } = await supabase
-        .from('site_patterns')
-        .select('sequence, name')
-        .eq('id', staff.pattern_id)
-        .maybeSingle();
+      // Get pattern from cached map
+      const patternData = patternsMap.get(staff.pattern_id);
       
-      if (!patternData?.sequence) {
+      if (!patternData) {
         console.log(`   ⚠️ Pattern not found in database`);
         continue;
       }
       
-      const patternSequence = Array.isArray(patternData.sequence)
-        ? patternData.sequence.filter((s): s is string => typeof s === 'string')
-        : [];
+      const patternSequence = patternData.sequence;
+      
       
       if (patternSequence.length === 0) {
         console.log(`   ⚠️ Empty pattern sequence`);
@@ -1002,7 +1038,7 @@ export async function generateAndSaveRoster(
           .delete()
           .eq('version_id', versionData.id);
         
-        // Insert updated assignments
+        // Insert updated assignments with batch optimization
         const updatedAssignments = engineAssignments.map(a => ({
           version_id: versionData.id,
           staff_id: a.staffId,
@@ -1014,9 +1050,16 @@ export async function generateAndSaveRoster(
           cost: a.cost || 0,
         }));
         
-        await supabase
-          .from('roster_assignments')
-          .insert(updatedAssignments);
+        // OPTIMIZATION: Batch insert in chunks of 500 to handle large rosters
+        const batchSize = 500;
+        for (let i = 0; i < updatedAssignments.length; i += batchSize) {
+          const chunk = updatedAssignments.slice(i, i + batchSize);
+          await supabase
+            .from('roster_assignments')
+            .insert(chunk);
+          
+          console.log(`📦 Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(updatedAssignments.length / batchSize)} (${chunk.length} records)`);
+        }
         
         console.log('✅ Database updated with automated changes');
         logger.info('Assignments updated', { count: updatedAssignments.length });

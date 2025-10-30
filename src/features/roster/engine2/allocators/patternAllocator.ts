@@ -93,29 +93,31 @@ export async function patternAllocator(
     })),
   });
 
-  // Generate assignments for each staff member
-  for (const member of staffWithPatterns) {
+  // OPTIMIZATION: Generate assignments for each staff member in parallel
+  // Each staff member's pattern expansion is independent, so we can parallelize
+  const staffAssignmentPromises = staffWithPatterns.map(async (member) => {
     const pattern = patterns.find(p => p.id === member.pattern_id);
     if (!pattern) {
       logger.warn('Pattern not found for staff', { 
         staffId: member.id, 
         patternId: member.pattern_id,
       });
-      continue;
+      return [];
     }
 
-    const staffAssignments = generateStaffAssignments({
+    return generateStaffAssignments({
       member,
       pattern,
       rosterStart,
       rosterEnd,
     });
-
-    assignments.push(...staffAssignments);
-  }
+  });
+  
+  const allStaffAssignments = await Promise.all(staffAssignmentPromises);
+  assignments.push(...allStaffAssignments.flat());
 
   console.info(
-    `[PatternAllocator] Generated ${assignments.length} pattern-based assignments for ${staffWithPatterns.length} staff`
+    `[PatternAllocator] Generated ${assignments.length} pattern-based assignments for ${staffWithPatterns.length} staff (parallelized)`
   );
 
   return assignments;
