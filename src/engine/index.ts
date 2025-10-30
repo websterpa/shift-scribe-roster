@@ -53,6 +53,15 @@ export {
   type CorrectiveAnalysis
 } from './corrective';
 
+// Auto-apply corrective engine
+export {
+  autoApplyCorrections,
+  hasCriticalCorrections,
+  formatChangelog,
+  type CorrectionChangeLog,
+  type AutoApplyResult
+} from './corrective/autoApply';
+
 // Export utilities
 export {
   exportRosterCSV,

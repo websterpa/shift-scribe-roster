@@ -21,7 +21,8 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
     weeklyAverageCompliant, 
     avgHoursPerWeek, 
     staffSummary, 
-    overallCompliance 
+    overallCompliance,
+    autoApplied 
   } = diagnostics;
 
   const totalViolations = Object.values(restViolations).reduce(
@@ -33,6 +34,30 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
 
   return (
     <div className="space-y-6">
+      {/* Auto-Applied Corrections Alert */}
+      {autoApplied && autoApplied.length > 0 && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <CheckCircle2 className="h-4 w-4 text-blue-600" />
+          <AlertDescription>
+            <strong>✓ Automatic Corrections Applied:</strong> {autoApplied.length} shift(s) automatically adjusted during generation to resolve rest period violations.
+            <details className="mt-2">
+              <summary className="cursor-pointer text-sm font-medium text-blue-700 hover:text-blue-800">
+                View Applied Corrections
+              </summary>
+              <div className="mt-2 space-y-1 text-xs">
+                {autoApplied.map((c, i) => (
+                  <div key={i} className="p-2 bg-white rounded border border-blue-100">
+                    <span className="font-semibold">{c.staffName}</span> on <span className="font-mono">{c.date}</span>
+                    : Changed <span className="px-1 bg-red-100 text-red-700 rounded">{c.oldShift}</span> to <span className="px-1 bg-green-100 text-green-700 rounded">{c.newShift}</span>
+                    <span className="text-muted-foreground ml-1">({c.reason})</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Overall Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

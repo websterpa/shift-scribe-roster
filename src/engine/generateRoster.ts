@@ -11,6 +11,7 @@ import { checkRestPeriods, checkWeeklyAverage, type ShiftRecord } from "@/engine
 import { summariseDiagnostics, type StaffDiagnostics } from "@/engine/diagnostics";
 import type { PatternDefinition, StaffPattern, Assignment } from "@/engine/diagnostics";
 import { saveRoster, type RosterVersion } from "./persistRoster";
+import { autoApplyCorrections } from "./corrective/autoApply";
 
 const logger = createLogger('AtlasRosterGenerator');
 
@@ -46,6 +47,16 @@ export interface RosterDiagnostics {
     totalShifts: number;
     fullyCompliant: number;
   };
+  autoApplied?: Array<{
+    staffId: string;
+    staffName: string;
+    dayIndex: number;
+    date: string;
+    oldShift: string;
+    newShift: string;
+    reason: string;
+    severity: 'critical' | 'warning' | 'info';
+  }>;
 }
 
 export interface RosterWithChecks {
@@ -338,11 +349,31 @@ export async function generateRosterWithChecks(
     wtdCompliantStaff: `${compliantStaff}/${Object.keys(weeklyAverageCompliant).length}`
   });
   
-  // 8. Persist roster to database with tenant isolation
+  // 8. Auto-apply safe corrections
+  console.log('🔧 [AtlasGenerator] Applying automatic corrections...');
+  const initialDiagnostics: RosterDiagnostics = {
+    restViolations,
+    weeklyAverageCompliant,
+    avgHoursPerWeek,
+    staffSummary,
+    overallCompliance: { avgCompliance, totalShifts, fullyCompliant }
+  };
+  
+  const { roster: correctedRoster, changelog } = autoApplyCorrections(roster, initialDiagnostics);
+  
+  if (changelog.length > 0) {
+    console.log(`✅ [AtlasGenerator] Applied ${changelog.length} automatic corrections:`, 
+      changelog.map(c => ({ staff: c.staffName, change: `${c.oldShift} → ${c.newShift}` }))
+    );
+  } else {
+    console.log('✅ [AtlasGenerator] No automatic corrections needed');
+  }
+  
+  // 9. Persist roster to database with tenant isolation
   console.log('💾 [AtlasGenerator] Persisting roster to database...');
   const version = await saveRoster({
     tenantId: input.tenantId,
-    roster,
+    roster: correctedRoster,
     configId: input.configId,
     label: input.label || 'Auto-Generated'
   });
@@ -351,13 +382,14 @@ export async function generateRosterWithChecks(
   
   return {
     version,
-    roster,
+    roster: correctedRoster,
     diagnostics: {
       restViolations,
       weeklyAverageCompliant,
       avgHoursPerWeek,
       staffSummary,
-      overallCompliance: { avgCompliance, totalShifts, fullyCompliant }
+      overallCompliance: { avgCompliance, totalShifts, fullyCompliant },
+      autoApplied: changelog
     }
   };
 }
