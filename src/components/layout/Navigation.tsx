@@ -15,6 +15,7 @@ const Navigation = () => {
     { path: '/staff', label: 'Staff', icon: Users, gradient: 'from-yellow-500 to-orange-600' },
     { path: '/roster/builder', label: 'Roster Builder', icon: Wand2, gradient: 'from-indigo-500 to-blue-600' },
     { path: '/my-rosters', label: 'My Rosters', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
+    { path: '/reports/archived-rosters', label: 'Version History', icon: BarChart3, gradient: 'from-emerald-500 to-green-600' },
     { path: '/leave-requests', label: 'Leave Requests', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
     { path: '/reports', label: 'Reports', icon: BarChart3, gradient: 'from-emerald-500 to-green-600' },
     { path: '/help', label: 'Help & Support', icon: HelpCircle, gradient: 'from-teal-500 to-cyan-600' },
