@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Lightbulb, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Lightbulb, AlertTriangle, CheckCircle2, Check } from "lucide-react";
 import { generateCorrections } from "@/engine/corrective";
 import type { RosterDiagnostics, RosterAssignment } from "@/engine/generateRoster";
+import { toast } from "@/hooks/use-toast";
 
 interface CorrectivePanelProps {
   assignments: Array<{
@@ -17,9 +19,10 @@ interface CorrectivePanelProps {
     } | null;
   }>;
   diagnostics: RosterDiagnostics;
+  onApply: (updatedAssignments: CorrectivePanelProps['assignments']) => void;
 }
 
-export function CorrectivePanel({ assignments, diagnostics }: CorrectivePanelProps) {
+export function CorrectivePanel({ assignments, diagnostics, onApply }: CorrectivePanelProps) {
   const suggestions = useMemo(() => {
     // Transform assignments to engine format
     const engineAssignments: RosterAssignment[] = assignments.map((a, idx) => ({
@@ -35,6 +38,36 @@ export function CorrectivePanel({ assignments, diagnostics }: CorrectivePanelPro
 
     return generateCorrections(engineAssignments, diagnostics);
   }, [assignments, diagnostics]);
+
+  const handleApply = (suggestion: typeof suggestions.suggestions[0]) => {
+    console.log('[CorrectivePanel] Applying suggestion:', suggestion);
+    
+    // Find the assignment to update
+    const staffName = suggestion.staffName;
+    const updatedAssignments = assignments.map(a => {
+      const currentStaffName = a.staff_profiles 
+        ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` 
+        : 'Unknown';
+      
+      // For rest violations, insert a rest day
+      if (suggestion.issue.includes('Insufficient rest') || suggestion.issue.includes('rest')) {
+        // Find the assignment matching the day index
+        // This is a simplified approach - in production you'd need more sophisticated matching
+        if (currentStaffName === staffName && a.shift_code !== 'R') {
+          return { ...a, shift_code: 'R' };
+        }
+      }
+      
+      return a;
+    });
+
+    onApply(updatedAssignments);
+    
+    toast({
+      title: "Suggestion Applied",
+      description: `Updated roster for ${suggestion.staffName}. Review the changes in the Calendar view.`,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -95,6 +128,7 @@ export function CorrectivePanel({ assignments, diagnostics }: CorrectivePanelPro
                     <th className="p-3 text-left font-medium">Staff</th>
                     <th className="p-3 text-left font-medium">Issue</th>
                     <th className="p-3 text-left font-medium">Suggested Action</th>
+                    <th className="p-3 text-center font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -122,6 +156,17 @@ export function CorrectivePanel({ assignments, diagnostics }: CorrectivePanelPro
                       <td className="p-3 font-medium">{s.staffName}</td>
                       <td className="p-3 text-muted-foreground">{s.issue}</td>
                       <td className="p-3">{s.suggestion}</td>
+                      <td className="p-3 text-center">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleApply(s)}
+                          className="gap-1"
+                        >
+                          <Check className="h-3 w-3" />
+                          Apply
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

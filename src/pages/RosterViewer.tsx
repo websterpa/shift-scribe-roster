@@ -65,6 +65,17 @@ const RosterViewer = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Handler to apply corrective suggestions
+  const handleApplyCorrection = (updatedAssignments: RosterAssignment[]) => {
+    console.log('[RosterViewer] Applying corrective suggestions');
+    if (rosterData) {
+      setRosterData({
+        ...rosterData,
+        assignments: updatedAssignments
+      });
+    }
+  };
+
   // Compute diagnostics from roster data
   const diagnostics = useMemo<RosterDiagnostics | null>(() => {
     if (!rosterData?.assignments || rosterData.assignments.length === 0) {
@@ -507,6 +518,7 @@ const RosterViewer = () => {
             <CorrectivePanel 
               assignments={rosterData.assignments}
               diagnostics={diagnostics}
+              onApply={handleApplyCorrection}
             />
           ) : (
             <Card>
