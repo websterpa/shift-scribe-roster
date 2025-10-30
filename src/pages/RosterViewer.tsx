@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Calendar, Users, Clock, Printer, Download, BarChart, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, Clock, Printer, Download, BarChart, AlertTriangle, Save, FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { RosterViewerHeader } from '@/components/roster/RosterViewerHeader';
@@ -15,6 +15,8 @@ import { RosterDiagnosticsPanel } from '@/components/roster/RosterDiagnosticsPan
 import { checkRestPeriods, checkWeeklyAverage } from '@/engine/validators/wtd';
 import { summariseDiagnostics } from '@/engine/diagnostics';
 import type { RosterDiagnostics, RosterAssignment as EngineRosterAssignment } from '@/engine/generateRoster';
+import { exportRosterCSV, exportRosterExcel, exportRosterPDF } from '@/engine/exports';
+import { useTenant } from '@/features/tenant/useTenant';
 
 interface RosterAssignment {
   id: string;
@@ -57,8 +59,10 @@ const RosterViewer = () => {
   
   const { rosterId } = useParams<{ rosterId: string }>();
   const navigate = useNavigate();
+  const { tenantId } = useTenant();
   const [rosterData, setRosterData] = useState<RosterData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Compute diagnostics from roster data
   const diagnostics = useMemo<RosterDiagnostics | null>(() => {
@@ -293,6 +297,109 @@ const RosterViewer = () => {
     }, 500);
   };
 
+  const handleExportCSV = () => {
+    if (!rosterData) return;
+    
+    console.log('📥 Exporting roster to CSV');
+    
+    // Convert database assignments to engine format
+    const engineAssignments: EngineRosterAssignment[] = rosterData.assignments.map(a => ({
+      staffId: a.staff_profiles ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` : 'Unknown',
+      staffName: a.staff_profiles ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` : 'Unknown',
+      dayIndex: 0, // Not needed for export
+      date: new Date(a.date),
+      shift: a.shift_code,
+      patternId: '', // Not needed for export
+      shiftStart: a.shift_start ? new Date(a.shift_start) : undefined,
+      shiftEnd: a.shift_end ? new Date(a.shift_end) : undefined,
+      hours: a.hours || undefined,
+      cost: a.cost || undefined,
+    }));
+    
+    try {
+      exportRosterCSV(engineAssignments, `${rosterData.version_name}-roster.csv`);
+      toast({
+        title: "CSV Export Complete",
+        description: `Exported ${engineAssignments.length} assignments to CSV`,
+      });
+    } catch (error) {
+      console.error('❌ CSV export failed:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export roster to CSV",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!rosterData) return;
+    
+    console.log('📊 Exporting roster to Excel');
+    
+    const engineAssignments: EngineRosterAssignment[] = rosterData.assignments.map(a => ({
+      staffId: a.staff_profiles ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` : 'Unknown',
+      staffName: a.staff_profiles ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` : 'Unknown',
+      dayIndex: 0,
+      date: new Date(a.date),
+      shift: a.shift_code,
+      patternId: '',
+      shiftStart: a.shift_start ? new Date(a.shift_start) : undefined,
+      shiftEnd: a.shift_end ? new Date(a.shift_end) : undefined,
+      hours: a.hours || undefined,
+      cost: a.cost || undefined,
+    }));
+    
+    try {
+      exportRosterExcel(engineAssignments, `${rosterData.version_name}-roster.xlsx`);
+      toast({
+        title: "Excel Export Complete",
+        description: `Exported ${engineAssignments.length} assignments to Excel`,
+      });
+    } catch (error) {
+      console.error('❌ Excel export failed:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export roster to Excel",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (!rosterData) return;
+    
+    console.log('📄 Exporting roster to PDF');
+    
+    const engineAssignments: EngineRosterAssignment[] = rosterData.assignments.map(a => ({
+      staffId: a.staff_profiles ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` : 'Unknown',
+      staffName: a.staff_profiles ? `${a.staff_profiles.first_name} ${a.staff_profiles.last_name}` : 'Unknown',
+      dayIndex: 0,
+      date: new Date(a.date),
+      shift: a.shift_code,
+      patternId: '',
+      shiftStart: a.shift_start ? new Date(a.shift_start) : undefined,
+      shiftEnd: a.shift_end ? new Date(a.shift_end) : undefined,
+      hours: a.hours || undefined,
+      cost: a.cost || undefined,
+    }));
+    
+    try {
+      exportRosterPDF(engineAssignments, `${rosterData.version_name}-roster.pdf`);
+      toast({
+        title: "PDF Preview Opened",
+        description: "Use your browser's print dialog to save as PDF",
+      });
+    } catch (error) {
+      console.error('❌ PDF export failed:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export roster to PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Show toast for rest violations when diagnostics are computed
   useEffect(() => {
     if (diagnostics && rosterData) {
@@ -333,7 +440,13 @@ const RosterViewer = () => {
 
   return (
     <div className="space-y-6">
-      <RosterViewerHeader rosterData={rosterData} onBack={() => navigate('/my-rosters')} />
+      <RosterViewerHeader 
+        rosterData={rosterData} 
+        onBack={() => navigate('/my-rosters')}
+        onExportCSV={handleExportCSV}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+      />
       
       {/* Rest Violations Banner */}
       {diagnostics && Object.values(diagnostics.restViolations || {}).reduce((sum: number, v: any[]) => sum + v.length, 0) > 0 && (

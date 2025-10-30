@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, Users, Clock, Settings } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, Clock, Settings, FileDown, FileSpreadsheet, FileText } from 'lucide-react';
 
 interface RosterData {
   id: string;
@@ -28,9 +28,18 @@ interface RosterData {
 interface RosterViewerHeaderProps {
   rosterData: RosterData;
   onBack: () => void;
+  onExportCSV?: () => void;
+  onExportExcel?: () => void;
+  onExportPDF?: () => void;
 }
 
-export const RosterViewerHeader = ({ rosterData, onBack }: RosterViewerHeaderProps) => {
+export const RosterViewerHeader = ({ 
+  rosterData, 
+  onBack, 
+  onExportCSV, 
+  onExportExcel, 
+  onExportPDF 
+}: RosterViewerHeaderProps) => {
   // Calculate total staff and costs
   const totalAssignments = rosterData.assignments.length;
   const totalHours = rosterData.assignments.reduce((sum, assignment) => sum + (assignment.hours || 0), 0);
@@ -48,12 +57,34 @@ export const RosterViewerHeader = ({ rosterData, onBack }: RosterViewerHeaderPro
 
   return (
     <div className="space-y-4">
-      {/* Navigation */}
-      <div className="flex items-center gap-4">
+      {/* Navigation and Actions */}
+      <div className="flex items-center justify-between gap-4">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to My Rosters
         </Button>
+        
+        {/* Export Actions */}
+        <div className="flex items-center gap-2">
+          {onExportCSV && (
+            <Button variant="outline" size="sm" onClick={onExportCSV}>
+              <FileText className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          )}
+          {onExportExcel && (
+            <Button variant="outline" size="sm" onClick={onExportExcel}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel
+            </Button>
+          )}
+          {onExportPDF && (
+            <Button variant="outline" size="sm" onClick={onExportPDF}>
+              <FileDown className="h-4 w-4 mr-2" />
+              PDF
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Header Card */}
