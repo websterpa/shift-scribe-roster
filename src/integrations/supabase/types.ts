@@ -85,7 +85,7 @@ export type Database = {
           severity: string
           shift_date: string
           staff_id: string | null
-          tenant_id: string | null
+          tenant_id: string
           version_id: string
         }
         Insert: {
@@ -98,7 +98,7 @@ export type Database = {
           severity: string
           shift_date: string
           staff_id?: string | null
-          tenant_id?: string | null
+          tenant_id: string
           version_id: string
         }
         Update: {
@@ -111,7 +111,7 @@ export type Database = {
           severity?: string
           shift_date?: string
           staff_id?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           version_id?: string
         }
         Relationships: [
@@ -357,7 +357,7 @@ export type Database = {
           shift_end: string | null
           shift_start: string | null
           staff_id: string
-          tenant_id: string | null
+          tenant_id: string
           version_id: string
         }
         Insert: {
@@ -370,7 +370,7 @@ export type Database = {
           shift_end?: string | null
           shift_start?: string | null
           staff_id: string
-          tenant_id?: string | null
+          tenant_id: string
           version_id: string
         }
         Update: {
@@ -383,7 +383,7 @@ export type Database = {
           shift_end?: string | null
           shift_start?: string | null
           staff_id?: string
-          tenant_id?: string | null
+          tenant_id?: string
           version_id?: string
         }
         Relationships: [
@@ -469,7 +469,7 @@ export type Database = {
           generated_at: string | null
           id: string
           label: string | null
-          tenant_id: string | null
+          tenant_id: string
           version_name: string | null
           version_number: number
         }
@@ -478,7 +478,7 @@ export type Database = {
           generated_at?: string | null
           id?: string
           label?: string | null
-          tenant_id?: string | null
+          tenant_id: string
           version_name?: string | null
           version_number: number
         }
@@ -487,7 +487,7 @@ export type Database = {
           generated_at?: string | null
           id?: string
           label?: string | null
-          tenant_id?: string | null
+          tenant_id?: string
           version_name?: string | null
           version_number?: number
         }
@@ -560,7 +560,7 @@ export type Database = {
           site_id: string
           system: string
           teams_required: number | null
-          tenant_id: string | null
+          tenant_id: string
         }
         Insert: {
           avg_weekly_hours?: number | null
@@ -575,7 +575,7 @@ export type Database = {
           site_id: string
           system: string
           teams_required?: number | null
-          tenant_id?: string | null
+          tenant_id: string
         }
         Update: {
           avg_weekly_hours?: number | null
@@ -590,7 +590,7 @@ export type Database = {
           site_id?: string
           system?: string
           teams_required?: number | null
-          tenant_id?: string | null
+          tenant_id?: string
         }
         Relationships: []
       }
