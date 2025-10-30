@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { cachedFetch, invalidateCache } from "@/lib/cache";
 import { getTenantId } from "@/features/tenant/useTenant";
 
 export type PatternToken = "E" | "L" | "N" | "D" | "R";
@@ -19,21 +20,33 @@ export type SavedPattern = {
 
 export async function listPatterns(siteId: string): Promise<SavedPattern[]> {
   if (!siteId) return [];
-  // TODO(tenant): Add tenant_id filter when site_patterns table has tenant_id column
-  const { data, error } = await supabase
-    .from("site_patterns")
-    .select("id,site_id,created_by,name,system,sequence,cycle_length,created_at")
-    .eq("site_id", siteId)
-    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
-    .order("created_at", { ascending: false });
   
-  if (error || !data) return [];
+  // Use cache with 60-second TTL to reduce redundant queries
+  const cacheKey = `patterns_${siteId}`;
   
-  // Coerce sequence into tokens array
-  return data.map((row: any) => ({
-    ...row,
-    sequence: Array.isArray(row.sequence) ? row.sequence : []
-  }));
+  return cachedFetch(cacheKey, async () => {
+    // TODO(tenant): Add tenant_id filter when site_patterns table has tenant_id column
+    const { data, error } = await supabase
+      .from("site_patterns")
+      .select("id,site_id,created_by,name,system,sequence,cycle_length,created_at")
+      .eq("site_id", siteId)
+      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+      .order("created_at", { ascending: false });
+    
+    if (error || !data) return [];
+    
+    // Coerce sequence into tokens array
+    return data.map((row: any) => ({
+      ...row,
+      sequence: Array.isArray(row.sequence) ? row.sequence : [],
+      cycle_length: row.cycle_length || 8,
+      avg_weekly_hours: row.avg_weekly_hours || 37.5,
+      teams_required: row.teams_required || 5,
+      is_wtd_compliant: row.is_wtd_compliant,
+      description: row.description,
+      created_at: row.created_at,
+    }));
+  }, 60_000); // 60-second TTL
 }
 
 export async function savePattern(args: {
@@ -71,6 +84,9 @@ export async function savePattern(args: {
     .select("id")
     .single();
 
+  // Invalidate patterns cache after insert
+  invalidateCache(`patterns_${args.siteId}`);
+
   if (error) return { ok: false };
   return { ok: true, id: data?.id };
 }
@@ -83,5 +99,9 @@ export async function deletePattern(id: string): Promise<boolean> {
     .delete()
     .eq("id", id);
     // .eq("tenant_id", getTenantId()); // Uncomment when column exists
+  
+  // Invalidate all patterns cache after delete (pattern could be in any site)
+  invalidateCache(/^patterns_/);
+  
   return !error;
 }

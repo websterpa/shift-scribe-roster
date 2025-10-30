@@ -279,6 +279,10 @@ export const StaffDialog: React.FC<StaffDialogProps> = ({
         throw result.error;
       }
 
+      // Invalidate staff cache after mutation
+      const { invalidateCache } = await import('@/lib/cache');
+      invalidateCache(/^staff_/);
+
       showSuccessToast(
         staffMember ? 'Staff member updated successfully' : 'Staff member created successfully'
       );

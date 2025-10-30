@@ -10,6 +10,7 @@
 import { createLogger } from "@/utils/errorLogger";
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember } from "@/types/roster";
+import { cachedFetch } from "@/lib/cache";
 
 const logger = createLogger('FetchStaffMembers');
 
@@ -30,21 +31,25 @@ const logger = createLogger('FetchStaffMembers');
 export async function fetchStaffMembers(tenantId?: string): Promise<StaffMember[]> {
   logger.info('Fetching staff members for roster generation', { tenantId });
   
-  try {
-    // Query all staff with 'active' availability_status
-    // Do NOT filter by is_active, role, site_id, or skills - keep it permissive
-    // Note: Using explicit type to avoid Supabase PostgREST deep type instantiation issues
-    let query: any = supabase
-      .from('staff_profiles')
-      .select('*')
-      .eq('availability_status', 'active');
+  // Use cache with 60-second TTL to reduce redundant queries
+  const cacheKey = `staff_${tenantId || 'default'}`;
+  
+  return cachedFetch(cacheKey, async () => {
+    try {
+      // Query all staff with 'active' availability_status
+      // Do NOT filter by is_active, role, site_id, or skills - keep it permissive
+      // Note: Using explicit type to avoid Supabase PostgREST deep type instantiation issues
+      let query: any = supabase
+        .from('staff_profiles')
+        .select('*')
+        .eq('availability_status', 'active');
 
-    // Apply tenant filter if provided
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+      // Apply tenant filter if provided
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
 
-    const { data, error } = await query;
+      const { data, error } = await query;
 
     if (error) {
       logger.error(new Error('Failed to fetch staff members'), { error });
@@ -112,9 +117,10 @@ export async function fetchStaffMembers(tenantId?: string): Promise<StaffMember[
       });
     }
     
-    return staffMembers;
-  } catch (error) {
-    logger.error(new Error('Exception in fetchStaffMembers'), { originalError: error });
-    return [];
-  }
+      return staffMembers;
+    } catch (error) {
+      logger.error(new Error('Exception in fetchStaffMembers'), { originalError: error });
+      return [];
+    }
+  }, 60_000); // 60-second TTL
 }
