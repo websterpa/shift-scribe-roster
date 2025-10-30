@@ -9,6 +9,7 @@ import { generateCorrections, type CorrectionSuggestion, type CorrectiveAnalysis
 import type { RosterAssignment, RosterDiagnostics } from '@/engine/generateRoster';
 import { createLogger } from '@/utils/errorLogger';
 import { persistCorrectionAudit } from '@/services/audit/persistCorrectionAudit';
+import { perf } from '@/lib/perf';
 
 const logger = createLogger('AutoApplyCorrections');
 
@@ -49,6 +50,7 @@ export async function autoApplyCorrections(
   versionId?: string,
   tenantId?: string
 ): Promise<AutoApplyResult> {
+  perf.start('AutoCorrections');
   logger.info('[autoApplyCorrections] Starting automatic correction application');
   
   const corrections: CorrectiveAnalysis = generateCorrections(roster, diagnostics);
@@ -122,17 +124,22 @@ export async function autoApplyCorrections(
     }
   }
 
+  const correctionMs = Math.round(perf.end('AutoCorrections'));
+  
   logger.info('[autoApplyCorrections] Automatic correction complete', {
     totalSuggestions: corrections.suggestions.length,
     applied: appliedCount,
-    skipped: skippedCount
+    skipped: skippedCount,
+    durationMs: correctionMs
   });
 
   // Persist audit entries to database if versionId provided
   let auditEntriesPersisted = 0;
   if (versionId && changelog.length > 0) {
     try {
+      perf.start('PersistAudit');
       auditEntriesPersisted = await persistCorrectionAudit(versionId, changelog, tenantId);
+      perf.end('PersistAudit');
       logger.info('[autoApplyCorrections] ✅ Persisted audit entries', {
         persisted: auditEntriesPersisted,
         total: changelog.length

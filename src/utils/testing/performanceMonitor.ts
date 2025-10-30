@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use src/lib/perf.ts instead for production performance monitoring
+ * This file is kept for backward compatibility with existing tests only
+ */
+
 // Performance monitoring for roster generation
 export class RosterPerformanceMonitor {
   private static instance: RosterPerformanceMonitor;

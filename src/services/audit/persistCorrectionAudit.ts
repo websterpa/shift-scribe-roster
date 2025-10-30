@@ -8,6 +8,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { createLogger } from '@/utils/errorLogger';
 import type { CorrectionChangeLog } from '@/engine/corrective/autoApply';
+import { getTenantId } from '@/features/tenant/useTenant';
 
 const logger = createLogger('PersistCorrectionAudit');
 
@@ -19,7 +20,7 @@ export interface AuditInsertRow {
   new_shift: string;
   reason: string;
   severity: 'critical' | 'warning' | 'info';
-  tenant_id?: string;
+  tenant_id: string;  // Required after migration
 }
 
 /**
@@ -46,6 +47,9 @@ export async function persistCorrectionAudit(
     tenantId
   });
 
+  // Use provided tenant_id or fallback to getTenantId()
+  const effectiveTenantId = tenantId || getTenantId();
+  
   // Convert changelog to database format
   const rows: AuditInsertRow[] = changelog.map(entry => ({
     version_id: versionId,
@@ -55,7 +59,7 @@ export async function persistCorrectionAudit(
     new_shift: entry.newShift,
     reason: entry.reason,
     severity: entry.severity,
-    ...(tenantId && { tenant_id: tenantId })
+    tenant_id: effectiveTenantId
   }));
 
   // Batch insert in chunks of 100 to avoid payload limits

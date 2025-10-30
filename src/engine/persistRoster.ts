@@ -5,6 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { RosterAssignment } from './generateRoster';
+import { perf } from '@/lib/perf';
 
 export interface SaveRosterInput {
   tenantId: string;
@@ -31,6 +32,7 @@ export interface RosterVersion {
 export async function saveRoster(input: SaveRosterInput): Promise<RosterVersion> {
   const { tenantId, roster, configId, label = 'Auto-Generated' } = input;
 
+  perf.start('persistRoster-GetVersion');
   console.log(`[persistRoster] Saving roster for tenant ${tenantId}`, {
     assignmentCount: roster.length,
     configId,
@@ -45,12 +47,15 @@ export async function saveRoster(input: SaveRosterInput): Promise<RosterVersion>
     .eq('tenant_id', tenantId)
     .order('version_number', { ascending: false })
     .limit(1);
+  
+  perf.end('persistRoster-GetVersion');
 
   const nextVersion = existingVersions && existingVersions.length > 0 
     ? existingVersions[0].version_number + 1 
     : 1;
 
   // Create version record
+  perf.start('persistRoster-CreateVersion');
   const { data: version, error: versionError } = await supabase
     .from('roster_versions')
     .insert({
@@ -61,6 +66,8 @@ export async function saveRoster(input: SaveRosterInput): Promise<RosterVersion>
     })
     .select()
     .single();
+  
+  perf.end('persistRoster-CreateVersion');
 
   if (versionError || !version) {
     console.error('[persistRoster] Failed to create version:', versionError);
@@ -89,6 +96,7 @@ export async function saveRoster(input: SaveRosterInput): Promise<RosterVersion>
   
   console.log(`[persistRoster] Inserting ${assignments.length} assignments in ${totalBatches} batches`);
   
+  perf.start('persistRoster-BatchInsert');
   for (let i = 0; i < assignments.length; i += batchSize) {
     const chunk = assignments.slice(i, i + batchSize);
     const batchNum = Math.floor(i / batchSize) + 1;
@@ -104,6 +112,7 @@ export async function saveRoster(input: SaveRosterInput): Promise<RosterVersion>
     
     console.log(`[persistRoster] Saved batch ${batchNum}/${totalBatches} (${chunk.length} assignments)`);
   }
+  perf.end('persistRoster-BatchInsert');
 
   console.log(`[persistRoster] Successfully saved ${assignments.length} assignments in ${totalBatches} batches`);
 

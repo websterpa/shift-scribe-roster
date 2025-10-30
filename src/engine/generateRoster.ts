@@ -13,6 +13,7 @@ import type { PatternDefinition, StaffPattern, Assignment } from "@/engine/diagn
 import { saveRoster, type RosterVersion } from "./persistRoster";
 import { autoApplyCorrections } from "./corrective/autoApply";
 import { balanceRoster, computeShiftScores } from "./balancer/fairness";
+import { perf } from "@/lib/perf";
 
 const logger = createLogger('AtlasRosterGenerator');
 
@@ -218,13 +219,13 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
 export async function generateRosterWithChecks(
   input: GenerateRosterInput
 ): Promise<RosterWithChecks> {
-  const startTotal = performance.now();
+  perf.start('RosterGeneration-Total');
   console.log('🚀 [AtlasGenerator] Starting roster generation with validation checks');
   
   // 1. Generate base roster
-  const startGen = performance.now();
+  perf.start('RosterGeneration-Core');
   const roster = await generateRoster(input);
-  const genMs = Math.round(performance.now() - startGen);
+  const genMs = Math.round(perf.end('RosterGeneration-Core'));
   
   if (roster.length === 0) {
     console.warn('⚠️ [AtlasGenerator] No assignments generated');
@@ -437,20 +438,21 @@ export async function generateRosterWithChecks(
   
   // 10. Persist roster to database with tenant isolation
   console.log('💾 [AtlasGenerator] Persisting roster to database...');
-  const startInsert = performance.now();
+  perf.start('RosterGeneration-Persist');
   const version = await saveRoster({
     tenantId: input.tenantId,
     roster: balancedRoster,
     configId: input.configId,
     label: input.label || 'Auto-Generated'
   });
-  const insertMs = Math.round(performance.now() - startInsert);
+  const insertMs = Math.round(perf.end('RosterGeneration-Persist'));
   
-  const totalMs = Math.round(performance.now() - startTotal);
+  const totalMs = Math.round(perf.end('RosterGeneration-Total'));
   const fetchMs = Math.round(totalMs - genMs - insertMs); // Data fetch is remainder
   
   console.log(`✅ [AtlasGenerator] Roster saved as version ${version.version_number}`);
-  console.log(`⚡ Performance: Fetch ${fetchMs}ms | Generate ${genMs}ms | Insert ${insertMs}ms | Total ${totalMs}ms`);
+  perf.summary();
+  perf.logMemory();
   
   return {
     version,
