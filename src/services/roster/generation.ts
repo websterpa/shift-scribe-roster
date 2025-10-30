@@ -18,6 +18,7 @@ import {
 } from "@/engine/validators/wtd";
 import { autoApplyCorrections } from '@/engine/corrective/autoApply';
 import { balanceRoster } from '@/engine/balancer/fairness';
+import { getTenantId } from '@/features/tenant/useTenant';
 
 const logger = createLogger('GenerateAndSaveRoster');
 
@@ -52,6 +53,8 @@ export async function generateAndSaveRoster(
   let genEndTime = 0;
   let insertStartTime = 0;
   let insertEndTime = 0;
+  
+  const tenantId = getTenantId(); // Get tenant ID for isolation
   
   // Extract config properties - handle both new and legacy formats
   const configId = config.configId || config.id;
@@ -132,6 +135,7 @@ export async function generateAndSaveRoster(
       .from('roster_versions')
       .insert({
         config_id: configId,
+        tenant_id: tenantId,
         version_name: versionNameToUse || `Version ${Date.now()}`,
         version_number: nextVersionNumber,
       })
@@ -738,6 +742,7 @@ export async function generateAndSaveRoster(
     
     return {
       version_id: versionData.id,
+      tenant_id: tenantId,
       staff_id: a.staffId,
       date: a.dateISO,
       shift_code: finalCode,
@@ -1061,6 +1066,7 @@ export async function generateAndSaveRoster(
         // Insert updated assignments with batch optimization
         const updatedAssignments = engineAssignments.map(a => ({
           version_id: versionData.id,
+          tenant_id: tenantId,
           staff_id: a.staffId,
           date: a.date.toISOString().split('T')[0],
           shift_code: a.shift,

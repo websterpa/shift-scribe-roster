@@ -1,4 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getTenantId } from "@/features/tenant/useTenant";
+
+const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 /**
  * Seed dummy patterns for testing purposes
@@ -18,17 +21,19 @@ export async function seedTestPatterns() {
       name: "Test Pattern 8h",
       system: "8h",
       sequence: ["D", "D", "E", "E", "L", "L", "R", "R"],
-      repeat_weeks: 17,
+      cycle_length: 17,
       site_id: "TEST-SITE-1",
-      created_by: user.id
+      created_by: user.id,
+      tenant_id: DEMO_TENANT_ID
     },
     {
       name: "Test Pattern 12h",
       system: "12h",
       sequence: ["D", "D", "D", "D", "R", "R", "R", "R", "N", "N", "N", "N", "R", "R", "R", "R"],
-      repeat_weeks: 17,
+      cycle_length: 17,
       site_id: "TEST-SITE-1",
-      created_by: user.id
+      created_by: user.id,
+      tenant_id: DEMO_TENANT_ID
     }
   ];
 

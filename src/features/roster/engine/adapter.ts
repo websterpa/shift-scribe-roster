@@ -51,6 +51,7 @@ export function adaptPatternAssignments(
     date: p.date,
     shift_code: p.shiftCode as 'E' | 'L' | 'N' | 'D',
     site_id: siteId,
+    tenant_id: tenantId,
   }));
 }
 

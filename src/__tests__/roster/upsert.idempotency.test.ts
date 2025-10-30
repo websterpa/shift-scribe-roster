@@ -5,6 +5,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
 
+const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 describe('Roster Assignments Upsert Idempotency', () => {
   const testVersionId = 'test-version-' + Date.now();
   const testStaffId = 'test-staff-' + Date.now();
@@ -21,6 +23,7 @@ describe('Roster Assignments Upsert Idempotency', () => {
   it('should not duplicate assignments on repeated upsert with same key', async () => {
     const assignment1 = {
       version_id: testVersionId,
+      tenant_id: DEMO_TENANT_ID,
       date: testDate,
       staff_id: testStaffId,
       shift_code: 'E',
@@ -86,6 +89,7 @@ describe('Roster Assignments Upsert Idempotency', () => {
     const assignments = [
       {
         version_id: testVersionId,
+        tenant_id: DEMO_TENANT_ID,
         date: testDate,
         staff_id: staff1Id,
         shift_code: 'E',
@@ -93,6 +97,7 @@ describe('Roster Assignments Upsert Idempotency', () => {
       },
       {
         version_id: testVersionId,
+        tenant_id: DEMO_TENANT_ID,
         date: testDate,
         staff_id: staff2Id,
         shift_code: 'L',
@@ -122,6 +127,7 @@ describe('Roster Assignments Upsert Idempotency', () => {
     const assignments = [
       {
         version_id: testVersionId,
+        tenant_id: DEMO_TENANT_ID,
         date: '2025-01-15',
         staff_id: testStaffId,
         shift_code: 'E',
@@ -129,6 +135,7 @@ describe('Roster Assignments Upsert Idempotency', () => {
       },
       {
         version_id: testVersionId,
+        tenant_id: DEMO_TENANT_ID,
         date: '2025-01-16',
         staff_id: testStaffId,
         shift_code: 'L',
