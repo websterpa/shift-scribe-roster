@@ -21,16 +21,15 @@ export type SavedPattern = {
 export async function listPatterns(siteId: string): Promise<SavedPattern[]> {
   if (!siteId) return [];
   
-  // Use cache with 60-second TTL to reduce redundant queries
-  const cacheKey = `patterns_${siteId}`;
+  const tenantId = getTenantId();
+  const cacheKey = `patterns_${siteId}_${tenantId}`;
   
   return cachedFetch(cacheKey, async () => {
-    // TODO(tenant): Add tenant_id filter when site_patterns table has tenant_id column
     const { data, error } = await supabase
       .from("site_patterns")
       .select("id,site_id,created_by,name,system,sequence,cycle_length,created_at")
       .eq("site_id", siteId)
-      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
     
     if (error || !data) return [];
@@ -65,7 +64,8 @@ export async function savePattern(args: {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user?.id) return { ok: false };
   
-  // TODO(tenant): Include tenant_id in insert when site_patterns table has tenant_id column
+  const tenantId = getTenantId();
+  
   const { data, error } = await supabase
     .from("site_patterns")
     .insert({
@@ -79,13 +79,14 @@ export async function savePattern(args: {
       teams_required: args.teamsRequired,
       is_wtd_compliant: args.isWtdCompliant,
       description: args.description,
-      // tenant_id: getTenantId(), // Uncomment when column exists
+      tenant_id: tenantId,
     })
     .select("id")
     .single();
 
   // Invalidate patterns cache after insert
-  invalidateCache(`patterns_${args.siteId}`);
+  const tenantIdForCache = getTenantId();
+  invalidateCache(`patterns_${args.siteId}_${tenantIdForCache}`);
 
   if (error) return { ok: false };
   return { ok: true, id: data?.id };
@@ -93,12 +94,14 @@ export async function savePattern(args: {
 
 export async function deletePattern(id: string): Promise<boolean> {
   if (!id) return false;
-  // TODO(tenant): Add tenant_id filter when site_patterns table has tenant_id column
+  
+  const tenantId = getTenantId();
+  
   const { error } = await supabase
     .from("site_patterns")
     .delete()
-    .eq("id", id);
-    // .eq("tenant_id", getTenantId()); // Uncomment when column exists
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
   
   // Invalidate all patterns cache after delete (pattern could be in any site)
   invalidateCache(/^patterns_/);

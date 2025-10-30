@@ -8,25 +8,24 @@ type ReqLegacy = Record<string, Record<string, number>>;
 type ReqNew = { days: Record<string, Array<{ role_id?: string; code?: string; logical?: string; needed: number }>> };
 
 export async function fetchRequiredCodes(versionId: string, monthStartISO: string, monthEndISO: string): Promise<Set<string>> {
-  // TODO(tenant): Add tenant_id filter when roster_versions table has tenant_id column
+  const tenantId = getTenantId();
+  
   const { data: vData, error: vErr } = await safeSelect<any>(
     supabase
       .from("roster_versions")
       .select("id, config_id")
       .eq("id", versionId)
-      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+      .eq("tenant_id", tenantId)
       .single(),
     "roster version"
   );
   if (vErr || !vData) return new Set();
   
-  // TODO(tenant): Add tenant_id filter when roster_config table has tenant_id column
   const { data: cData, error: cErr } = await safeSelect<any>(
     supabase
       .from("roster_config")
       .select("id, staffing_requirements")
       .eq("id", vData.config_id)
-      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
       .single(),
     "roster config"
   );

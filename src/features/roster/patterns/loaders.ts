@@ -5,6 +5,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import type { PatternTemplate, ShiftCode } from "./types";
+import { getTenantId } from "@/features/tenant/useTenant";
 
 /**
  * Validate that a string is a valid ShiftCode
@@ -57,12 +58,13 @@ export async function loadShiftPatterns(tenantId: string): Promise<PatternTempla
       return [];
     }
 
-    // TODO(tenant): Add tenant_id column to site_patterns table for proper multi-tenancy
-    // For now, filter by created_by (user_id)
+    const tenantId = getTenantId();
+    
     const { data, error } = await supabase
       .from('site_patterns')
       .select('*')
-      .eq('created_by', user.id);
+      .eq('created_by', user.id)
+      .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('❌ Error loading shift patterns:', error);
@@ -140,8 +142,6 @@ export async function loadCustomPatterns(tenantId: string): Promise<PatternTempl
       return [];
     }
 
-    // TODO(tenant): Add tenant_id column to custom_patterns table for proper multi-tenancy
-    // For now, filter by user_id
     const { data, error } = await supabase
       .from('custom_patterns')
       .select('*')

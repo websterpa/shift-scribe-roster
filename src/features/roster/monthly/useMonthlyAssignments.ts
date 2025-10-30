@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EnrichedAssignment } from "./types";
 import { safeSelect } from "@/integrations/supabase/safeQuery";
+import { getTenantId } from "@/features/tenant/useTenant";
 
 type FetchArgs = {
   sb: SupabaseClient;
@@ -22,13 +23,13 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   const endDate = new Date(start);
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toISOString().slice(0, 10);
+  const tenantId = getTenantId();
 
-  // TODO(tenant): Add tenant_id filter when roster_assignments table has tenant_id column
   let q = sb
     .from("roster_assignments")
     .select("*")
     .eq("version_id", versionId)
-    // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+    .eq("tenant_id", tenantId)
     .gte("shift_start", start)
     .lt("shift_start", end);
 
@@ -50,7 +51,6 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
   // Build staff name map - only if we have valid IDs
   const nameMap = new Map<string, string>();
   if (ids.length > 0) {
-    // TODO(tenant): Add tenant_id filter when staff_profiles table has tenant_id column
     const { data: staff, error: staffErr } = await safeSelect<any[]>(
       sb
         .from("staff_profiles")
@@ -58,7 +58,6 @@ export async function fetchMonthlyAssignments({ sb, versionId, monthISO, shiftCo
         .in("id", ids),
       "staff profiles"
     );
-      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
     
     if (staffErr) return [];
     
@@ -103,14 +102,14 @@ export async function countMonthlyAssignments({ sb, versionId, monthISO }: { sb:
   const endDate = new Date(start);
   endDate.setMonth(endDate.getMonth() + 1);
   const end = endDate.toISOString().slice(0, 10);
+  const tenantId = getTenantId();
 
-  // TODO(tenant): Add tenant_id filter when roster_assignments table has tenant_id column
   const { data: result, error } = await safeSelect<any>(
     sb
       .from("roster_assignments")
       .select("id", { count: "exact", head: true })
       .eq("version_id", versionId)
-      // .eq("tenant_id", getTenantId()) // Uncomment when column exists
+      .eq("tenant_id", tenantId)
       .gte("shift_start", start)
       .lt("shift_start", end),
     "assignment count"
