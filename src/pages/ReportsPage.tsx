@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardStats } from '@/components/roster/DashboardStats';
 import { RosterHeatmap } from '@/components/roster/RosterHeatmap';
 import { StaffUtilizationDashboard } from '@/components/roster/StaffUtilizationDashboard';
+import { AuditLog } from '@/components/roster/AuditLog';
 import { useReportsData } from '@/hooks/useReportsData';
 
 const ReportsPage = () => {
@@ -86,7 +87,7 @@ const ReportsPage = () => {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="cost" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="cost" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Cost Analysis
@@ -98,6 +99,10 @@ const ReportsPage = () => {
           <TabsTrigger value="utilization" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Utilization Trends
+          </TabsTrigger>
+          <TabsTrigger value="corrections" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Corrections History
           </TabsTrigger>
         </TabsList>
 
@@ -337,6 +342,10 @@ const ReportsPage = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="corrections" className="space-y-6">
+          <AuditLog />
         </TabsContent>
       </Tabs>
     </div>
