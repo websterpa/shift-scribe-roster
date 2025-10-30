@@ -37,7 +37,7 @@ export interface RosterAssignment {
 }
 
 export interface RosterDiagnostics {
-  restViolations: Record<string, string[]>;
+  restViolations: Record<string, Array<{ day: string; gap: number; message: string }>>;
   weeklyAverageCompliant: Record<string, boolean>;
   avgHoursPerWeek: Record<string, number>;
   staffSummary: StaffDiagnostics[];
@@ -282,7 +282,7 @@ export async function generateRosterWithChecks(
   
   // 6. Run WTD validation per staff member
   console.log('⚖️ [AtlasGenerator] Running WTD compliance checks');
-  const restViolations: Record<string, string[]> = {};
+  const restViolations: Record<string, Array<{ day: string; gap: number; message: string }>> = {};
   const weeklyAverageCompliant: Record<string, boolean> = {};
   const avgHoursPerWeek: Record<string, number> = {};
   

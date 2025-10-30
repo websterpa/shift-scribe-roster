@@ -215,9 +215,17 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
                       key={`${staffId}-${idx}`} 
                       className="p-3 bg-red-50 rounded-md text-sm text-red-900 border border-red-200"
                     >
-                      <span className="font-mono font-semibold">{staffId.slice(0, 8)}...</span>
-                      <span className="text-red-700"> → </span>
-                      {violation}
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="font-mono font-semibold">{staffId.slice(0, 8)}...</span>
+                          <span className="text-red-700"> → </span>
+                          <span className="font-medium">{violation.day}</span>
+                        </div>
+                        <span className="text-xs bg-red-200 px-2 py-1 rounded">
+                          {violation.gap.toFixed(1)}h rest
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-red-700">{violation.message}</p>
                     </div>
                   ))
                 )}

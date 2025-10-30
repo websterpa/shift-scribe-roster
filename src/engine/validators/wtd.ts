@@ -9,15 +9,21 @@ export interface ShiftRecord {
   end: Date;
 }
 
+export interface RestViolation {
+  day: string;
+  gap: number;
+  message: string;
+}
+
 /**
  * Checks minimum 11 hours rest between consecutive shifts
  * @param records - Array of shift records for a staff member
- * @returns Array of violation messages (empty if compliant)
+ * @returns Array of violation objects (empty if compliant)
  */
-export function checkRestPeriods(records: ShiftRecord[]): string[] {
+export function checkRestPeriods(records: ShiftRecord[]): RestViolation[] {
   console.log('[WTD] Checking rest periods for', records.length, 'shifts');
   
-  const violations: string[] = [];
+  const violations: RestViolation[] = [];
   const sorted = [...records].sort((a, b) => a.start.getTime() - b.start.getTime());
   
   for (let i = 1; i < sorted.length; i++) {
@@ -27,9 +33,14 @@ export function checkRestPeriods(records: ShiftRecord[]): string[] {
     const gapHours = gapMs / (1000 * 60 * 60);
     
     if (gapHours < 11) {
-      const violation = `Rest break violation: ${gapHours.toFixed(1)}h between shifts (minimum 11h required) before ${currentStart.toISOString()}`;
-      violations.push(violation);
-      console.warn('[WTD]', violation);
+      const day = currentStart.toISOString().split('T')[0];
+      const message = `Only ${gapHours.toFixed(1)}h rest between shifts (11h required)`;
+      violations.push({
+        day,
+        gap: gapHours,
+        message
+      });
+      console.warn('[WTD] Rest violation:', message, 'on', day);
     }
   }
   
@@ -93,7 +104,7 @@ export function validateWTDCompliance(
   records: ShiftRecord[]
 ): {
   compliant: boolean;
-  restViolations: string[];
+  restViolations: RestViolation[];
   weeklyAverageCompliant: boolean;
   avgHoursPerWeek: number;
 } {

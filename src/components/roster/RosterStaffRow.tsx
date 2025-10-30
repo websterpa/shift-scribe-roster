@@ -2,6 +2,8 @@
 import React from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { WTDComplianceIndicator } from './WTDComplianceIndicator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface StaffMember {
   name: string;
@@ -29,6 +31,7 @@ interface RosterStaffRowProps {
   staffMember: StaffMember;
   currentWeekDates: string[];
   staffAssignments: Map<string, RosterAssignment> | undefined;
+  staffViolations?: Map<string, { gap: number; message: string }>;
   weekHours: number;
   weekCost: number;
 }
@@ -37,10 +40,16 @@ export const RosterStaffRow = ({
   staffMember,
   currentWeekDates,
   staffAssignments,
+  staffViolations,
   weekHours,
   weekCost
 }: RosterStaffRowProps) => {
-  const getShiftColor = (shiftCode: string) => {
+  const getShiftColor = (shiftCode: string, hasViolation: boolean) => {
+    // If there's a violation, use red highlighting
+    if (hasViolation) {
+      return 'bg-red-100 text-red-900 border-red-300 shadow-sm';
+    }
+    
     switch (shiftCode) {
       case 'D': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'E': return 'bg-purple-100 text-purple-800 border-purple-200';
@@ -71,14 +80,52 @@ export const RosterStaffRow = ({
       </TableCell>
       {currentWeekDates.map((date) => {
         const assignment = staffAssignments?.get(date);
+        const violation = staffViolations?.get(date);
+        const hasViolation = !!violation;
+        
         return (
           <TableCell key={`${staffMember.name}-${date}`} className="text-center p-1 border-l">
             {assignment ? (
-              <div className={`inline-flex items-center justify-center w-8 h-8 rounded text-xs font-medium border ${getShiftColor(assignment.shift_code)}`}>
-                {assignment.shift_code}
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={`inline-flex items-center justify-center w-10 h-10 rounded text-xs font-medium border ${getShiftColor(assignment.shift_code, hasViolation)} relative`}>
+                      {assignment.shift_code}
+                      {hasViolation && (
+                        <AlertTriangle 
+                          className="absolute -top-1 -right-1 text-red-600" 
+                          size={14}
+                        />
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  {hasViolation && violation && (
+                    <TooltipContent className="bg-destructive text-destructive-foreground">
+                      <div className="space-y-1">
+                        <p className="font-semibold flex items-center gap-1">
+                          <AlertTriangle size={14} />
+                          WTD Rest Violation
+                        </p>
+                        <p className="text-sm">Only {violation.gap.toFixed(1)}h rest</p>
+                        <p className="text-xs opacity-90">{violation.message}</p>
+                      </div>
+                    </TooltipContent>
+                  )}
+                  {!hasViolation && (
+                    <TooltipContent>
+                      <div className="space-y-1">
+                        <p className="font-medium">{assignment.shift_code} Shift</p>
+                        <p className="text-xs">{date}</p>
+                        {assignment.hours && (
+                          <p className="text-xs">{assignment.hours}h</p>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             ) : (
-              <div className="inline-flex items-center justify-center w-8 h-8 rounded text-xs text-gray-400">
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded text-xs text-gray-400">
                 -
               </div>
             )}

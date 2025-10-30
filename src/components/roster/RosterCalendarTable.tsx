@@ -26,12 +26,29 @@ interface RosterAssignment {
 
 interface RosterCalendarTableProps {
   assignments: RosterAssignment[];
+  diagnostics?: {
+    restViolations: Record<string, Array<{ day: string; gap: number; message: string }>>;
+    weeklyAverageCompliant: Record<string, boolean>;
+  };
 }
 
-export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) => {
+export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendarTableProps) => {
   console.log('🔄 RosterCalendarTable component rendered with', assignments.length, 'assignments');
   
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
+
+  // Build violation map for quick lookup: staffName -> date -> violation
+  const violationMap = new Map<string, Map<string, { gap: number; message: string }>>();
+  
+  if (diagnostics?.restViolations) {
+    Object.entries(diagnostics.restViolations).forEach(([staffId, violations]) => {
+      const staffViolationMap = new Map<string, { gap: number; message: string }>();
+      violations.forEach(v => {
+        staffViolationMap.set(v.day, { gap: v.gap, message: v.message });
+      });
+      violationMap.set(staffId, staffViolationMap);
+    });
+  }
 
   // Get unique staff members and dates
   const staffMap = new Map<string, { name: string; role: string; maxHours: number; optedOut: boolean }>();
@@ -121,6 +138,7 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
             <TableBody>
               {staff.map((staffMember) => {
                 const staffAssignments = assignmentMap.get(staffMember.name);
+                const staffViolations = violationMap.get(staffMember.name);
                 const weekHours = currentWeekDates.reduce((sum, date) => {
                   const assignment = staffAssignments?.get(date);
                   return sum + (assignment?.hours || 0);
@@ -136,6 +154,7 @@ export const RosterCalendarTable = ({ assignments }: RosterCalendarTableProps) =
                     staffMember={staffMember}
                     currentWeekDates={currentWeekDates}
                     staffAssignments={staffAssignments}
+                    staffViolations={staffViolations}
                     weekHours={weekHours}
                     weekCost={weekCost}
                   />

@@ -82,7 +82,7 @@ const RosterViewer = () => {
       });
 
       // Run WTD validation per staff member
-      const restViolations: Record<string, string[]> = {};
+      const restViolations: Record<string, Array<{ day: string; gap: number; message: string }>> = {};
       const weeklyAverageCompliant: Record<string, boolean> = {};
       const avgHoursPerWeek: Record<string, number> = {};
       const staffSummary: Array<{
@@ -475,7 +475,10 @@ const RosterViewer = () => {
         </TabsList>
         
         <TabsContent value="calendar" className="space-y-6">
-          <RosterCalendarTable assignments={rosterData.assignments} />
+          <RosterCalendarTable 
+            assignments={rosterData.assignments}
+            diagnostics={diagnostics || undefined}
+          />
         </TabsContent>
         
         <TabsContent value="diagnostics" className="space-y-6">
