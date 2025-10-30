@@ -34,6 +34,8 @@ interface RosterStaffRowProps {
   staffViolations?: Map<string, { gap: number; message: string }>;
   weekHours: number;
   weekCost: number;
+  heatmapEnabled?: boolean;
+  complianceScore?: number;
 }
 
 export const RosterStaffRow = ({
@@ -42,9 +44,22 @@ export const RosterStaffRow = ({
   staffAssignments,
   staffViolations,
   weekHours,
-  weekCost
+  weekCost,
+  heatmapEnabled = false,
+  complianceScore = 100
 }: RosterStaffRowProps) => {
   const getShiftColor = (shiftCode: string, hasViolation: boolean) => {
+    // If heatmap is enabled, use compliance-based coloring
+    if (heatmapEnabled) {
+      if (complianceScore >= 100) {
+        return 'bg-green-100 text-green-900 border-green-300';
+      } else if (complianceScore >= 80) {
+        return 'bg-amber-100 text-amber-900 border-amber-300';
+      } else {
+        return 'bg-red-100 text-red-900 border-red-300';
+      }
+    }
+    
     // If there's a violation, use red highlighting
     if (hasViolation) {
       return 'bg-red-100 text-red-900 border-red-300 shadow-sm';

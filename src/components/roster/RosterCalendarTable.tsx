@@ -6,6 +6,7 @@ import { RosterCalendarHeader } from './RosterCalendarHeader';
 import { RosterStaffRow } from './RosterStaffRow';
 import { RosterShiftLegend } from './RosterShiftLegend';
 import { RosterWeekNavigation } from './RosterWeekNavigation';
+import { ComplianceSummary } from './ComplianceSummary';
 
 interface RosterAssignment {
   id: string;
@@ -36,6 +37,7 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
   console.log('🔄 RosterCalendarTable component rendered with', assignments.length, 'assignments');
   
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
+  const [heatmapEnabled, setHeatmapEnabled] = useState(false);
 
   // Build violation map for quick lookup: staffName -> date -> violation
   const violationMap = new Map<string, Map<string, { gap: number; message: string }>>();
@@ -120,8 +122,29 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
     }
   };
 
+  // Calculate compliance score per staff member for heatmap
+  const getStaffComplianceScore = (staffName: string): number => {
+    if (!diagnostics?.restViolations) return 100;
+    
+    const violations = violationMap.get(staffName);
+    if (!violations || violations.size === 0) return 100;
+    
+    // Calculate score based on violation count vs total shifts
+    const totalShifts = currentWeekDates.length;
+    const violationCount = violations.size;
+    return Math.round(((totalShifts - violationCount) / totalShifts) * 100);
+  };
+
   return (
-    <Card>
+    <>
+      <ComplianceSummary
+        diagnostics={diagnostics}
+        totalStaff={staff.length}
+        heatmapEnabled={heatmapEnabled}
+        onHeatmapToggle={setHeatmapEnabled}
+      />
+      
+      <Card className="mt-4">
       <CardHeader>
         <RosterWeekNavigation
           currentWeekIndex={currentWeekIndex}
@@ -139,6 +162,7 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
               {staff.map((staffMember) => {
                 const staffAssignments = assignmentMap.get(staffMember.name);
                 const staffViolations = violationMap.get(staffMember.name);
+                const complianceScore = getStaffComplianceScore(staffMember.name);
                 const weekHours = currentWeekDates.reduce((sum, date) => {
                   const assignment = staffAssignments?.get(date);
                   return sum + (assignment?.hours || 0);
@@ -157,6 +181,8 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
                     staffViolations={staffViolations}
                     weekHours={weekHours}
                     weekCost={weekCost}
+                    heatmapEnabled={heatmapEnabled}
+                    complianceScore={complianceScore}
                   />
                 );
               })}
@@ -167,5 +193,6 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
         <RosterShiftLegend />
       </CardContent>
     </Card>
+    </>
   );
 };
