@@ -7,6 +7,7 @@ import { RosterStaffRow } from './RosterStaffRow';
 import { RosterShiftLegend } from './RosterShiftLegend';
 import { RosterWeekNavigation } from './RosterWeekNavigation';
 import { ComplianceSummary } from './ComplianceSummary';
+import { ComplianceModal } from './ComplianceModal';
 
 interface RosterAssignment {
   id: string;
@@ -38,6 +39,8 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
   
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [heatmapEnabled, setHeatmapEnabled] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<{ name: string; role: string; maxHours: number; optedOut: boolean } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Build violation map for quick lookup: staffName -> date -> violation
   const violationMap = new Map<string, Map<string, { gap: number; message: string }>>();
@@ -135,6 +138,16 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
     return Math.round(((totalShifts - violationCount) / totalShifts) * 100);
   };
 
+  const handleStaffClick = (staffMember: { name: string; role: string; maxHours: number; optedOut: boolean }) => {
+    setSelectedStaff(staffMember);
+    setModalOpen(true);
+  };
+
+  const selectedStaffWeekHours = selectedStaff ? currentWeekDates.reduce((sum, date) => {
+    const assignment = assignmentMap.get(selectedStaff.name)?.get(date);
+    return sum + (assignment?.hours || 0);
+  }, 0) : 0;
+
   return (
     <>
       <ComplianceSummary
@@ -183,6 +196,7 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
                     weekCost={weekCost}
                     heatmapEnabled={heatmapEnabled}
                     complianceScore={complianceScore}
+                    onStaffClick={() => handleStaffClick(staffMember)}
                   />
                 );
               })}
@@ -193,6 +207,14 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
         <RosterShiftLegend />
       </CardContent>
     </Card>
+    
+    <ComplianceModal
+      staff={selectedStaff}
+      diagnostics={diagnostics}
+      weekHours={selectedStaffWeekHours}
+      open={modalOpen}
+      onOpenChange={setModalOpen}
+    />
     </>
   );
 };

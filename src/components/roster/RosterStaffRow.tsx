@@ -36,6 +36,7 @@ interface RosterStaffRowProps {
   weekCost: number;
   heatmapEnabled?: boolean;
   complianceScore?: number;
+  onStaffClick?: () => void;
 }
 
 export const RosterStaffRow = ({
@@ -46,7 +47,8 @@ export const RosterStaffRow = ({
   weekHours,
   weekCost,
   heatmapEnabled = false,
-  complianceScore = 100
+  complianceScore = 100,
+  onStaffClick
 }: RosterStaffRowProps) => {
   const getShiftColor = (shiftCode: string, hasViolation: boolean) => {
     // If heatmap is enabled, use compliance-based coloring
@@ -80,11 +82,16 @@ export const RosterStaffRow = ({
   };
 
   return (
-    <TableRow key={staffMember.name} className="hover:bg-gray-50">
-      <TableCell className="sticky left-0 bg-white border-r-2">
+    <TableRow key={staffMember.name} className="hover:bg-muted/50">
+      <TableCell className="sticky left-0 bg-background border-r-2">
         <div className="space-y-1">
-          <div className="font-medium">{staffMember.name}</div>
-          <div className="text-xs text-gray-500">{staffMember.role}</div>
+          <button
+            onClick={onStaffClick}
+            className="font-medium text-left hover:text-primary hover:underline transition-colors"
+          >
+            {staffMember.name}
+          </button>
+          <div className="text-xs text-muted-foreground">{staffMember.role}</div>
           <WTDComplianceIndicator
             weeklyHours={weekHours}
             maxHours={staffMember.maxHours}
