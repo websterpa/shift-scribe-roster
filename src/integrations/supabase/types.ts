@@ -74,6 +74,63 @@ export type Database = {
         }
         Relationships: []
       }
+      correction_audit: {
+        Row: {
+          applied_at: string
+          created_at: string
+          id: string
+          new_shift: string
+          old_shift: string
+          reason: string
+          severity: string
+          shift_date: string
+          staff_id: string | null
+          tenant_id: string | null
+          version_id: string
+        }
+        Insert: {
+          applied_at?: string
+          created_at?: string
+          id?: string
+          new_shift: string
+          old_shift: string
+          reason: string
+          severity: string
+          shift_date: string
+          staff_id?: string | null
+          tenant_id?: string | null
+          version_id: string
+        }
+        Update: {
+          applied_at?: string
+          created_at?: string
+          id?: string
+          new_shift?: string
+          old_shift?: string
+          reason?: string
+          severity?: string
+          shift_date?: string
+          staff_id?: string | null
+          tenant_id?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_audit_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_audit_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "roster_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_patterns: {
         Row: {
           avg_weekly_hours: number | null

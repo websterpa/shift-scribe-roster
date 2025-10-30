@@ -8,6 +8,7 @@
 import { generateCorrections, type CorrectionSuggestion, type CorrectiveAnalysis } from './index';
 import type { RosterAssignment, RosterDiagnostics } from '@/engine/generateRoster';
 import { createLogger } from '@/utils/errorLogger';
+import { persistCorrectionAudit } from '@/services/audit/persistCorrectionAudit';
 
 const logger = createLogger('AutoApplyCorrections');
 
@@ -27,6 +28,7 @@ export interface AutoApplyResult {
   changelog: CorrectionChangeLog[];
   suggestionsApplied: number;
   suggestionsSkipped: number;
+  auditEntriesPersisted?: number;
 }
 
 /**
@@ -37,12 +39,16 @@ export interface AutoApplyResult {
  * 
  * @param roster - Original roster assignments
  * @param diagnostics - Current roster diagnostics
+ * @param versionId - Optional roster version ID for audit persistence
+ * @param tenantId - Optional tenant ID for isolation
  * @returns Updated roster with changelog
  */
-export function autoApplyCorrections(
+export async function autoApplyCorrections(
   roster: RosterAssignment[],
-  diagnostics: RosterDiagnostics
-): AutoApplyResult {
+  diagnostics: RosterDiagnostics,
+  versionId?: string,
+  tenantId?: string
+): Promise<AutoApplyResult> {
   logger.info('[autoApplyCorrections] Starting automatic correction application');
   
   const corrections: CorrectiveAnalysis = generateCorrections(roster, diagnostics);
@@ -122,11 +128,27 @@ export function autoApplyCorrections(
     skipped: skippedCount
   });
 
+  // Persist audit entries to database if versionId provided
+  let auditEntriesPersisted = 0;
+  if (versionId && changelog.length > 0) {
+    try {
+      auditEntriesPersisted = await persistCorrectionAudit(versionId, changelog, tenantId);
+      logger.info('[autoApplyCorrections] ✅ Persisted audit entries', {
+        persisted: auditEntriesPersisted,
+        total: changelog.length
+      });
+    } catch (error) {
+      logger.error('[autoApplyCorrections] Failed to persist audit entries', { error });
+      // Continue execution even if audit persistence fails
+    }
+  }
+
   return {
     roster: updatedRoster,
     changelog,
     suggestionsApplied: appliedCount,
-    suggestionsSkipped: skippedCount
+    suggestionsSkipped: skippedCount,
+    auditEntriesPersisted
   };
 }
 

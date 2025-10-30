@@ -374,7 +374,7 @@ export async function generateRosterWithChecks(
     overallCompliance: { avgCompliance, totalShifts, fullyCompliant }
   };
   
-  const { roster: correctedRoster, changelog } = autoApplyCorrections(roster, initialDiagnostics);
+  const { roster: correctedRoster, changelog } = await autoApplyCorrections(roster, initialDiagnostics);
   
   if (changelog.length > 0) {
     console.log(`✅ [AtlasGenerator] Applied ${changelog.length} automatic corrections:`, 

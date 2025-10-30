@@ -1001,7 +1001,12 @@ export async function generateAndSaveRoster(
           overallCompliance: { avgCompliance: 100, totalShifts: 0, fullyCompliant: 0 }
         };
         
-        const correctionResult = autoApplyCorrections(engineAssignments, basicDiagnostics);
+        const correctionResult = await autoApplyCorrections(
+          engineAssignments, 
+          basicDiagnostics,
+          versionData.id,
+          undefined // tenantId - to be added when tenant isolation is complete
+        );
         engineAssignments = correctionResult.roster;
         autoCorrectionsApplied = correctionResult.changelog.length;
         
