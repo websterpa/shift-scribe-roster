@@ -48,3 +48,5 @@ export type {
   RosterWithChecks,
   RosterDiagnostics 
 };
+
+export type { RosterVersion } from '@/engine/persistRoster';

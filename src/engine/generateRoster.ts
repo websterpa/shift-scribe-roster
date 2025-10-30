@@ -10,14 +10,17 @@ import { createLogger } from "@/utils/errorLogger";
 import { checkRestPeriods, checkWeeklyAverage, type ShiftRecord } from "@/engine/validators/wtd";
 import { summariseDiagnostics, type StaffDiagnostics } from "@/engine/diagnostics";
 import type { PatternDefinition, StaffPattern, Assignment } from "@/engine/diagnostics";
+import { saveRoster, type RosterVersion } from "./persistRoster";
 
 const logger = createLogger('AtlasRosterGenerator');
 
 export interface GenerateRosterInput {
-  tenantId?: string;
+  tenantId: string;
+  configId: string;
   siteId?: string;
   startDate: Date;
   endDate: Date;
+  label?: string;
 }
 
 export interface RosterAssignment {
@@ -27,6 +30,10 @@ export interface RosterAssignment {
   date: Date;
   shift: string;
   patternId: string;
+  shiftStart?: Date;
+  shiftEnd?: Date;
+  hours?: number;
+  cost?: number;
 }
 
 export interface RosterDiagnostics {
@@ -42,6 +49,7 @@ export interface RosterDiagnostics {
 }
 
 export interface RosterWithChecks {
+  version: RosterVersion;
   roster: RosterAssignment[];
   diagnostics: RosterDiagnostics;
 }
@@ -194,7 +202,17 @@ export async function generateRosterWithChecks(
   
   if (roster.length === 0) {
     console.warn('⚠️ [AtlasGenerator] No assignments generated');
+    
+    // Still create a version for empty roster
+    const version = await saveRoster({
+      tenantId: input.tenantId,
+      roster: [],
+      configId: input.configId,
+      label: input.label || 'Empty Roster'
+    });
+    
     return {
+      version,
       roster: [],
       diagnostics: {
         restViolations: {},
@@ -320,7 +338,19 @@ export async function generateRosterWithChecks(
     wtdCompliantStaff: `${compliantStaff}/${Object.keys(weeklyAverageCompliant).length}`
   });
   
+  // 8. Persist roster to database with tenant isolation
+  console.log('💾 [AtlasGenerator] Persisting roster to database...');
+  const version = await saveRoster({
+    tenantId: input.tenantId,
+    roster,
+    configId: input.configId,
+    label: input.label || 'Auto-Generated'
+  });
+  
+  console.log(`✅ [AtlasGenerator] Roster saved as version ${version.version_number}`);
+  
   return {
+    version,
     roster,
     diagnostics: {
       restViolations,
