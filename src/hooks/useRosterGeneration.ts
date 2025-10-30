@@ -182,13 +182,15 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
     }
   }, [staffList, selectedConfig]);
 
-  const handleGenerateRoster = async () => {
+  const handleGenerateRoster = async (options?: { autoCorrect?: boolean; aiBalance?: boolean }) => {
     console.log('🚀 useRosterGeneration: handleGenerateRoster called');
     console.log('📊 Current state:', {
       selectedConfig: selectedConfig?.config_name,
       rosterName,
       staffCount: staffList.length,
-      selectedPattern: selectedPattern.length > 0 ? selectedPattern : 'none'
+      selectedPattern: selectedPattern.length > 0 ? selectedPattern : 'none',
+      autoCorrect: options?.autoCorrect ?? true,
+      aiBalance: options?.aiBalance ?? true,
     });
 
     // Validation
@@ -279,7 +281,11 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       const result = await generateAndSaveRoster(
         staffList,
         configForGeneration,
-        rosterName.trim()
+        rosterName.trim(),
+        {
+          autoCorrect: options?.autoCorrect ?? true,
+          aiBalance: options?.aiBalance ?? true,
+        }
       );
       
       console.log('✅ useRosterGeneration: Roster generated successfully, result:', result);
@@ -291,7 +297,7 @@ export const useRosterGeneration = (configIdFromUrl: string | null) => {
       
       toast({
         title: "Roster generated successfully",
-        description: `Generated roster: "${rosterName.trim()}"${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}`,
+        description: `Generated roster: "${rosterName.trim()}"${selectedPattern.length > 0 ? ` with ${selectedPattern.length}-day pattern` : ''}${result.autoCorrectionsApplied ? ` (${result.autoCorrectionsApplied} auto-corrections applied)` : ''}${result.aiBalancingApplied ? ` (${result.aiBalancingApplied} AI adjustments)` : ''}`,
       });
       
     } catch (error: any) {

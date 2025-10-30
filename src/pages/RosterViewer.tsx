@@ -4,6 +4,8 @@ import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Calendar, Users, Clock, Printer, Download, BarChart, AlertTriangle, Save, FileDown, Lightbulb } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -471,7 +473,7 @@ const RosterViewer = () => {
       )}
 
       <Tabs defaultValue="calendar" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Calendar View
@@ -483,6 +485,10 @@ const RosterViewer = () => {
           <TabsTrigger value="corrective" className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4" />
             Corrective
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Audit Log
           </TabsTrigger>
           <TabsTrigger value="print" className="flex items-center gap-2">
             <Printer className="h-4 w-4" />
@@ -531,6 +537,84 @@ const RosterViewer = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+        
+        <TabsContent value="audit" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Automated Changes Audit Log
+              </CardTitle>
+              <CardDescription>
+                View all automatic corrections and AI balancing adjustments applied during roster generation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {diagnostics?.autoApplied && diagnostics.autoApplied.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="p-3 text-left font-medium">Timestamp</th>
+                          <th className="p-3 text-left font-medium">Staff</th>
+                          <th className="p-3 text-left font-medium">Date</th>
+                          <th className="p-3 text-left font-medium">Change</th>
+                          <th className="p-3 text-left font-medium">Reason</th>
+                          <th className="p-3 text-center font-medium">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diagnostics.autoApplied.map((change, i) => (
+                          <tr key={i} className="border-b last:border-0 hover:bg-muted/50">
+                            <td className="p-3 text-muted-foreground">{rosterData.generated_at ? new Date(rosterData.generated_at).toLocaleString() : 'N/A'}</td>
+                            <td className="p-3 font-medium">{change.staffName || change.staffId}</td>
+                            <td className="p-3">{change.date}</td>
+                            <td className="p-3">
+                              <span className="inline-flex items-center gap-2">
+                                <Badge variant="destructive" className="font-mono">{change.oldShift}</Badge>
+                                <span>→</span>
+                                <Badge variant="outline" className="font-mono bg-green-50 text-green-700 border-green-200">{change.newShift}</Badge>
+                              </span>
+                            </td>
+                            <td className="p-3 text-sm text-muted-foreground">{change.reason}</td>
+                            <td className="p-3 text-center">
+                              <Badge variant={change.severity === 'critical' ? 'destructive' : change.severity === 'warning' ? 'default' : 'outline'}>
+                                {change.severity || 'auto'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <AlertDescription className="text-sm">
+                      <strong>ℹ️ About Auto-Corrections:</strong> These changes were automatically applied during generation to ensure WTD compliance. Auto-corrections prioritize staff safety by inserting rest periods where needed.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">No Automated Changes</h3>
+                  <p className="text-muted-foreground">
+                    No automatic corrections or AI balancing adjustments were needed for this roster. The generated schedule met all compliance requirements without modifications.
+                  </p>
+                </div>
+              )}
+              
+              {diagnostics?.fairnessBalancing && diagnostics.fairnessBalancing.appliedCount > 0 && (
+                <Alert className="border-purple-200 bg-purple-50 mt-4">
+                  <Lightbulb className="h-4 w-4 text-purple-600" />
+                  <AlertDescription>
+                    <strong>🤖 AI Fairness Balancing:</strong> {diagnostics.fairnessBalancing.appliedCount} shift(s) were adjusted based on analysis of {diagnostics.fairnessBalancing.historicalDataPoints} past assignments to prevent staff fatigue and ensure equitable distribution.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
         
         <TabsContent value="print" className="space-y-6">

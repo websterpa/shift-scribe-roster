@@ -26,7 +26,8 @@ const logger = createLogger('GenerateAndSaveRoster');
 export async function generateAndSaveRoster(
   staffList: StaffMember[],
   config: any, // Accept any config format for backward compatibility
-  versionName?: string
+  versionName?: string,
+  automationOptions?: { autoCorrect?: boolean; aiBalance?: boolean }
 ): Promise<{
   versionId: string;
   totalAssignments: number;
@@ -35,6 +36,8 @@ export async function generateAndSaveRoster(
   costResult?: { totalCost: number; averageCost: number; breakdown: Record<string, unknown> };
   generatorResult?: CorrectiveResult;
   patternLocked?: boolean;
+  autoCorrectionsApplied?: number;
+  aiBalancingApplied?: number;
 }> {
   // Extract config properties - handle both new and legacy formats
   const configId = config.configId || config.id;
@@ -894,6 +897,135 @@ export async function generateAndSaveRoster(
 
   console.log('✓ Diagnostics from engine:', result.diagnostics);
 
+  // 🔧 AUTOMATION: Apply auto-corrections and AI balancing if enabled
+  let autoCorrectionsApplied = 0;
+  let aiBalancingApplied = 0;
+  
+  const autoCorrectEnabled = automationOptions?.autoCorrect ?? true;
+  const aiBalanceEnabled = automationOptions?.aiBalance ?? true;
+  
+  console.log('🤖 Automation settings:', { autoCorrectEnabled, aiBalanceEnabled });
+  
+  if (autoCorrectEnabled || aiBalanceEnabled) {
+    console.group('🔧 AUTOMATION PHASE');
+    
+    // Fetch the inserted assignments for processing
+    const { data: currentAssignments, error: fetchError } = await supabase
+      .from('roster_assignments')
+      .select('*')
+      .eq('version_id', versionData.id)
+      .order('date', { ascending: true });
+    
+    if (fetchError) {
+      logger.warn('Failed to fetch assignments for automation', { error: fetchError });
+    } else if (currentAssignments && currentAssignments.length > 0) {
+      // Import automation functions
+      const { autoApplyCorrections } = await import('@/engine/corrective/autoApply');
+      const { balanceRoster } = await import('@/engine/balancer/fairness');
+      
+      // Convert to engine format
+      let engineAssignments: any[] = currentAssignments.map((a: any) => ({
+        staffId: a.staff_id,
+        staffName: correctiveStaff.find(s => s.id === a.staff_id)?.name || a.staff_id,
+        dayIndex: 0,
+        date: new Date(a.date),
+        shift: a.shift_code,
+        patternId: '',
+        shiftStart: a.shift_start ? new Date(a.shift_start) : undefined,
+        shiftEnd: a.shift_end ? new Date(a.shift_end) : undefined,
+        hours: a.hours,
+        cost: a.cost,
+      }));
+      
+      // Apply auto-corrections if enabled
+      if (autoCorrectEnabled) {
+        console.log('🔧 Applying automatic corrections...');
+        
+        // Build basic diagnostics for correction engine
+        const basicDiagnostics = {
+          restViolations: {},
+          weeklyAverageCompliant: {},
+          avgHoursPerWeek: {},
+          staffSummary: [],
+          overallCompliance: { avgCompliance: 100, totalShifts: 0, fullyCompliant: 0 }
+        };
+        
+        const correctionResult = autoApplyCorrections(engineAssignments, basicDiagnostics);
+        engineAssignments = correctionResult.roster;
+        autoCorrectionsApplied = correctionResult.changelog.length;
+        
+        console.log(`✅ Applied ${autoCorrectionsApplied} automatic corrections`);
+        logger.info('Auto-corrections applied', { count: autoCorrectionsApplied });
+      }
+      
+      // Apply AI fairness balancing if enabled
+      if (aiBalanceEnabled) {
+        console.log('⚖️ Applying AI fairness balancing...');
+        
+        // Load historical roster data (last 3 months)
+        const threeMonthsAgo = new Date(days[0] + 'T00:00:00');
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        
+        const { data: historicalAssignments } = await supabase
+          .from('roster_assignments')
+          .select('staff_id, date, shift_code')
+          .gte('date', threeMonthsAgo.toISOString().split('T')[0])
+          .lt('date', days[0]);
+        
+        const historicalRoster = (historicalAssignments || []).map((a: any) => ({
+          staffId: a.staff_id,
+          staffName: correctiveStaff.find(s => s.id === a.staff_id)?.name || a.staff_id,
+          dayIndex: 0,
+          date: new Date(a.date),
+          shift: a.shift_code,
+          patternId: 'historical'
+        }));
+        
+        const beforeBalancing = engineAssignments.length;
+        engineAssignments = balanceRoster(engineAssignments, historicalRoster);
+        aiBalancingApplied = engineAssignments.filter(a => a.notes && a.notes.includes('Fatigue prevention')).length;
+        
+        console.log(`✅ Applied ${aiBalancingApplied} AI balancing adjustments (${historicalRoster.length} historical records analyzed)`);
+        logger.info('AI balancing applied', { 
+          count: aiBalancingApplied,
+          historicalRecords: historicalRoster.length 
+        });
+      }
+      
+      // Update database with corrected assignments if any changes were made
+      if (autoCorrectionsApplied > 0 || aiBalancingApplied > 0) {
+        console.log('💾 Updating database with automated changes...');
+        
+        // Delete old assignments
+        await supabase
+          .from('roster_assignments')
+          .delete()
+          .eq('version_id', versionData.id);
+        
+        // Insert updated assignments
+        const updatedAssignments = engineAssignments.map(a => ({
+          version_id: versionData.id,
+          staff_id: a.staffId,
+          date: a.date.toISOString().split('T')[0],
+          shift_code: a.shift,
+          shift_start: a.shiftStart?.toISOString(),
+          shift_end: a.shiftEnd?.toISOString(),
+          hours: a.hours || (a.shift === 'D' || a.shift === 'N' ? 12 : 8),
+          cost: a.cost || 0,
+        }));
+        
+        await supabase
+          .from('roster_assignments')
+          .insert(updatedAssignments);
+        
+        console.log('✅ Database updated with automated changes');
+        logger.info('Assignments updated', { count: updatedAssignments.length });
+      }
+    }
+    
+    console.groupEnd();
+  }
+
   // Calculate total variance as sum of E, L, N variances
   const totalVariance = result.fairness.variance.E + result.fairness.variance.L + result.fairness.variance.N;
 
@@ -905,6 +1037,8 @@ export async function generateAndSaveRoster(
     costResult: { totalCost: 0, averageCost: 0, breakdown: {} },
     generatorResult: result, // Pass through full engine result with diagnostics
     patternLocked: config.patternLocked ?? false, // Pass through pattern-locked mode flag
+    autoCorrectionsApplied,
+    aiBalancingApplied,
   };
 }
 

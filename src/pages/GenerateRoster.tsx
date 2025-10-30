@@ -28,6 +28,8 @@ const GenerateRoster = () => {
   const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>([]);
   const [isLoadingPatterns, setIsLoadingPatterns] = useState(false);
   const [handoverMinutes, setHandoverMinutes] = useState(0);
+  const [autoCorrectEnabled, setAutoCorrectEnabled] = useState(true);
+  const [aiBalanceEnabled, setAiBalanceEnabled] = useState(true);
   
   const { user, isAuthenticated } = useSupabaseAuth();
   
@@ -117,6 +119,8 @@ const GenerateRoster = () => {
   const handleEnhancedGenerate = async () => {
     console.log('🚀 Enhanced generate with pattern:', selectedPattern);
     console.log('🏷️ Using roster name:', rosterName);
+    console.log('⚙️ Auto-correct enabled:', autoCorrectEnabled);
+    console.log('⚙️ AI balance enabled:', aiBalanceEnabled);
     
     if (!selectedConfig) {
       toast({
@@ -145,8 +149,8 @@ const GenerateRoster = () => {
       return;
     }
 
-    // Call the existing handler which will now properly use the pattern
-    await handleGenerateRoster();
+    // Call the existing handler with automation flags
+    await handleGenerateRoster({ autoCorrect: autoCorrectEnabled, aiBalance: aiBalanceEnabled });
   };
 
   const isGenerateDisabled = !selectedConfig || selectedPattern.length === 0 || isGenerating || staffList.length === 0;
@@ -160,10 +164,30 @@ const GenerateRoster = () => {
             Create optimized shift rosters with custom pattern selection
           </p>
         </div>
-        <Badge variant="secondary" className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4" />
-          Enhanced Algorithm
-        </Badge>
+        <div className="flex items-center gap-6">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={autoCorrectEnabled}
+              onChange={(e) => setAutoCorrectEnabled(e.target.checked)}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <span className="text-sm font-medium">Auto-Correct</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={aiBalanceEnabled}
+              onChange={(e) => setAiBalanceEnabled(e.target.checked)}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <span className="text-sm font-medium">AI Balance</span>
+          </label>
+          <Badge variant="secondary" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Enhanced Algorithm
+          </Badge>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
