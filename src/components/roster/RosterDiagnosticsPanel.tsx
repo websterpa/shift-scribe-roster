@@ -8,7 +8,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, Clock, TrendingUp } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Clock, TrendingUp, Lightbulb } from "lucide-react";
 import type { RosterDiagnostics } from "@/engine/generateRoster";
 
 interface RosterDiagnosticsPanelProps {
@@ -22,7 +22,8 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
     avgHoursPerWeek, 
     staffSummary, 
     overallCompliance,
-    autoApplied 
+    autoApplied,
+    fairnessBalancing
   } = diagnostics;
 
   const totalViolations = Object.values(restViolations).reduce(
@@ -54,6 +55,16 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
                 ))}
               </div>
             </details>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* AI Fairness Balancing Alert */}
+      {fairnessBalancing && fairnessBalancing.appliedCount > 0 && (
+        <Alert className="border-purple-200 bg-purple-50">
+          <Lightbulb className="h-4 w-4 text-purple-600" />
+          <AlertDescription>
+            <strong>🤖 AI Fairness Balancing Applied:</strong> {fairnessBalancing.appliedCount} shift(s) adjusted based on historical workload analysis ({fairnessBalancing.historicalDataPoints} past assignments) to prevent staff fatigue and ensure equitable distribution.
           </AlertDescription>
         </Alert>
       )}

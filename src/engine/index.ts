@@ -62,6 +62,17 @@ export {
   type AutoApplyResult
 } from './corrective/autoApply';
 
+// AI Fairness Balancer
+export {
+  computeShiftScores,
+  balanceRoster,
+  getRebalancingCandidates,
+  generateFairnessReport,
+  type ShiftWeights,
+  type StaffWorkloadScore,
+  type FairnessAnalysis
+} from './balancer/fairness';
+
 // Export utilities
 export {
   exportRosterCSV,
