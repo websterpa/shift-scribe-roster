@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { summariseDiagnostics, calculateOverallCompliance, type StaffDiagnostics } from "@/engine/diagnostics";
-import { CheckCircle2, AlertCircle, TrendingUp } from "lucide-react";
+import { CheckCircle2, AlertCircle, TrendingUp, Clock, Database, Save } from "lucide-react";
 
 interface DiagnosticsPanelProps {
   versionId: string;
@@ -24,9 +24,15 @@ interface DiagnosticsPanelProps {
     sequence: any;
     cycle_length: number;
   }>;
+  perfMetrics?: {
+    fetchMs: number;
+    genMs: number;
+    insertMs: number;
+    totalMs: number;
+  };
 }
 
-export function DiagnosticsPanel({ assignments, staffMembers, patterns }: DiagnosticsPanelProps) {
+export function DiagnosticsPanel({ assignments, staffMembers, patterns, perfMetrics }: DiagnosticsPanelProps) {
   console.log("DiagnosticsPanel: rendering with", assignments.length, "assignments");
   
   const diagnostics = useMemo(() => {
@@ -166,6 +172,29 @@ export function DiagnosticsPanel({ assignments, staffMembers, patterns }: Diagno
             </TableBody>
           </Table>
         </div>
+        
+        {/* Performance Metrics Footer */}
+        {perfMetrics && (
+          <div className="mt-6 rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-4 items-center">
+              <span className="flex items-center gap-1">
+                <Clock className="inline w-4 h-4" />
+                Fetch: {perfMetrics.fetchMs}ms
+              </span>
+              <span className="flex items-center gap-1">
+                <Database className="inline w-4 h-4" />
+                Generate: {perfMetrics.genMs}ms
+              </span>
+              <span className="flex items-center gap-1">
+                <Save className="inline w-4 h-4" />
+                Insert: {perfMetrics.insertMs}ms
+              </span>
+              <span className="font-medium text-foreground">
+                Total: {perfMetrics.totalMs}ms
+              </span>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
