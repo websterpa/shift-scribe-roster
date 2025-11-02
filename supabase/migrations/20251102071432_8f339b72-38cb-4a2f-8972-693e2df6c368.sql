@@ -1,0 +1,2 @@
+-- Add documentation comment to patterns_legacy view
+COMMENT ON VIEW patterns_legacy IS 'VIEW — deprecated, retained for backward-compatibility testing only. Provides legacy token-based pattern format for comparison with historical data.';
