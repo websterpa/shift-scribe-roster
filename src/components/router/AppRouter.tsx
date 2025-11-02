@@ -33,6 +33,7 @@ import GuidedRosterBuilderV2 from '@/pages/roster/GuidedRosterBuilderV2';
 import RLSHelp from '@/pages/Admin/RLSHelp';
 import ShiftPatterns from '@/pages/Admin/ShiftPatterns';
 import ArchivedRostersReport from '@/pages/ArchivedRostersReport';
+import FeasibilityCalculator from '@/pages/FeasibilityCalculator';
 import NotFound from '@/pages/NotFound';
 
 export function AppRouter() {
@@ -73,6 +74,7 @@ export function AppRouter() {
               <Route path="admin/rls-setup" element={<RLSHelp />} />
               <Route path="admin/patterns" element={<ShiftPatterns />} />
               <Route path="admin/pattern-library" element={<PatternLibrary />} />
+              <Route path="feasibility" element={<FeasibilityCalculator />} />
             </Route>
             
       {/* 404 route */}

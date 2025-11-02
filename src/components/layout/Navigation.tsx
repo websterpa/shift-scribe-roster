@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Users, FileText, BarChart3, HelpCircle, Wand2, Shield, ListTree } from 'lucide-react';
+import { Calendar, Users, FileText, BarChart3, HelpCircle, Wand2, Shield, ListTree, Calculator } from 'lucide-react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 const Navigation = () => {
@@ -13,6 +13,7 @@ const Navigation = () => {
   const navigationItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Calendar, gradient: 'from-blue-500 to-purple-600' },
     { path: '/staff', label: 'Staff', icon: Users, gradient: 'from-yellow-500 to-orange-600' },
+    { path: '/feasibility', label: 'Feasibility', icon: Calculator, gradient: 'from-cyan-500 to-blue-600' },
     { path: '/roster/builder', label: 'Roster Builder', icon: Wand2, gradient: 'from-indigo-500 to-blue-600' },
     { path: '/my-rosters', label: 'My Rosters', icon: FileText, gradient: 'from-purple-500 to-pink-600' },
     { path: '/reports/archived-rosters', label: 'Version History', icon: BarChart3, gradient: 'from-emerald-500 to-green-600' },
