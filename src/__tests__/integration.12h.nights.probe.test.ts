@@ -40,6 +40,8 @@ describe("12h Nights Database Integration Probes", () => {
   });
 
   test("Patterns legacy view exists and has tokens column", async () => {
+    // NOTE: patterns_legacy is a database view retained for backward-compatibility
+    // testing only. It provides the legacy token-based format for pattern comparison.
     const { data, error } = await supabase
       .from("patterns_legacy")
       .select("tokens, name, site_id")

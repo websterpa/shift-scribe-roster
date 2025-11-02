@@ -3,13 +3,12 @@
 /**
  * Schema-Agnostic Roster Generator
  * 
- * @deprecated Use `@/features/roster/engine` instead.
+ * Retained for backward test compatibility only.
  * 
- * This module provides a schema-agnostic generator but is being phased out
- * in favor of the canonical roster engine at @/features/roster/engine.
- * 
- * For new code, use generateCorrectiveRoster from @/features/roster/engine.
- * This module is retained for backward compatibility with test components only.
+ * This module provides a schema-agnostic generator that supports flexible
+ * table and column naming configurations. While the main application uses
+ * the canonical roster engine at @/features/roster/engine, this module
+ * remains available for testing components that require schema flexibility.
  * 
  * @module services/roster/helpers/rosterGeneration
  */
