@@ -28,6 +28,8 @@ export interface FeasibilityResult {
   utilizationPct: number; // staff utilization percentage
   isWTDCompliant: boolean; // whether the pattern respects WTD limits
   warnings: string[]; // any feasibility warnings
+  surplus: number | null; // surplus/deficit if staff_count provided
+  bufferPct: number; // buffer percentage applied
 }
 
 /**
@@ -36,15 +38,19 @@ export interface FeasibilityResult {
  * @param requiredShifts - Daily shift requirements
  * @param shiftLengthHours - Duration of each shift in hours
  * @param wtdRules - Working Time Directive rules
+ * @param bufferPct - Buffer percentage (0-20) for flexibility
+ * @param staffCount - Optional: current staff count for surplus/deficit calculation
  * @returns Feasibility analysis result
  */
 export function calculateFeasibility(
   pattern: PatternSequence,
   requiredShifts: RequiredShifts,
   shiftLengthHours: number,
-  wtdRules: WTDRules
+  wtdRules: WTDRules,
+  bufferPct: number = 10,
+  staffCount?: number
 ): FeasibilityResult {
-  console.log('🧮 calculateFeasibility entry', { pattern, requiredShifts, shiftLengthHours, wtdRules });
+  console.log('🧮 calculateFeasibility entry', { pattern, requiredShifts, shiftLengthHours, wtdRules, bufferPct, staffCount });
 
   const warnings: string[] = [];
 
@@ -62,7 +68,9 @@ export function calculateFeasibility(
       requiredStaff: 0,
       utilizationPct: 0,
       isWTDCompliant: true,
-      warnings: ['Pattern contains no work days - cannot calculate staffing requirements']
+      warnings: ['Pattern contains no work days - cannot calculate staffing requirements'],
+      surplus: null,
+      bufferPct
     };
   }
 
@@ -89,17 +97,29 @@ export function calculateFeasibility(
   // Calculate weekly hours required
   const weeklyHoursRequired = dailyHoursRequired * 7;
 
-  // Calculate minimum required staff (rounded up to nearest whole number)
-  const requiredStaff = Math.ceil(weeklyHoursRequired / hoursPerStaffPerWeek);
+  // Calculate minimum required staff with buffer (rounded up to nearest whole number)
+  const requiredStaff = Math.ceil((weeklyHoursRequired / hoursPerStaffPerWeek) * (1 + bufferPct / 100));
 
   // Calculate utilization (how efficiently staff time is used)
   const utilizationPct = (weeklyHoursRequired / (requiredStaff * hoursPerStaffPerWeek)) * 100;
+
+  // Calculate surplus/deficit if staff count provided
+  const surplus = staffCount !== undefined ? staffCount - requiredStaff : null;
 
   // Add utilization warnings
   if (utilizationPct < 70) {
     warnings.push(`Low utilization (${utilizationPct.toFixed(1)}%) - consider adjusting pattern or requirements`);
   } else if (utilizationPct > 95) {
     warnings.push(`Very high utilization (${utilizationPct.toFixed(1)}%) - minimal buffer for flexibility`);
+  }
+
+  // Add surplus/deficit warnings
+  if (surplus !== null) {
+    if (surplus < -1) {
+      warnings.push(`Staff deficit: ${Math.abs(surplus).toFixed(1)} additional staff needed`);
+    } else if (surplus > 1) {
+      warnings.push(`Staff surplus: ${surplus.toFixed(1)} excess staff available`);
+    }
   }
 
   console.log('✅ calculateFeasibility result', {
@@ -109,6 +129,8 @@ export function calculateFeasibility(
     requiredStaff,
     utilizationPct,
     isWTDCompliant,
+    surplus,
+    bufferPct,
     warnings
   });
 
@@ -119,6 +141,8 @@ export function calculateFeasibility(
     requiredStaff,
     utilizationPct,
     isWTDCompliant,
-    warnings
+    warnings,
+    surplus,
+    bufferPct
   };
 }

@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calculator, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save } from 'lucide-react';
 import { calculateFeasibility, PatternSequence, RequiredShifts, WTDRules } from '@/utils/feasibility/capacityCalculator';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,8 @@ const FeasibilityCalculator = () => {
     L: 2,
     N: 1
   });
+  const [bufferPct, setBufferPct] = useState<number>(10);
+  const [staffCount, setStaffCount] = useState<string>('');
   const [wtdRules] = useState<WTDRules>({
     maxWeeklyHours: 48,
     minDailyRestHours: 11,
@@ -69,7 +72,9 @@ const FeasibilityCalculator = () => {
         patternSequence,
         requiredShifts,
         shiftLengthHours,
-        wtdRules
+        wtdRules,
+        bufferPct,
+        staffCount ? Number(staffCount) : undefined
       );
 
       setResult(calculatedResult);
@@ -78,20 +83,36 @@ const FeasibilityCalculator = () => {
       console.error('❌ Error calculating feasibility:', error);
       toast.error('Error calculating feasibility');
     }
-  }, [selectedPattern, shiftLengthHours, requiredShifts, wtdRules]);
+  }, [selectedPattern, shiftLengthHours, requiredShifts, wtdRules, bufferPct, staffCount]);
 
-  const handleAddToRoster = () => {
+  const handleSaveSetup = () => {
     if (!result || !selectedPattern) return;
 
-    // Navigate to roster builder with pre-filled data
-    const params = new URLSearchParams({
+    const feasibilityConfig = {
       patternId: selectedPatternId,
-      recommendedStaff: result.requiredStaff.toString(),
-      shiftLength: shiftLengthHours.toString()
-    });
+      patternName: selectedPattern.name,
+      shiftLength: shiftLengthHours,
+      requiredShifts,
+      bufferPct,
+      staffCount: staffCount ? Number(staffCount) : null,
+      requiredStaff: result.requiredStaff,
+      timestamp: new Date().toISOString()
+    };
 
-    navigate(`/roster/builder?${params.toString()}`);
-    toast.success(`Recommended ${result.requiredStaff} staff members`);
+    localStorage.setItem('feasibilityConfig', JSON.stringify(feasibilityConfig));
+    toast.success('Configuration saved! Use it in Roster Setup.');
+  };
+
+  const getSurplusIndicator = () => {
+    if (result?.surplus === null) return null;
+    
+    const surplus = result.surplus;
+    if (surplus > 1) {
+      return { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', label: 'Surplus' };
+    } else if (surplus < -1) {
+      return { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'Deficit' };
+    }
+    return { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', label: 'Balanced' };
   };
 
   return (
@@ -154,6 +175,37 @@ const FeasibilityCalculator = () => {
                 value={shiftLengthHours}
                 onChange={(e) => setShiftLengthHours(Number(e.target.value))}
               />
+            </div>
+
+            {/* Buffer Percentage */}
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <Label htmlFor="buffer">Buffer %</Label>
+                <span className="text-sm font-medium">{bufferPct}%</span>
+              </div>
+              <Slider
+                id="buffer"
+                min={0}
+                max={20}
+                step={1}
+                value={[bufferPct]}
+                onValueChange={(value) => setBufferPct(value[0])}
+              />
+              <p className="text-xs text-muted-foreground">Add buffer for flexibility and absences</p>
+            </div>
+
+            {/* Staff Count (Optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="staffCount">Current Staff Count (optional)</Label>
+              <Input
+                id="staffCount"
+                type="number"
+                min="0"
+                placeholder="Enter current staff count"
+                value={staffCount}
+                onChange={(e) => setStaffCount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Calculate surplus or deficit</p>
             </div>
 
             {/* Required Shifts */}
@@ -233,12 +285,34 @@ const FeasibilityCalculator = () => {
                   <div className="p-4 bg-primary/5 rounded-lg">
                     <p className="text-sm text-muted-foreground">Required Staff</p>
                     <p className="text-3xl font-bold text-primary">{result.requiredStaff}</p>
+                    <p className="text-xs text-muted-foreground mt-1">with {result.bufferPct}% buffer</p>
                   </div>
                   <div className="p-4 bg-secondary/10 rounded-lg">
                     <p className="text-sm text-muted-foreground">Utilization</p>
                     <p className="text-3xl font-bold">{result.utilizationPct.toFixed(1)}%</p>
                   </div>
                 </div>
+
+                {/* Surplus/Deficit Indicator */}
+                {result.surplus !== null && getSurplusIndicator() && (
+                  <div className={`p-4 rounded-lg border ${getSurplusIndicator()!.bg} ${getSurplusIndicator()!.border}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {(() => {
+                        const Icon = getSurplusIndicator()!.icon;
+                        return <Icon className={`h-5 w-5 ${getSurplusIndicator()!.color}`} />;
+                      })()}
+                      <p className={`font-semibold ${getSurplusIndicator()!.color}`}>
+                        {getSurplusIndicator()!.label}
+                      </p>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-sm text-muted-foreground">Staff Balance:</span>
+                      <span className={`text-2xl font-bold ${getSurplusIndicator()!.color}`}>
+                        {result.surplus > 0 ? '+' : ''}{result.surplus.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Detailed Metrics */}
                 <div className="space-y-3 pt-4 border-t">
@@ -291,12 +365,12 @@ const FeasibilityCalculator = () => {
 
                 {/* Action Button */}
                 <Button 
-                  onClick={handleAddToRoster} 
+                  onClick={handleSaveSetup} 
                   className="w-full"
                   disabled={!result.isWTDCompliant || result.requiredStaff === 0}
                 >
-                  Add to Roster Builder
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <Save className="w-4 h-4 mr-2" />
+                  Use This Setup
                 </Button>
               </div>
             )}
