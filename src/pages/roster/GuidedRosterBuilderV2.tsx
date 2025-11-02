@@ -27,7 +27,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock, Calculator, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 import { EligibilityInspector } from '@/features/roster/debug/EligibilityInspector';
 
@@ -40,6 +41,7 @@ interface PreviewData {
 
 export default function GuidedRosterBuilderV2() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [siteSettings, setSiteSettings] = useState<any>(null);
   const [previewData, setPreviewData] = useState<PreviewData>({});
@@ -47,6 +49,7 @@ export default function GuidedRosterBuilderV2() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [ackWarnings, setAckWarnings] = useState(false);
+  const [hasFeasibilityConfig, setHasFeasibilityConfig] = useState(false);
   const [openSections, setOpenSections] = useState({
     basics: true,
     pattern: true,
@@ -78,6 +81,7 @@ export default function GuidedRosterBuilderV2() {
   // Load initial data
   useEffect(() => {
     loadStaffAndSettings();
+    loadFeasibilityConfig();
   }, []);
 
   // Update staffing defaults when system changes
@@ -100,6 +104,48 @@ export default function GuidedRosterBuilderV2() {
     }, 500);
     return () => clearTimeout(timer);
   }, [JSON.stringify(watchedValues)]);
+
+  const loadFeasibilityConfig = () => {
+    try {
+      console.log('📊 GuidedRosterBuilderV2: Checking for feasibility config');
+      const stored = localStorage.getItem('feasibilityConfig');
+      
+      if (stored) {
+        const config = JSON.parse(stored);
+        console.log('✅ Feasibility config loaded:', config);
+        
+        // Determine system based on shift length
+        const system = config.shiftLength === 12 ? '12h' : '8h';
+        form.setValue('system', system);
+        
+        // Map required shifts to staffing format
+        if (config.requiredShifts) {
+          const staffing = form.getValues('staffing');
+          staffing.forEach((day: any) => {
+            day.need = {
+              E: config.requiredShifts.E || 0,
+              L: config.requiredShifts.L || 0,
+              N: config.requiredShifts.N || 0,
+              D: config.requiredShifts.D || 0
+            };
+          });
+          form.setValue('staffing', staffing);
+        }
+        
+        setHasFeasibilityConfig(true);
+        
+        toast({
+          title: "Feasibility configuration loaded",
+          description: `Using calculated setup: ${config.requiredStaff} staff recommended`,
+        });
+        
+        // Clear the stored config after loading
+        localStorage.removeItem('feasibilityConfig');
+      }
+    } catch (error) {
+      console.error('❌ Error loading feasibility config:', error);
+    }
+  };
 
   const loadStaffAndSettings = async () => {
     try {
@@ -292,8 +338,29 @@ export default function GuidedRosterBuilderV2() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Guided Roster Builder v2</h1>
-          <p className="text-slate-600 mt-2">Schema-driven, validated roster generation</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Guided Roster Builder v2</h1>
+              <p className="text-slate-600 mt-2">Schema-driven, validated roster generation</p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/feasibility')}
+              className="flex items-center gap-2"
+            >
+              <Calculator className="h-4 w-4" />
+              Back to Calculator
+            </Button>
+          </div>
+          
+          {hasFeasibilityConfig && (
+            <Alert className="mt-4 bg-blue-50 border-blue-200">
+              <Calculator className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                Configuration loaded from Feasibility Calculator. Review and adjust as needed.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

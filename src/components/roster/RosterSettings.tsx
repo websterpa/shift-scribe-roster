@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { saveConfig, updateConfig, fetchConfigById, ConfigData } from "@/utils/configHelpers";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from '@/hooks/use-toast';
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Trash2, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import PatternSelector from "./PatternSelector";
 
@@ -39,6 +40,7 @@ export default function RosterSettings({
 }: Props) {
   console.log('🔄 RosterSettings component rendered');
   
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const configId = searchParams.get('configId');
@@ -65,13 +67,50 @@ export default function RosterSettings({
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [hasFeasibilityConfig, setHasFeasibilityConfig] = useState(false);
 
   useEffect(() => {
     console.log('🔄 RosterSettings useEffect triggered', { configId });
     if (configId) {
       loadConfiguration(configId);
+    } else {
+      // Only load feasibility config if NOT loading an existing config
+      loadFeasibilityConfig();
     }
   }, [configId]);
+
+  const loadFeasibilityConfig = () => {
+    try {
+      console.log('📊 RosterSettings: Checking for feasibility config');
+      const stored = localStorage.getItem('feasibilityConfig');
+      
+      if (stored) {
+        const config = JSON.parse(stored);
+        console.log('✅ Feasibility config loaded:', config);
+        
+        // Map feasibility config to form values
+        const shiftType = config.shiftLength === 12 ? '12h' : '8h';
+        setShiftType(shiftType);
+        
+        if (config.shiftLength) {
+          const opsHours = config.shiftLength === 12 ? 24 : 16;
+          setOpsHours(opsHours);
+        }
+        
+        setHasFeasibilityConfig(true);
+        
+        toast({
+          title: "Feasibility configuration loaded",
+          description: `Using calculated setup: ${config.requiredStaff} staff recommended`,
+        });
+        
+        // Clear the stored config after loading
+        localStorage.removeItem('feasibilityConfig');
+      }
+    } catch (error) {
+      console.error('❌ Error loading feasibility config:', error);
+    }
+  };
 
   const loadConfiguration = async (id: string) => {
     try {
@@ -303,6 +342,23 @@ export default function RosterSettings({
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {hasFeasibilityConfig && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <Calculator className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 flex items-center justify-between">
+            <span>Configuration loaded from Feasibility Calculator. Review and adjust as needed.</span>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/feasibility')}
+              className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+            >
+              Back to Calculator
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
