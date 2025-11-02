@@ -421,6 +421,7 @@ export type Database = {
           site_start_time: string | null
           staffing_requirements: Json | null
           start_date: string
+          tenant_id: string
           timezone: string | null
         }
         Insert: {
@@ -440,6 +441,7 @@ export type Database = {
           site_start_time?: string | null
           staffing_requirements?: Json | null
           start_date: string
+          tenant_id?: string
           timezone?: string | null
         }
         Update: {
@@ -459,6 +461,7 @@ export type Database = {
           site_start_time?: string | null
           staffing_requirements?: Json | null
           start_date?: string
+          tenant_id?: string
           timezone?: string | null
         }
         Relationships: []

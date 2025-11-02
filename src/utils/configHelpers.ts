@@ -27,12 +27,11 @@ export interface ConfigData {
 export const fetchAllConfigs = async () => {
   console.log('📥 configHelpers: Fetching all configurations...');
   
-  // TODO(tenant): Add tenant_id filter when roster_config table has tenant_id column
   const { data, error } = await supabase
     .from('roster_config')
     .select('*')
     .not('config_name', 'like', 'Wizard Temp Config%') // Filter out wizard temp configs
-    // .eq('tenant_id', getTenantId()) // Uncomment when column exists
+    .eq('tenant_id', getTenantId())
     .order('created_at', { ascending: false });
   
   if (error) {
@@ -47,12 +46,11 @@ export const fetchAllConfigs = async () => {
 export const fetchConfigById = async (configId: string) => {
   console.log('📥 configHelpers: Fetching configuration by ID:', configId);
   
-  // TODO(tenant): Add tenant_id filter when roster_config table has tenant_id column
   const { data, error } = await supabase
     .from('roster_config')
     .select('*')
     .eq('id', configId)
-    // .eq('tenant_id', getTenantId()) // Uncomment when column exists
+    .eq('tenant_id', getTenantId())
     .single();
   
   if (error) {
@@ -68,7 +66,6 @@ export const saveConfig = async (configData: ConfigData): Promise<string> => {
   console.log('💾 configHelpers: Saving configuration...', configData.configName);
   
   // Create new config
-  // TODO(tenant): Include tenant_id in insert when roster_config table has tenant_id column
   const { data, error } = await supabase
     .from('roster_config')
     .insert({
@@ -89,7 +86,7 @@ export const saveConfig = async (configData: ConfigData): Promise<string> => {
         late_shift_staff: 1
       },
       pattern: configData.pattern || [],
-      // tenant_id: getTenantId(), // Uncomment when column exists
+      tenant_id: getTenantId(),
     })
     .select()
     .single();
@@ -106,7 +103,6 @@ export const saveConfig = async (configData: ConfigData): Promise<string> => {
 export const updateConfig = async (configId: string, configData: any) => {
   console.log('🔄 configHelpers: Updating configuration...', configId);
   
-  // TODO(tenant): Add tenant_id filter when roster_config table has tenant_id column
   const { data, error } = await supabase
     .from('roster_config')
     .update({
@@ -124,7 +120,7 @@ export const updateConfig = async (configId: string, configData: any) => {
       pattern: configData.pattern
     })
     .eq('id', configId)
-    // .eq('tenant_id', getTenantId()) // Uncomment when column exists
+    .eq('tenant_id', getTenantId())
     .select()
     .single();
   
@@ -142,12 +138,11 @@ export const ensureDefaultConfig = async () => {
   
   try {
     // Check if any configuration exists (excluding wizard temp configs)
-    // TODO(tenant): Add tenant_id filter when roster_config table has tenant_id column
     const { data: existingConfigs, error: fetchError } = await supabase
       .from('roster_config')
       .select('id')
       .not('config_name', 'like', 'Wizard Temp Config%')
-      // .eq('tenant_id', getTenantId()) // Uncomment when column exists
+      .eq('tenant_id', getTenantId())
       .limit(1);
     
     if (fetchError) {
