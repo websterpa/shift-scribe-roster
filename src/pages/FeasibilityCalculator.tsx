@@ -12,6 +12,7 @@ import { calculateFeasibility, PatternSequence, RequiredShifts, WTDRules } from 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LabelList, Cell } from 'recharts';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -329,6 +330,64 @@ const FeasibilityCalculator = () => {
                     <span className="font-medium">{result.weeklyHoursRequired.toFixed(1)}h</span>
                   </div>
                 </div>
+
+                {/* Utilisation Chart */}
+                {staffCount && Number(staffCount) > 0 && (
+                  <div className="pt-4 border-t">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-semibold mb-1">Staff Utilisation</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Weekly demand vs supply — current utilisation:{' '}
+                        <span className={
+                          result.utilizationPct < 80 
+                            ? 'text-muted-foreground font-medium' 
+                            : result.utilizationPct <= 100 
+                            ? 'text-primary font-medium' 
+                            : 'text-destructive font-medium'
+                        }>
+                          {result.utilizationPct.toFixed(1)}%
+                        </span>
+                        {' '}
+                        <span className="font-medium">
+                          ({result.utilizationPct > 100 ? 'Overstaffed' : result.utilizationPct >= 80 ? 'Efficient' : 'Understaffed'})
+                        </span>
+                      </p>
+                    </div>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart 
+                          data={[
+                            { name: 'Required', hours: result.weeklyHoursRequired },
+                            { name: 'Available', hours: result.hoursPerStaffPerWeek * Number(staffCount) }
+                          ]}
+                          margin={{ top: 20, right: 20, left: 0, bottom: 0 }}
+                        >
+                          <XAxis dataKey="name" />
+                          <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
+                          <Tooltip 
+                            formatter={(value: number) => `${value.toFixed(1)} h`}
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '0.5rem'
+                            }}
+                          />
+                          <Legend />
+                          <Bar dataKey="hours" radius={[6, 6, 0, 0]}>
+                            <Cell fill="hsl(var(--primary))" />
+                            <Cell fill="hsl(var(--secondary-foreground))" />
+                            <LabelList 
+                              dataKey="hours" 
+                              position="top" 
+                              formatter={(value: number) => `${value.toFixed(0)}h`}
+                              style={{ fill: 'hsl(var(--foreground))', fontSize: '0.875rem', fontWeight: 600 }}
+                            />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
 
                 {/* WTD Compliance */}
                 <div className="pt-4 border-t">
