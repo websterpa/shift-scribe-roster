@@ -1065,6 +1065,17 @@ const FeasibilityCalculator = () => {
                   <Save className="w-4 h-4 mr-2" />
                   Use This Setup
                 </Button>
+
+                {/* Compare Scenarios Link */}
+                <Button 
+                  onClick={() => navigate('/scenarios/compare')}
+                  variant="outline"
+                  className="w-full mt-2"
+                  disabled={scenarios.length < 1}
+                >
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Compare Scenarios
+                </Button>
               </div>
             )}
           </CardContent>

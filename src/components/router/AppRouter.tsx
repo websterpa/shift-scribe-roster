@@ -34,6 +34,7 @@ import RLSHelp from '@/pages/Admin/RLSHelp';
 import ShiftPatterns from '@/pages/Admin/ShiftPatterns';
 import ArchivedRostersReport from '@/pages/ArchivedRostersReport';
 import FeasibilityCalculator from '@/pages/FeasibilityCalculator';
+import ScenarioComparison from '@/pages/ScenarioComparison';
 import NotFound from '@/pages/NotFound';
 
 export function AppRouter() {
@@ -75,6 +76,7 @@ export function AppRouter() {
               <Route path="admin/patterns" element={<ShiftPatterns />} />
               <Route path="admin/pattern-library" element={<PatternLibrary />} />
               <Route path="feasibility" element={<FeasibilityCalculator />} />
+              <Route path="scenarios/compare" element={<ScenarioComparison />} />
             </Route>
             
       {/* 404 route */}
