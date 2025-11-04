@@ -201,6 +201,61 @@ const FeasibilityCalculator = () => {
     }
   };
 
+  const exportCSV = () => {
+    if (!result || !selectedPattern) return;
+
+    try {
+      const rows = [
+        ['Shift Scribe – Feasibility Report'],
+        ['Generated', new Date().toLocaleString()],
+        [''],
+        ['Configuration'],
+        ['Pattern', selectedPattern.name],
+        ['System', selectedPattern.system],
+        ['Cycle Length (weeks)', selectedPattern.cycle_length.toString()],
+        ['Shift Length (hours)', shiftLengthHours.toString()],
+        ['Required Shifts Per Day', requiredShiftsPerDay.toString()],
+        ['Buffer %', bufferPct.toString()],
+        ...(staffCount ? [['Current Staff Count', staffCount]] : []),
+        [''],
+        ['Results'],
+        ['Work Ratio', `${(result.workRatio * 100).toFixed(1)}%`],
+        ['Avg Weekly Hours Per Staff', `${result.hoursPerStaffPerWeek.toFixed(1)}h`],
+        ['Weekly Demand', `${result.weeklyHoursRequired.toFixed(1)}h`],
+        ['Required Staff', result.requiredStaff.toString()],
+        ['Utilization', `${result.utilizationPct.toFixed(1)}%`],
+        ...(result.surplus !== null ? [['Surplus/Deficit', result.surplus > 0 ? `+${result.surplus.toFixed(1)}` : result.surplus.toFixed(1)]] : []),
+        ['WTD Compliant', result.isWTDCompliant ? 'Yes' : 'No'],
+        [''],
+        ['WTD Constraints'],
+        ['Max Weekly Hours', `${wtdRules.max_weekly_hours}h`],
+        ['Min Daily Rest', `${wtdRules.min_daily_rest_hours}h`],
+        ['Max Consecutive Days', wtdRules.max_consec_days.toString()],
+        ['Max Consecutive Nights', wtdRules.max_consec_nights.toString()],
+      ];
+
+      if (result.warnings.length > 0) {
+        rows.push(['']);
+        rows.push(['Warnings']);
+        result.warnings.forEach(warning => rows.push(['', warning]));
+      }
+
+      const csvContent = rows.map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Feasibility_Report_${selectedPattern.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast.success('CSV report exported successfully');
+    } catch (error) {
+      console.error('❌ Error exporting CSV:', error);
+      toast.error('Failed to export CSV report');
+    }
+  };
+
   const exportJSON = () => {
     if (!result || !selectedPattern) return;
 
@@ -718,28 +773,37 @@ const FeasibilityCalculator = () => {
                 {/* Export Buttons */}
                 <div className="space-y-3 pt-4 border-t">
                   <p className="text-sm font-medium text-muted-foreground">Export Report</p>
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button 
                       onClick={exportPDF} 
                       variant="default"
-                      className="flex-1"
+                      size="sm"
                       disabled={isExporting || !result.isWTDCompliant}
                     >
                       {isExporting ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                       ) : (
-                        <FileText className="w-4 h-4 mr-2" />
+                        <FileText className="w-4 h-4 mr-1" />
                       )}
-                      Export PDF
+                      PDF
+                    </Button>
+                    <Button 
+                      onClick={exportCSV} 
+                      variant="outline"
+                      size="sm"
+                      disabled={isExporting}
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      CSV
                     </Button>
                     <Button 
                       onClick={exportJSON} 
                       variant="outline"
-                      className="flex-1"
+                      size="sm"
                       disabled={isExporting}
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Export JSON
+                      <Download className="w-4 h-4 mr-1" />
+                      JSON
                     </Button>
                   </div>
                 </div>
