@@ -7,12 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Slider } from '@/components/ui/slider';
-import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save } from 'lucide-react';
+import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save, FileText, Download, Loader2 } from 'lucide-react';
 import { calculateFeasibility, PatternSequence, RequiredShifts, WTDRules } from '@/utils/feasibility/capacityCalculator';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LabelList, Cell } from 'recharts';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -51,6 +53,7 @@ const FeasibilityCalculator = () => {
 
   // Result state
   const [result, setResult] = useState<ReturnType<typeof calculateFeasibility> | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // Get selected pattern
   const selectedPattern = patterns?.find(p => p.id === selectedPatternId);
@@ -114,6 +117,116 @@ const FeasibilityCalculator = () => {
       return { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'Deficit' };
     }
     return { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', label: 'Balanced' };
+  };
+
+  const exportPDF = async () => {
+    if (!result || !selectedPattern) return;
+
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      
+      // Header
+      pdf.setFontSize(20);
+      pdf.text('Shift Scribe – Feasibility Report', 40, 40);
+      
+      // Pattern details
+      pdf.setFontSize(12);
+      pdf.text(`Pattern: ${selectedPattern.name}`, 40, 70);
+      pdf.text(`Shift Length: ${shiftLengthHours}h`, 40, 90);
+      pdf.text(`Required Shifts: E=${requiredShifts.E || 0}, L=${requiredShifts.L || 0}, N=${requiredShifts.N || 0}, D=${requiredShifts.D || 0}`, 40, 110);
+      pdf.text(`Buffer: ${bufferPct}%`, 40, 130);
+      if (staffCount) {
+        pdf.text(`Current Staff: ${staffCount}`, 40, 150);
+      }
+      
+      // Calculations
+      pdf.setFontSize(14);
+      pdf.text('Calculated Results:', 40, 180);
+      pdf.setFontSize(12);
+      pdf.text(`Work Ratio: ${(result.workRatio * 100).toFixed(1)}%`, 40, 200);
+      pdf.text(`Avg Weekly Hours/Staff: ${result.hoursPerStaffPerWeek.toFixed(1)}h`, 40, 220);
+      pdf.text(`Weekly Demand: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 240);
+      pdf.text(`Required Staff: ${result.requiredStaff.toFixed(1)}`, 40, 260);
+      pdf.text(`Utilisation: ${result.utilizationPct.toFixed(1)}%`, 40, 280);
+      
+      if (result.surplus !== null) {
+        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 300);
+      }
+      
+      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 320);
+      
+      // Capture chart if available
+      const chartEl = document.querySelector('.recharts-wrapper') as HTMLElement;
+      if (chartEl && staffCount && Number(staffCount) > 0) {
+        const canvas = await html2canvas(chartEl, { scale: 2, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 40, 350, 500, 250);
+      }
+      
+      // Footer
+      pdf.setFontSize(10);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, 40, pdf.internal.pageSize.height - 40);
+      pdf.text('Shift Scribe v1.0 – Feasibility Calculator', 40, pdf.internal.pageSize.height - 25);
+      
+      pdf.save(`Feasibility_Report_${selectedPattern.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('PDF report exported successfully');
+    } catch (error) {
+      console.error('❌ Error exporting PDF:', error);
+      toast.error('Failed to export PDF report');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportJSON = () => {
+    if (!result || !selectedPattern) return;
+
+    try {
+      const data = {
+        metadata: {
+          timestamp: new Date().toISOString(),
+          generatedBy: 'Shift Scribe Feasibility Calculator',
+          version: '1.0'
+        },
+        configuration: {
+          pattern: {
+            id: selectedPatternId,
+            name: selectedPattern.name,
+            sequence: selectedPattern.sequence,
+            system: selectedPattern.system
+          },
+          shiftLengthHours,
+          requiredShifts,
+          bufferPct,
+          staffCount: staffCount ? Number(staffCount) : null,
+          wtdRules
+        },
+        results: {
+          workRatio: result.workRatio,
+          hoursPerStaffPerWeek: result.hoursPerStaffPerWeek,
+          weeklyHoursRequired: result.weeklyHoursRequired,
+          requiredStaff: result.requiredStaff,
+          utilizationPct: result.utilizationPct,
+          surplus: result.surplus,
+          isWTDCompliant: result.isWTDCompliant,
+          warnings: result.warnings
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Feasibility_Report_${selectedPattern.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success('JSON report exported successfully');
+    } catch (error) {
+      console.error('❌ Error exporting JSON:', error);
+      toast.error('Failed to export JSON report');
+    }
   };
 
   return (
@@ -421,6 +534,35 @@ const FeasibilityCalculator = () => {
                     ))}
                   </div>
                 )}
+
+                {/* Export Buttons */}
+                <div className="space-y-3 pt-4 border-t">
+                  <p className="text-sm font-medium text-muted-foreground">Export Report</p>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={exportPDF} 
+                      variant="default"
+                      className="flex-1"
+                      disabled={isExporting || !result.isWTDCompliant}
+                    >
+                      {isExporting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <FileText className="w-4 h-4 mr-2" />
+                      )}
+                      Export PDF
+                    </Button>
+                    <Button 
+                      onClick={exportJSON} 
+                      variant="outline"
+                      className="flex-1"
+                      disabled={isExporting}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export JSON
+                    </Button>
+                  </div>
+                </div>
 
                 {/* Action Button */}
                 <Button 
