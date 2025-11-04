@@ -12,9 +12,11 @@ import { calculateFeasibility, PatternSequence, RequiredShifts, WTDRules } from 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LabelList, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { simulateWTD } from '@/utils/feasibility/wtdSimulation';
+import { Switch } from '@/components/ui/switch';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -54,6 +56,7 @@ const FeasibilityCalculator = () => {
   // Result state
   const [result, setResult] = useState<ReturnType<typeof calculateFeasibility> | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [showWTDSimulation, setShowWTDSimulation] = useState<boolean>(true);
 
   // Get selected pattern
   const selectedPattern = patterns?.find(p => p.id === selectedPatternId);
@@ -88,6 +91,24 @@ const FeasibilityCalculator = () => {
       toast.error('Error calculating feasibility');
     }
   }, [selectedPattern, shiftLengthHours, requiredShifts, wtdRules, bufferPct, staffCount]);
+
+  // Calculate WTD simulation data
+  const wtdSimulationData = result && selectedPattern && showWTDSimulation
+    ? simulateWTD({
+        pattern: { 
+          sequence: Array.isArray(selectedPattern.sequence) 
+            ? (selectedPattern.sequence as string[]) 
+            : [] 
+        },
+        shift_length: shiftLengthHours,
+        weeks: 17
+      })
+    : null;
+
+  const nonCompliantWeeks = wtdSimulationData?.filter(w => !w.compliant).length ?? 0;
+  const complianceRate = wtdSimulationData 
+    ? ((17 - nonCompliantWeeks) / 17 * 100).toFixed(1) 
+    : '0';
 
   const handleSaveSetup = () => {
     if (!result || !selectedPattern) return;
@@ -385,6 +406,18 @@ const FeasibilityCalculator = () => {
           <CardHeader>
             <CardTitle>Analysis Results</CardTitle>
             <CardDescription>Calculated staffing requirements</CardDescription>
+            {result && (
+              <div className="flex items-center gap-2 pt-2">
+                <Switch 
+                  id="wtd-simulation" 
+                  checked={showWTDSimulation}
+                  onCheckedChange={setShowWTDSimulation}
+                />
+                <Label htmlFor="wtd-simulation" className="text-sm cursor-pointer">
+                  Show 17-Week WTD Simulation
+                </Label>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {!result ? (
@@ -500,6 +533,82 @@ const FeasibilityCalculator = () => {
                       </ResponsiveContainer>
                     </div>
                   </div>
+                )}
+
+                {/* 17-Week WTD Simulation */}
+                {showWTDSimulation && wtdSimulationData && (
+                  <Card className="mt-4 border-muted">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">17-Week WTD Compliance Simulation</CardTitle>
+                      <CardDescription className="text-sm">
+                        Rolling average weekly hours (limit: 48 h) — compliance{' '}
+                        <span className={
+                          parseFloat(complianceRate) === 100 
+                            ? 'text-primary font-semibold' 
+                            : 'text-destructive font-semibold'
+                        }>
+                          {complianceRate}%
+                        </span>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64 mb-3">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart 
+                            data={wtdSimulationData} 
+                            margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                          >
+                            <XAxis 
+                              dataKey="week" 
+                              label={{ value: 'Week', position: 'insideBottomRight', offset: -5 }}
+                            />
+                            <YAxis 
+                              domain={[30, 60]} 
+                              label={{ value: 'Hours', angle: -90, position: 'insideLeft' }}
+                            />
+                            <Tooltip 
+                              formatter={(value: number) => `${value} h`}
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--card))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '0.5rem'
+                              }}
+                            />
+                            <ReferenceLine 
+                              y={48} 
+                              stroke="hsl(var(--destructive))" 
+                              strokeDasharray="4 2" 
+                              label={{ value: '48 h limit', fill: 'hsl(var(--destructive))' }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="rolling_avg" 
+                              stroke="hsl(var(--primary))" 
+                              strokeWidth={2} 
+                              dot={false}
+                              name="Rolling Avg"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      
+                      {nonCompliantWeeks > 0 ? (
+                        <Alert variant="destructive" className="py-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription className="text-sm">
+                            ⚠ {nonCompliantWeeks} week(s) exceed 48 h average — review pattern or staffing.
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <Alert className="py-2 bg-green-50 border-green-200">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <AlertDescription className="text-sm text-green-800">
+                            ✅ Fully compliant across 17 weeks.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* WTD Compliance */}
