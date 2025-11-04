@@ -27,12 +27,17 @@ const FeasibilityCalculator = () => {
   const { data: patterns, isLoading: patternsLoading } = useQuery({
     queryKey: ['site-patterns'],
     queryFn: async () => {
+      console.log('🔍 Fetching patterns from site_patterns table...');
       const { data, error } = await supabase
         .from('site_patterns')
         .select('*')
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching patterns:', error);
+        throw error;
+      }
+      console.log('✅ Patterns loaded:', data?.length, 'patterns', data);
       return data;
     }
   });
@@ -281,12 +286,16 @@ const FeasibilityCalculator = () => {
                 <SelectTrigger id="pattern">
                   <SelectValue placeholder={patternsLoading ? "Loading patterns..." : "Select a pattern"} />
                 </SelectTrigger>
-                <SelectContent>
-                  {patterns?.map(pattern => (
-                    <SelectItem key={pattern.id} value={pattern.id}>
-                      {pattern.name} ({pattern.system}) - {Array.isArray(pattern.sequence) ? pattern.sequence.join(' ') : ''}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="z-50 bg-popover">
+                  {patterns?.length ? (
+                    patterns.map(pattern => (
+                      <SelectItem key={pattern.id} value={pattern.id}>
+                        {pattern.name} ({pattern.system}) - {Array.isArray(pattern.sequence) ? pattern.sequence.join(' ') : ''}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-muted-foreground text-sm">No patterns found</div>
+                  )}
                 </SelectContent>
               </Select>
               {selectedPattern && (
