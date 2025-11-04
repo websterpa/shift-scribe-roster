@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Slider } from '@/components/ui/slider';
 import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save, FileText, Download, Loader2 } from 'lucide-react';
-import { calculateFeasibility, PatternSequence, RequiredShifts, WTDRules } from '@/utils/feasibility/capacityCalculator';
+import { calculateFeasibility, type FeasibilityInput } from '@/services/feasibility/calculateFeasibility';
+import { UtilisationChart, type UtilisationData } from '@/components/Feasibility/UtilisationChart';
+import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -45,18 +47,10 @@ const FeasibilityCalculator = () => {
   // Form state
   const [selectedPatternId, setSelectedPatternId] = useState<string>('');
   const [shiftLengthHours, setShiftLengthHours] = useState<number>(8);
-  const [requiredShifts, setRequiredShifts] = useState<RequiredShifts>({
-    E: 2,
-    L: 2,
-    N: 1
-  });
+  const [requiredShiftsPerDay, setRequiredShiftsPerDay] = useState<number>(3);
   const [bufferPct, setBufferPct] = useState<number>(10);
   const [staffCount, setStaffCount] = useState<string>('');
-  const [wtdRules] = useState<WTDRules>({
-    maxWeeklyHours: 48,
-    minDailyRestHours: 11,
-    minWeeklyRestHours: 24
-  });
+  const wtdRules = DEFAULT_WTD_RULES;
 
   // Result state
   const [result, setResult] = useState<ReturnType<typeof calculateFeasibility> | null>(null);
@@ -74,28 +68,30 @@ const FeasibilityCalculator = () => {
     }
 
     try {
-      const patternSequence: PatternSequence = {
-        sequence: Array.isArray(selectedPattern.sequence) 
-          ? (selectedPattern.sequence as string[])
-          : []
+      const input: FeasibilityInput = {
+        pattern: {
+          sequence: Array.isArray(selectedPattern.sequence) 
+            ? (selectedPattern.sequence as string[])
+            : [],
+          cycle_length: selectedPattern.cycle_length,
+          avg_weekly_hours: selectedPattern.avg_weekly_hours,
+          teams_required: selectedPattern.teams_required
+        },
+        shiftLengthHours,
+        requiredShiftsPerDay,
+        bufferPercent: bufferPct,
+        currentStaffCount: staffCount ? Number(staffCount) : undefined,
+        wtdRules
       };
 
-      const calculatedResult = calculateFeasibility(
-        patternSequence,
-        requiredShifts,
-        shiftLengthHours,
-        wtdRules,
-        bufferPct,
-        staffCount ? Number(staffCount) : undefined
-      );
-
+      const calculatedResult = calculateFeasibility(input);
       setResult(calculatedResult);
       console.log('📊 Feasibility calculated:', calculatedResult);
     } catch (error) {
       console.error('❌ Error calculating feasibility:', error);
       toast.error('Error calculating feasibility');
     }
-  }, [selectedPattern, shiftLengthHours, requiredShifts, wtdRules, bufferPct, staffCount]);
+  }, [selectedPattern, shiftLengthHours, requiredShiftsPerDay, wtdRules, bufferPct, staffCount]);
 
   // Calculate WTD simulation data
   const wtdSimulationData = result && selectedPattern && showWTDSimulation
@@ -122,7 +118,7 @@ const FeasibilityCalculator = () => {
       patternId: selectedPatternId,
       patternName: selectedPattern.name,
       shiftLength: shiftLengthHours,
-      requiredShifts,
+      requiredShiftsPerDay,
       bufferPct,
       staffCount: staffCount ? Number(staffCount) : null,
       requiredStaff: result.requiredStaff,
@@ -160,7 +156,7 @@ const FeasibilityCalculator = () => {
       pdf.setFontSize(12);
       pdf.text(`Pattern: ${selectedPattern.name}`, 40, 70);
       pdf.text(`Shift Length: ${shiftLengthHours}h`, 40, 90);
-      pdf.text(`Required Shifts: E=${requiredShifts.E || 0}, L=${requiredShifts.L || 0}, N=${requiredShifts.N || 0}, D=${requiredShifts.D || 0}`, 40, 110);
+      pdf.text(`Required Shifts Per Day: ${requiredShiftsPerDay}`, 40, 110);
       pdf.text(`Buffer: ${bufferPct}%`, 40, 130);
       if (staffCount) {
         pdf.text(`Current Staff: ${staffCount}`, 40, 150);
@@ -223,7 +219,7 @@ const FeasibilityCalculator = () => {
             system: selectedPattern.system
           },
           shiftLengthHours,
-          requiredShifts,
+          requiredShiftsPerDay,
           bufferPct,
           staffCount: staffCount ? Number(staffCount) : null,
           wtdRules
@@ -352,59 +348,28 @@ const FeasibilityCalculator = () => {
               <p className="text-xs text-muted-foreground">Calculate surplus or deficit</p>
             </div>
 
-            {/* Required Shifts */}
-            <div className="space-y-3">
-              <Label>Daily Shift Requirements</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="reqE" className="text-xs">Early (E)</Label>
-                  <Input
-                    id="reqE"
-                    type="number"
-                    min="0"
-                    value={requiredShifts.E || 0}
-                    onChange={(e) => setRequiredShifts({ ...requiredShifts, E: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="reqL" className="text-xs">Late (L)</Label>
-                  <Input
-                    id="reqL"
-                    type="number"
-                    min="0"
-                    value={requiredShifts.L || 0}
-                    onChange={(e) => setRequiredShifts({ ...requiredShifts, L: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="reqN" className="text-xs">Night (N)</Label>
-                  <Input
-                    id="reqN"
-                    type="number"
-                    min="0"
-                    value={requiredShifts.N || 0}
-                    onChange={(e) => setRequiredShifts({ ...requiredShifts, N: Number(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="reqD" className="text-xs">Day (D - 12h)</Label>
-                  <Input
-                    id="reqD"
-                    type="number"
-                    min="0"
-                    value={requiredShifts.D || 0}
-                    onChange={(e) => setRequiredShifts({ ...requiredShifts, D: Number(e.target.value) })}
-                  />
-                </div>
-              </div>
+            {/* Required Shifts Per Day */}
+            <div className="space-y-2">
+              <Label htmlFor="reqShifts">Required Shifts Per Day</Label>
+              <Input
+                id="reqShifts"
+                type="number"
+                min="1"
+                max="10"
+                value={requiredShiftsPerDay}
+                onChange={(e) => setRequiredShiftsPerDay(Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">Total staff needed per shift period</p>
             </div>
 
             {/* WTD Rules Display */}
             <div className="space-y-2 pt-4 border-t">
               <Label className="text-xs text-muted-foreground">WTD Constraints</Label>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Max Weekly Hours: <span className="font-semibold">{wtdRules.maxWeeklyHours}h</span></div>
-                <div>Min Daily Rest: <span className="font-semibold">{wtdRules.minDailyRestHours}h</span></div>
+                <div>Max Weekly Hours: <span className="font-semibold">{wtdRules.max_weekly_hours}h</span></div>
+                <div>Min Daily Rest: <span className="font-semibold">{wtdRules.min_daily_rest_hours}h</span></div>
+                <div>Max Consec Days: <span className="font-semibold">{wtdRules.max_consec_days}</span></div>
+                <div>Max Consec Nights: <span className="font-semibold">{wtdRules.max_consec_nights}</span></div>
               </div>
             </div>
           </CardContent>
@@ -485,6 +450,103 @@ const FeasibilityCalculator = () => {
                     <span className="font-medium">{result.weeklyHoursRequired.toFixed(1)}h</span>
                   </div>
                 </div>
+
+                {/* Pattern Workload Distribution */}
+                <div className="mt-4">
+                  <UtilisationChart
+                    data={[
+                      { 
+                        metric: 'Active Days', 
+                        value: result.activeDaysInCycle,
+                        unit: ' days'
+                      },
+                      { 
+                        metric: 'Rest Days', 
+                        value: result.restDaysInCycle,
+                        unit: ' days'
+                      },
+                      { 
+                        metric: 'Buffer', 
+                        value: result.bufferPct,
+                        unit: '%'
+                      },
+                      {
+                        metric: 'Hours/Staff/Week',
+                        value: result.hoursPerStaffPerWeek,
+                        unit: ' h'
+                      }
+                    ]}
+                    title="Pattern Analysis"
+                    description="Workload distribution across the pattern cycle"
+                  />
+                </div>
+
+                {/* WTD Compliance Status */}
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle className="text-base">WTD Compliance Checks</CardTitle>
+                    <CardDescription>
+                      {result.isWTDCompliant 
+                        ? '✅ Pattern meets all WTD requirements' 
+                        : '⚠️ Pattern has WTD violations'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span>11h Daily Rest</span>
+                        <span className={result.wtdChecks.restPeriodsOk ? 'text-green-600' : 'text-red-600'}>
+                          {result.wtdChecks.restPeriodsOk ? '✅ OK' : '⚠️ Violation'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span>48h Weekly Average</span>
+                        <span className={result.wtdChecks.weeklyAverageOk ? 'text-green-600' : 'text-red-600'}>
+                          {result.wtdChecks.weeklyAverageOk ? '✅ OK' : '⚠️ Violation'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span>Consecutive Days Limit</span>
+                        <span className={result.wtdChecks.consecutiveDaysOk ? 'text-green-600' : 'text-red-600'}>
+                          {result.wtdChecks.consecutiveDaysOk ? '✅ OK' : '⚠️ Violation'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span>Consecutive Nights Limit</span>
+                        <span className={result.wtdChecks.consecutiveNightsOk ? 'text-green-600' : 'text-red-600'}>
+                          {result.wtdChecks.consecutiveNightsOk ? '✅ OK' : '⚠️ Violation'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <span>Weekly Rest Period</span>
+                        <span className={result.wtdChecks.weeklyRestOk ? 'text-green-600' : 'text-red-600'}>
+                          {result.wtdChecks.weeklyRestOk ? '✅ OK' : '⚠️ Violation'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {result.wtdViolations.length > 0 && (
+                      <Alert className="mt-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="text-sm space-y-1">
+                            <p className="font-medium">Violations detected:</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              {result.wtdViolations.slice(0, 3).map((v, i) => (
+                                <li key={i} className="text-xs">{v}</li>
+                              ))}
+                            </ul>
+                            {result.wtdViolations.length > 3 && (
+                              <p className="text-xs text-muted-foreground">
+                                +{result.wtdViolations.length - 3} more violations
+                              </p>
+                            )}
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
 
                 {/* Utilisation Chart */}
                 {staffCount && Number(staffCount) > 0 && (
