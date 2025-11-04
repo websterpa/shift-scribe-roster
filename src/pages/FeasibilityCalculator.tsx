@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Slider } from '@/components/ui/slider';
-import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save, FileText, Download, Loader2 } from 'lucide-react';
+import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save, FileText, Download, Loader2, Trash2 } from 'lucide-react';
 import { calculateFeasibility, type FeasibilityInput } from '@/services/feasibility/calculateFeasibility';
 import { UtilisationChart, type UtilisationData } from '@/components/Feasibility/UtilisationChart';
 import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
@@ -20,6 +20,13 @@ import html2canvas from 'html2canvas';
 import { simulateWTD, getWTDSimulationSummary, type WTDSimulationSummary } from '@/utils/feasibility/wtdSimulation';
 import { Switch } from '@/components/ui/switch';
 import { recommendAdjustments, type AdjustmentRecommendation } from '@/services/feasibility/recommendAdjustments';
+import { 
+  saveScenario, 
+  loadScenarios, 
+  deleteScenario, 
+  type FeasibilityScenario,
+  type SaveScenarioInput 
+} from '@/services/feasibility/scenarios';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -60,8 +67,129 @@ const FeasibilityCalculator = () => {
   const [wtdSummary, setWtdSummary] = useState<WTDSimulationSummary | null>(null);
   const [recommendations, setRecommendations] = useState<AdjustmentRecommendation[]>([]);
 
-  // Get selected pattern
+  // Scenario management state
+  const [scenarioName, setScenarioName] = useState<string>('');
+  const [scenarios, setScenarios] = useState<FeasibilityScenario[]>([]);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isLoadingScenarios, setIsLoadingScenarios] = useState<boolean>(false);
+
+  // Load saved scenarios on mount
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      setIsLoadingScenarios(true);
+      try {
+        const data = await loadScenarios();
+        setScenarios(data);
+      } catch (error) {
+        console.error('Error loading scenarios:', error);
+      } finally {
+        setIsLoadingScenarios(false);
+      }
+    };
+    fetchScenarios();
+  }, []);
+
+  // Load saved scenarios on mount
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      setIsLoadingScenarios(true);
+      try {
+        const data = await loadScenarios();
+        setScenarios(data);
+      } catch (error) {
+        console.error('Error loading scenarios:', error);
+      } finally {
+        setIsLoadingScenarios(false);
+      }
+    };
+    fetchScenarios();
+  }, []);
+
   const selectedPattern = patterns?.find(p => p.id === selectedPatternId);
+
+  // Save current scenario
+  const handleSaveScenario = async () => {
+    if (!selectedPattern || !result) {
+      toast.error('No results to save - please select a pattern first');
+      return;
+    }
+
+    const name = scenarioName.trim() || 
+      `${selectedPattern.name} – ${new Date().toLocaleDateString()}`;
+
+    setIsSaving(true);
+    try {
+      const scenarioData: SaveScenarioInput = {
+        name,
+        pattern_id: selectedPattern.id,
+        pattern_name: selectedPattern.name,
+        staff_count: staffCount ? Number(staffCount) : null,
+        shift_length: shiftLengthHours,
+        buffer_percent: bufferPct,
+        required_shifts_per_day: requiredShiftsPerDay,
+        avg_weekly_hours: result.hoursPerStaffPerWeek,
+        required_staff: result.requiredStaff,
+        utilization_pct: result.utilizationPct,
+        is_wtd_compliant: result.isWTDCompliant,
+        total_breaches: wtdSummary?.totalBreaches ?? 0,
+        avg_rolling: wtdSummary?.avgRolling ?? null,
+        max_rolling: wtdSummary?.maxRolling ?? null,
+        recommendations
+      };
+
+      await saveScenario(scenarioData);
+      toast.success('Scenario saved successfully');
+      
+      // Reload scenarios
+      const updatedScenarios = await loadScenarios();
+      setScenarios(updatedScenarios);
+      setScenarioName('');
+    } catch (error) {
+      console.error('Error saving scenario:', error);
+      toast.error('Failed to save scenario');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Load a saved scenario
+  const handleLoadScenario = (scenarioId: string) => {
+    const scenario = scenarios.find(s => s.id === scenarioId);
+    if (!scenario) return;
+
+    console.log('📂 Loading scenario:', scenario.name);
+
+    // Restore pattern
+    if (scenario.pattern_id) {
+      setSelectedPatternId(scenario.pattern_id);
+    }
+
+    // Restore inputs
+    setShiftLengthHours(Number(scenario.shift_length));
+    setBufferPct(Number(scenario.buffer_percent));
+    setRequiredShiftsPerDay(scenario.required_shifts_per_day);
+    if (scenario.staff_count) {
+      setStaffCount(String(scenario.staff_count));
+    }
+
+    toast.success(`Loaded scenario: ${scenario.name}`);
+  };
+
+  // Delete a scenario
+  const handleDeleteScenario = async (scenarioId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this scenario?')) return;
+
+    try {
+      await deleteScenario(scenarioId);
+      toast.success('Scenario deleted');
+      const updatedScenarios = await loadScenarios();
+      setScenarios(updatedScenarios);
+    } catch (error) {
+      console.error('Error deleting scenario:', error);
+      toast.error('Failed to delete scenario');
+    }
+  };
 
   // Recalculate on input change
   useEffect(() => {
@@ -941,6 +1069,92 @@ const FeasibilityCalculator = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Scenario Management */}
+        {result && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Save or Load Scenario</CardTitle>
+              <CardDescription>Persist and compare different configuration setups</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Save Section */}
+              <div className="space-y-2">
+                <Label htmlFor="scenarioName">Save Current Configuration</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="scenarioName"
+                    placeholder="Enter scenario name (optional)"
+                    value={scenarioName}
+                    onChange={(e) => setScenarioName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSaveScenario}
+                    disabled={isSaving || !result}
+                    variant="secondary"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Save
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Auto-generated name if left blank: {selectedPattern?.name} – {new Date().toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Load Section */}
+              <div className="space-y-2 pt-4 border-t">
+                <Label>Load Saved Scenario ({scenarios.length})</Label>
+                {isLoadingScenarios ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : scenarios.length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {scenarios.map((scenario) => (
+                      <div
+                        key={scenario.id}
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                        onClick={() => handleLoadScenario(scenario.id!)}
+                      >
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium text-sm">{scenario.name}</p>
+                          <div className="flex gap-4 text-xs text-muted-foreground">
+                            <span>{scenario.pattern_name}</span>
+                            <span>Staff: {scenario.staff_count ?? 'N/A'}</span>
+                            <span>Shift: {scenario.shift_length}h</span>
+                            <span className={scenario.is_wtd_compliant ? 'text-green-600' : 'text-destructive'}>
+                              {scenario.is_wtd_compliant ? '✅ Compliant' : '⚠️ Breaches: ' + scenario.total_breaches}
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => handleDeleteScenario(scenario.id!, e)}
+                          className="shrink-0 ml-2"
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Alert>
+                    <AlertDescription className="text-sm">
+                      No saved scenarios yet. Configure a pattern and click "Save" above.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -170,6 +170,87 @@ export type Database = {
         }
         Relationships: []
       }
+      feasibility_scenarios: {
+        Row: {
+          avg_rolling: number | null
+          avg_weekly_hours: number | null
+          buffer_percent: number
+          created_at: string | null
+          id: string
+          is_wtd_compliant: boolean | null
+          max_rolling: number | null
+          name: string
+          pattern_id: string | null
+          pattern_name: string | null
+          recommendations: Json | null
+          required_shifts_per_day: number
+          required_staff: number | null
+          shift_length: number
+          staff_count: number | null
+          total_breaches: number | null
+          updated_at: string | null
+          user_id: string
+          utilization_pct: number | null
+        }
+        Insert: {
+          avg_rolling?: number | null
+          avg_weekly_hours?: number | null
+          buffer_percent: number
+          created_at?: string | null
+          id?: string
+          is_wtd_compliant?: boolean | null
+          max_rolling?: number | null
+          name: string
+          pattern_id?: string | null
+          pattern_name?: string | null
+          recommendations?: Json | null
+          required_shifts_per_day?: number
+          required_staff?: number | null
+          shift_length: number
+          staff_count?: number | null
+          total_breaches?: number | null
+          updated_at?: string | null
+          user_id: string
+          utilization_pct?: number | null
+        }
+        Update: {
+          avg_rolling?: number | null
+          avg_weekly_hours?: number | null
+          buffer_percent?: number
+          created_at?: string | null
+          id?: string
+          is_wtd_compliant?: boolean | null
+          max_rolling?: number | null
+          name?: string
+          pattern_id?: string | null
+          pattern_name?: string | null
+          recommendations?: Json | null
+          required_shifts_per_day?: number
+          required_staff?: number | null
+          shift_length?: number
+          staff_count?: number | null
+          total_breaches?: number | null
+          updated_at?: string | null
+          user_id?: string
+          utilization_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feasibility_scenarios_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "patterns_legacy"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feasibility_scenarios_pattern_id_fkey"
+            columns: ["pattern_id"]
+            isOneToOne: false
+            referencedRelation: "site_patterns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approved_at: string | null
