@@ -11,6 +11,13 @@ export interface WTDSimulationWeek {
   compliant: boolean;
 }
 
+export interface WTDSimulationSummary {
+  totalBreaches: number;
+  avgRolling: number;
+  maxRolling: number;
+  breachWeeks: number[];
+}
+
 export interface WTDSimulationInput {
   pattern: { sequence: string[] };
   shift_length: number;
@@ -50,10 +57,31 @@ export function simulateWTD({
     });
   }
   
+  const totalBreaches = results.filter(w => !w.compliant).length;
+  const avgRolling = results.reduce((sum, w) => sum + w.rolling_avg, 0) / results.length;
+  const maxRolling = Math.max(...results.map(w => w.rolling_avg));
+  const breachWeeks = results.filter(w => !w.compliant).map(w => w.week);
+  
   console.log('✅ WTD Simulation complete:', { 
     total_weeks: weeks,
-    compliant_weeks: results.filter(w => w.compliant).length 
+    compliant_weeks: results.filter(w => w.compliant).length,
+    totalBreaches,
+    avgRolling: avgRolling.toFixed(1)
   });
   
   return results;
+}
+
+export function getWTDSimulationSummary(results: WTDSimulationWeek[]): WTDSimulationSummary {
+  const totalBreaches = results.filter(w => !w.compliant).length;
+  const avgRolling = results.reduce((sum, w) => sum + w.rolling_avg, 0) / results.length;
+  const maxRolling = Math.max(...results.map(w => w.rolling_avg));
+  const breachWeeks = results.filter(w => !w.compliant).map(w => w.week);
+  
+  return {
+    totalBreaches,
+    avgRolling: parseFloat(avgRolling.toFixed(1)),
+    maxRolling: parseFloat(maxRolling.toFixed(1)),
+    breachWeeks
+  };
 }

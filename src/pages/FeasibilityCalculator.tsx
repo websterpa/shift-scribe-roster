@@ -17,8 +17,9 @@ import { toast } from 'sonner';
 import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { simulateWTD } from '@/utils/feasibility/wtdSimulation';
+import { simulateWTD, getWTDSimulationSummary, type WTDSimulationSummary } from '@/utils/feasibility/wtdSimulation';
 import { Switch } from '@/components/ui/switch';
+import { recommendAdjustments, type AdjustmentRecommendation } from '@/services/feasibility/recommendAdjustments';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -56,6 +57,8 @@ const FeasibilityCalculator = () => {
   const [result, setResult] = useState<ReturnType<typeof calculateFeasibility> | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showWTDSimulation, setShowWTDSimulation] = useState<boolean>(true);
+  const [wtdSummary, setWtdSummary] = useState<WTDSimulationSummary | null>(null);
+  const [recommendations, setRecommendations] = useState<AdjustmentRecommendation[]>([]);
 
   // Get selected pattern
   const selectedPattern = patterns?.find(p => p.id === selectedPatternId);
@@ -111,6 +114,29 @@ const FeasibilityCalculator = () => {
     ? ((17 - nonCompliantWeeks) / 17 * 100).toFixed(1) 
     : '0';
 
+  // Update WTD summary and recommendations when simulation data changes
+  useEffect(() => {
+    if (wtdSimulationData && wtdSimulationData.length > 0) {
+      const summary = getWTDSimulationSummary(wtdSimulationData);
+      setWtdSummary(summary);
+      
+      if (summary.totalBreaches > 0 && selectedPattern) {
+        const recs = recommendAdjustments(
+          selectedPattern,
+          summary.totalBreaches,
+          summary.avgRolling,
+          summary.maxRolling
+        );
+        setRecommendations(recs);
+      } else {
+        setRecommendations([]);
+      }
+    } else {
+      setWtdSummary(null);
+      setRecommendations([]);
+    }
+  }, [wtdSimulationData, selectedPattern]);
+
   const handleSaveSetup = () => {
     if (!result || !selectedPattern) return;
 
@@ -139,6 +165,43 @@ const FeasibilityCalculator = () => {
       return { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'Deficit' };
     }
     return { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', label: 'Balanced' };
+  };
+
+  const applyRecommendation = (rec: AdjustmentRecommendation) => {
+    console.log('🔧 Applying recommendation:', rec.action);
+    
+    if (rec.type === 'shift_reduction') {
+      if (rec.action.includes('1 hour')) {
+        setShiftLengthHours(prev => Math.max(6, prev - 1));
+        toast.success('Shift length reduced by 1 hour');
+      } else if (rec.action.includes('0.5')) {
+        setShiftLengthHours(prev => Math.max(6, prev - 0.5));
+        toast.success('Shift length reduced by 0.5 hours');
+      }
+    } else if (rec.type === 'staff_increase') {
+      if (rec.action.includes('by 2')) {
+        setStaffCount(prev => String(Number(prev || 0) + 2));
+        toast.success('Staff count increased by 2');
+      } else if (rec.action.includes('by 1')) {
+        setStaffCount(prev => String(Number(prev || 0) + 1));
+        toast.success('Staff count increased by 1');
+      }
+    } else if (rec.type === 'pattern_change') {
+      if (rec.action.includes('4-On 4-Off')) {
+        const fourOnPattern = patterns?.find(p => p.name.toLowerCase().includes('4-on 4-off'));
+        if (fourOnPattern) {
+          setSelectedPatternId(fourOnPattern.id);
+          toast.success('Switched to 4-On 4-Off pattern');
+        } else {
+          toast.error('4-On 4-Off pattern not found');
+        }
+      } else if (rec.action.includes('8-hour')) {
+        setShiftLengthHours(8);
+        toast.success('Switched to 8-hour shifts');
+      } else {
+        toast.info(rec.description);
+      }
+    }
   };
 
   const exportPDF = async () => {
@@ -718,21 +781,78 @@ const FeasibilityCalculator = () => {
                         </ResponsiveContainer>
                       </div>
                       
-                      {nonCompliantWeeks > 0 ? (
-                        <Alert variant="destructive" className="py-2">
-                          <AlertTriangle className="h-4 w-4" />
-                          <AlertDescription className="text-sm">
-                            ⚠ {nonCompliantWeeks} week(s) exceed 48 h average — review pattern or staffing.
-                          </AlertDescription>
-                        </Alert>
-                      ) : (
-                        <Alert className="py-2 bg-green-50 border-green-200">
+                      {nonCompliantWeeks > 0 && wtdSummary ? (
+                        <div className="space-y-3">
+                          <Alert variant="destructive" className="border-l-4 border-destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              <div className="space-y-2">
+                                <p className="font-semibold">
+                                  ⚠ {wtdSummary.totalBreaches} week(s) exceed the 48-hour WTD limit
+                                </p>
+                                <div className="text-sm space-y-1">
+                                  <p>• Average rolling workload: <strong>{wtdSummary.avgRolling}h/week</strong></p>
+                                  <p>• Peak rolling workload: <strong>{wtdSummary.maxRolling}h/week</strong></p>
+                                  <p>• Breach weeks: {wtdSummary.breachWeeks.join(', ')}</p>
+                                </div>
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+
+                          {recommendations.length > 0 && (
+                            <Card className="border-orange-200 bg-orange-50/50">
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                                  Suggested Corrective Actions
+                                </CardTitle>
+                                <CardDescription className="text-sm">
+                                  Apply these adjustments to restore WTD compliance
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-2">
+                                {recommendations.map((rec, idx) => (
+                                  <div 
+                                    key={idx} 
+                                    className="flex items-start justify-between gap-3 p-3 bg-card rounded-lg border"
+                                  >
+                                    <div className="flex-1 space-y-1">
+                                      <p className="font-medium text-sm">{rec.action}</p>
+                                      <p className="text-xs text-muted-foreground">{rec.description}</p>
+                                      <div className="flex gap-2 items-center mt-1">
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                          rec.priority === 'high' 
+                                            ? 'bg-red-100 text-red-700' 
+                                            : rec.priority === 'medium'
+                                            ? 'bg-orange-100 text-orange-700'
+                                            : 'bg-blue-100 text-blue-700'
+                                        }`}>
+                                          {rec.priority} priority
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => applyRecommendation(rec)}
+                                      className="shrink-0"
+                                    >
+                                      Apply
+                                    </Button>
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+                      ) : nonCompliantWeeks === 0 ? (
+                        <Alert className="bg-green-50 border-green-200">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <AlertDescription className="text-sm text-green-800">
+                          <AlertDescription className="text-green-800">
                             ✅ Fully compliant across 17 weeks.
                           </AlertDescription>
                         </Alert>
-                      )}
+                      ) : null}
                     </CardContent>
                   </Card>
                 )}
