@@ -74,6 +74,11 @@ const FeasibilityCalculator = () => {
   const [bufferPct, setBufferPct] = useState<number>(10);
   const [staffCount, setStaffCount] = useState<string>('');
   const [standardContractHours, setStandardContractHours] = useState<number>(37.5);
+  const [patternFilterScope, setPatternFilterScope] = useState<'All' | '8h' | '12h'>(() => {
+    const saved = localStorage.getItem('patternPicker.scope');
+    if (saved === 'All' || saved === '8h' || saved === '12h') return saved;
+    return '8h'; // Default to 8h
+  });
   const wtdRules = DEFAULT_WTD_RULES;
 
   // Result state
@@ -132,6 +137,12 @@ const FeasibilityCalculator = () => {
 
   const selectedPattern = patterns?.find(p => p.id === selectedPatternId);
   
+  // Filter patterns based on scope
+  const filteredPatterns = patterns?.filter(p => {
+    if (patternFilterScope === 'All') return true;
+    return p.system === patternFilterScope;
+  }) || [];
+  
   // Detect shift system
   const system: System = detectSystem(shiftLengthHours);
   
@@ -148,6 +159,45 @@ const FeasibilityCalculator = () => {
       return updated;
     });
   }, [system]);
+  
+  // Auto-adjust filter when shift length changes
+  useEffect(() => {
+    const targetSystem = shiftLengthHours === 12 ? '12h' : '8h';
+    if (patternFilterScope !== 'All') {
+      setPatternFilterScope(targetSystem);
+      localStorage.setItem('patternPicker.scope', targetSystem);
+    }
+  }, [shiftLengthHours]);
+  
+  // Persist filter scope changes
+  useEffect(() => {
+    localStorage.setItem('patternPicker.scope', patternFilterScope);
+  }, [patternFilterScope]);
+  
+  // Pattern selection with cross-system validation
+  const handlePatternSelection = (patternId: string) => {
+    const pattern = patterns?.find(p => p.id === patternId);
+    if (!pattern) return;
+    
+    // Check for system mismatch
+    const expectedSystem = shiftLengthHours === 12 ? '12h' : '8h';
+    if (pattern.system !== expectedSystem) {
+      const targetShiftLength = pattern.system === '12h' ? 12 : 8;
+      
+      toast.error(
+        `This is a ${pattern.system} pattern. Shift Length is currently ${shiftLengthHours}h.`,
+        {
+          description: `Auto-switching to ${targetShiftLength}-hour shifts to match pattern.`,
+          duration: 4000
+        }
+      );
+      
+      // Auto-switch shift length to match pattern
+      setShiftLengthHours(targetShiftLength);
+    }
+    
+    setSelectedPatternId(patternId);
+  };
 
   // Save current scenario
   const handleSaveScenario = async () => {
@@ -741,25 +791,75 @@ const FeasibilityCalculator = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Pattern Selection */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="pattern">Shift Pattern</Label>
+              
+              {/* Pattern Filter Segmented Control */}
+              <div className="flex items-center gap-2 p-1 bg-muted rounded-lg w-fit">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={patternFilterScope === 'All' ? 'default' : 'ghost'}
+                  onClick={() => setPatternFilterScope('All')}
+                  className="h-7 px-3 text-xs"
+                >
+                  All
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={patternFilterScope === '8h' ? 'default' : 'ghost'}
+                  onClick={() => setPatternFilterScope('8h')}
+                  className="h-7 px-3 text-xs"
+                >
+                  8h Only
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={patternFilterScope === '12h' ? 'default' : 'ghost'}
+                  onClick={() => setPatternFilterScope('12h')}
+                  className="h-7 px-3 text-xs"
+                >
+                  12h Only
+                </Button>
+              </div>
+              
               <Select
                 value={selectedPatternId}
-                onValueChange={setSelectedPatternId}
+                onValueChange={handlePatternSelection}
                 disabled={patternsLoading}
               >
-                <SelectTrigger id="pattern">
+                <SelectTrigger id="pattern" className="bg-background">
                   <SelectValue placeholder={patternsLoading ? "Loading patterns..." : "Select a pattern"} />
                 </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  {patterns?.length ? (
-                    patterns.map(pattern => (
-                      <SelectItem key={pattern.id} value={pattern.id}>
-                        {pattern.name} ({pattern.system}) - {Array.isArray(pattern.sequence) ? pattern.sequence.join(' ') : ''}
-                      </SelectItem>
-                    ))
+                <SelectContent className="z-50 bg-popover max-h-[300px]">
+                  {filteredPatterns.length ? (
+                    filteredPatterns.map(pattern => {
+                      const sequencePreview = Array.isArray(pattern.sequence) 
+                        ? pattern.sequence.slice(0, 8).join('') + (pattern.sequence.length > 8 ? '…' : '')
+                        : '';
+                      return (
+                        <SelectItem key={pattern.id} value={pattern.id} className="bg-popover">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "px-1.5 py-0.5 rounded text-xs font-semibold",
+                              pattern.system === '12h' 
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                                : "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+                            )}>
+                              {pattern.system}
+                            </span>
+                            <span className="font-medium">{pattern.name}</span>
+                            <span className="text-muted-foreground text-xs">— {sequencePreview}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })
                   ) : (
-                    <div className="p-2 text-muted-foreground text-sm">No patterns found</div>
+                    <div className="p-2 text-muted-foreground text-sm bg-popover">
+                      No {patternFilterScope !== 'All' ? patternFilterScope : ''} patterns found
+                    </div>
                   )}
                 </SelectContent>
               </Select>
