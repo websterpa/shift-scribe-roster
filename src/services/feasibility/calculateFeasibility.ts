@@ -139,12 +139,15 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
   const fteAvailable = currentStaffCount ? (currentStaffCount * standardContractHours) / standardContractHours : requiredStaff;
   
   // WTD Validation - Extend sequence to cover 17 weeks for proper validation
+  // @deprecated Legacy WTD validation - UI now uses unified wtdStatus from engine2
   const extendedSequence = generateExtendedSequence(sequence, wtdRules.reference_period_weeks);
   
   // Run comprehensive WTD validation
+  // @deprecated Legacy - kept for backward compatibility only
   const wtdValidation = validateStaffWTD(extendedSequence, wtdRules);
   
   // Individual checks for detailed feedback
+  // @deprecated Legacy checks - UI uses unified status
   const consecDaysCheck = validateConsecutiveDays(extendedSequence, wtdRules.max_consec_days);
   const consecNightsCheck = validateConsecutiveNights(extendedSequence, wtdRules.max_consec_nights);
   const weeklyRestCheck = validateWeeklyRest(extendedSequence);
@@ -177,6 +180,8 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
     warnings.push('Very high utilization - little flexibility for absences');
   }
   
+  // @deprecated Legacy WTD warning - UI now uses unified wtdStatus banner
+  // This warning is filtered out in FeasibilityCalculator.tsx
   if (!wtdValidation.valid) {
     warnings.push('Pattern violates WTD regulations - review required');
   }

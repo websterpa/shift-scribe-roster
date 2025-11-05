@@ -331,6 +331,11 @@ const FeasibilityCalculator = () => {
       
       // Use per-shift total if available, otherwise fall back to legacy value
       const effectiveRequiredShiftsPerDay = totalRequiredPerDay > 0 ? totalRequiredPerDay : requiredShiftsPerDay;
+      
+      // Guard: warn if using legacy field instead of per-shift requirements
+      if (totalRequiredPerDay === 0 && requiredShiftsPerDay > 0) {
+        console.warn('⚠️ Deprecated: legacy requiredShiftsPerDay value ignored for WTD. Use per-shift requirements instead.');
+      }
 
       const input: FeasibilityInput = {
         pattern: {
@@ -612,7 +617,7 @@ const FeasibilityCalculator = () => {
         pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 420);
       }
       
-      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 440);
+      pdf.text(`WTD Compliant: ${wtdStatus?.success ? 'Yes' : 'No'}`, 40, 440);
       
       // Capture chart if available
       const chartEl = document.querySelector('.recharts-wrapper') as HTMLElement;
@@ -1545,17 +1550,20 @@ const FeasibilityCalculator = () => {
                 )}
 
 
-                {/* Warnings */}
-                {result.warnings.length > 0 && (
+                {/* Warnings - Filter out WTD warnings (now handled by unified banner) */}
+                {result.warnings.filter(w => !w.toLowerCase().includes('wtd')).length > 0 && (
                   <div className="space-y-2">
-                    {result.warnings.map((warning, idx) => (
-                      <Alert key={idx} className="bg-yellow-50 border-yellow-200">
-                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                        <AlertDescription className="text-yellow-800 text-sm">
-                          {warning}
-                        </AlertDescription>
-                      </Alert>
-                    ))}
+                    {result.warnings
+                      .filter(w => !w.toLowerCase().includes('wtd'))
+                      .map((warning, idx) => (
+                        <Alert key={idx} className="bg-yellow-50 border-yellow-200">
+                          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                          <AlertDescription className="text-yellow-800 text-sm">
+                            {warning}
+                          </AlertDescription>
+                        </Alert>
+                      ))
+                    }
                   </div>
                 )}
 
@@ -1567,7 +1575,7 @@ const FeasibilityCalculator = () => {
                       onClick={exportPDF} 
                       variant="default"
                       size="sm"
-                      disabled={isExporting || !result.isWTDCompliant}
+                      disabled={isExporting || !(wtdStatus?.success ?? false)}
                     >
                       {isExporting ? (
                         <Loader2 className="w-4 h-4 mr-1 animate-spin" />
@@ -1601,7 +1609,7 @@ const FeasibilityCalculator = () => {
                 <Button 
                   onClick={handleSaveSetup} 
                   className="w-full"
-                  disabled={!result.isWTDCompliant || result.requiredStaff === 0}
+                  disabled={!(wtdStatus?.success ?? false) || result.requiredStaff === 0}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Use This Setup
