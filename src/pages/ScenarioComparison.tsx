@@ -64,9 +64,9 @@ const ScenarioComparison = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRecomputing, setIsRecomputing] = useState(false);
   
-  const [baselineId, setBaselineId] = useState<string>('');
-  const [compareId1, setCompareId1] = useState<string>('');
-  const [compareId2, setCompareId2] = useState<string>('');
+  const [baselineId, setBaselineId] = useState<string | null>(null);
+  const [compareId1, setCompareId1] = useState<string | null>(null);
+  const [compareId2, setCompareId2] = useState<string | null>(null);
   
   const [enrichedScenarios, setEnrichedScenarios] = useState<{
     baseline?: EnrichedScenario;
@@ -76,7 +76,7 @@ const ScenarioComparison = () => {
   
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
 
-  // Load all scenarios
+  // Load all scenarios and restore persisted baseline
   useEffect(() => {
     const fetchScenarios = async () => {
       setIsLoading(true);
@@ -84,6 +84,13 @@ const ScenarioComparison = () => {
         const data = await loadScenarios();
         setScenarios(data);
         console.log(`✅ Loaded ${data.length} scenarios`);
+        
+        // Restore persisted baseline from localStorage
+        const savedBaselineId = localStorage.getItem('scenarioBaselineId');
+        if (savedBaselineId && data.some(s => s.id === savedBaselineId)) {
+          setBaselineId(savedBaselineId);
+          console.log('✅ Restored baseline from localStorage:', savedBaselineId);
+        }
       } catch (error) {
         console.error('❌ Error loading scenarios:', error);
         toast.error('Failed to load scenarios');
@@ -216,6 +223,38 @@ const ScenarioComparison = () => {
     };
   };
 
+  // Set recommended scenario as baseline
+  const handleSetAsBaseline = () => {
+    if (!recommendedId) return;
+    
+    console.log('🔄 Setting recommended scenario as baseline:', recommendedId);
+    
+    // Enforce distinct scenarios with swap logic
+    let newBaselineId = recommendedId;
+    let newCompareId1 = compareId1;
+    let newCompareId2 = compareId2;
+    
+    if (compareId1 === recommendedId) {
+      // Swap: old baseline goes to compare slot 1, recommended becomes baseline
+      newCompareId1 = baselineId;
+    } else if (compareId2 === recommendedId) {
+      // Swap: old baseline goes to compare slot 2, recommended becomes baseline
+      newCompareId2 = baselineId;
+    }
+    
+    setBaselineId(newBaselineId);
+    setCompareId1(newCompareId1);
+    setCompareId2(newCompareId2);
+    
+    // Persist to localStorage
+    localStorage.setItem('scenarioBaselineId', newBaselineId);
+    
+    // Clear recommendation highlight
+    setRecommendedId(null);
+    
+    toast.success('Baseline updated successfully');
+  };
+
   // Recommend best scenario
   const handleRecommendBest = () => {
     console.log('🎯 Recommending best scenario...');
@@ -298,10 +337,10 @@ const ScenarioComparison = () => {
   // Export CSV
   const exportCSV = () => {
     const rows = [
-      ['Scenario Comparison Export'],
+          ['Scenario Comparison Export'],
       ['Generated', new Date().toLocaleString()],
       [''],
-      ['Scenario', 'Pattern', 'Staff Count', 'Shift Length', 'Buffer %', 'Weekly Hours/Staff', 'Required Staff', 'Total Breaches', 'Avg Rolling', 'WTD Compliant', 'Recommended']
+      ['Scenario', 'Pattern', 'Staff Count', 'Shift Length', 'Buffer %', 'Weekly Hours/Staff', 'Required Staff', 'Total Breaches', 'Avg Rolling', 'WTD Compliant', 'Baseline', 'Recommended']
     ];
 
     [enrichedScenarios.baseline, enrichedScenarios.compare1, enrichedScenarios.compare2]
@@ -319,6 +358,7 @@ const ScenarioComparison = () => {
           String(scenario.computed?.simulationSummary?.totalBreaches ?? scenario.total_breaches),
           scenario.computed?.simulationSummary?.avgRolling?.toFixed(1) ?? scenario.avg_rolling?.toFixed(1) ?? 'N/A',
           scenario.computed?.isWTDCompliant ? 'Yes' : 'No',
+          scenario.id === baselineId ? 'Yes' : 'No',
           scenario.id === recommendedId ? 'Yes' : 'No'
         ]);
       });
@@ -354,9 +394,9 @@ const ScenarioComparison = () => {
           if (!scenario) return;
           
           pdf.setFontSize(12);
-          const scenarioTitle = scenario.id === recommendedId 
-            ? `Scenario ${idx + 1}: ${scenario.name} ⭐ RECOMMENDED`
-            : `Scenario ${idx + 1}: ${scenario.name}`;
+          let scenarioTitle = `Scenario ${idx + 1}: ${scenario.name}`;
+          if (scenario.id === baselineId) scenarioTitle += ' [BASELINE]';
+          if (scenario.id === recommendedId) scenarioTitle += ' ⭐ RECOMMENDED';
           pdf.text(scenarioTitle, 14, y);
           y += 6;
           
@@ -420,10 +460,20 @@ const ScenarioComparison = () => {
         isRecommended && 'ring-2 ring-green-500 shadow-lg'
       )}>
         {isRecommended && (
-          <div className="absolute -top-2 -right-2 z-10">
+          <div className="absolute -top-2 -right-2 z-10 flex gap-2 items-center">
             <span className="rounded-full bg-green-600 text-white text-xs px-2 py-1 shadow-md font-medium">
               ⭐ Recommended
             </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleSetAsBaseline}
+              disabled={baselineId === recommendedId}
+              title={baselineId === recommendedId ? 'Already baseline' : 'Promote to baseline'}
+              className="h-6 text-xs px-2"
+            >
+              Set as Baseline
+            </Button>
           </div>
         )}
         <CardHeader>
