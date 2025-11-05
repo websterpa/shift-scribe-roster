@@ -161,6 +161,14 @@ export const RosterCalendarTable = ({ assignments, diagnostics }: RosterCalendar
     overscan: 5, // Number of items to render outside visible area
   });
   
+  // Expose virtualizer globally for jump-to-day functionality
+  React.useEffect(() => {
+    (window as any).__calendarVirtualizer__ = rowVirtualizer;
+    return () => {
+      delete (window as any).__calendarVirtualizer__;
+    };
+  }, [rowVirtualizer]);
+  
   console.log('📊 Virtual scrolling stats:', {
     totalStaff: staff.length,
     virtualItems: rowVirtualizer.getVirtualItems().length,

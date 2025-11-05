@@ -31,6 +31,8 @@ import { diagnosePattern, type RestViolation } from '@/engine2/constraints/wtdDi
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { computeWTDStatus, type WTDStatus } from '@/services/feasibility/computeWTDStatus';
+import { firstDateForCycleIndex } from '@/lib/cycleMapping';
+import { format } from 'date-fns';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -334,6 +336,58 @@ const FeasibilityCalculator = () => {
 
     localStorage.setItem('feasibilityConfig', JSON.stringify(feasibilityConfig));
     toast.success('Configuration saved! Use it in Roster Setup.');
+  };
+
+  // Jump to first violation in monthly calendar (if calendar is rendered)
+  const jumpToFirstViolation = () => {
+    if (!restViolations?.length || !selectedPattern) {
+      toast.error('No violations to jump to');
+      return;
+    }
+    
+    const v = restViolations[0];
+    const cycleLen = selectedPattern.cycle_length;
+    
+    // Use current month (or default to current date)
+    const now = new Date();
+    const visibleMonthStartISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    
+    // Use pattern_start_date if available, otherwise use month start
+    const cycleStartISO = (selectedPattern as any).pattern_start_date ?? visibleMonthStartISO;
+    
+    const targetDate = firstDateForCycleIndex(visibleMonthStartISO, cycleStartISO, cycleLen, v.toIdx);
+    
+    if (!targetDate) {
+      toast.error('Could not find violation date in current month');
+      return;
+    }
+    
+    const id = `day-${format(targetDate, 'yyyy-MM-dd')}`;
+    const el = document.getElementById(id);
+    
+    if (!el) {
+      toast.info(`Violation on day ${v.toIdx + 1} (${format(targetDate, 'MMM d, yyyy')}) - calendar not visible on this page`);
+      return;
+    }
+    
+    // Try virtualizer first
+    const dayIndex = targetDate.getDate() - 1;
+    const virtualizer = (window as any).__calendarVirtualizer__;
+    
+    if (virtualizer?.scrollToIndex) {
+      virtualizer.scrollToIndex(dayIndex, { align: 'center' });
+    } else {
+      // Fallback to DOM scroll
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }
+    
+    // Brief highlight
+    el.classList.add('ring-2', 'ring-red-500', 'ring-offset-2');
+    setTimeout(() => {
+      el.classList.remove('ring-2', 'ring-red-500', 'ring-offset-2');
+    }, 2000);
+    
+    toast.success(`Jumped to violation on ${format(targetDate, 'MMM d, yyyy')}`);
   };
 
   const getSurplusIndicator = () => {
@@ -663,16 +717,28 @@ const FeasibilityCalculator = () => {
                     <Alert variant="destructive" className="py-2">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription className="text-sm">
-                        <p className="font-semibold mb-1">
-                          {restViolations.length} rest violation{restViolations.length > 1 ? 's' : ''} detected
-                        </p>
-                        <ul className="text-xs space-y-0.5 ml-4 list-disc">
-                          {restViolations.map((v, idx) => (
-                            <li key={idx}>
-                              Day {v.toIdx + 1}: {v.fromCode}→{v.toCode} only {v.restHours.toFixed(1)}h rest (needs ≥ 11h)
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className="font-semibold mb-1">
+                              {restViolations.length} rest violation{restViolations.length > 1 ? 's' : ''} detected
+                            </p>
+                            <ul className="text-xs space-y-0.5 ml-4 list-disc">
+                              {restViolations.map((v, idx) => (
+                                <li key={idx}>
+                                  Day {v.toIdx + 1}: {v.fromCode}→{v.toCode} only {v.restHours.toFixed(1)}h rest (needs ≥ 11h)
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={jumpToFirstViolation}
+                            className="shrink-0 h-7 text-xs"
+                          >
+                            Jump to Day
+                          </Button>
+                        </div>
                       </AlertDescription>
                     </Alert>
                   )}

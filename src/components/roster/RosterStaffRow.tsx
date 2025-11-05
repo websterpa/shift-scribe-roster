@@ -4,6 +4,7 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { WTDComplianceIndicator } from './WTDComplianceIndicator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface StaffMember {
   name: string;
@@ -100,13 +101,19 @@ export const RosterStaffRow = ({
           />
         </div>
       </TableCell>
-      {currentWeekDates.map((date) => {
+      {currentWeekDates.map((date, dateIndex) => {
         const assignment = staffAssignments?.get(date);
         const violation = staffViolations?.get(date);
         const hasViolation = !!violation;
+        const cellId = `day-${format(new Date(date), 'yyyy-MM-dd')}`;
         
         return (
-          <TableCell key={`${staffMember.name}-${date}`} className="text-center p-1 border-l">
+          <TableCell 
+            key={`${staffMember.name}-${date}`} 
+            id={cellId}
+            data-day-index={dateIndex}
+            className="text-center p-1 border-l"
+          >
             {assignment ? (
               <TooltipProvider>
                 <Tooltip>
