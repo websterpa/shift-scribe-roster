@@ -507,19 +507,21 @@ const FeasibilityCalculator = () => {
       pdf.text(`Standard Contract Hours: ${result.standardContractHours}h/week`, 40, 300);
       pdf.text(`Available Hours/Week: ${result.availableHoursPerWeek.toFixed(1)}h`, 40, 320);
       pdf.text(`Overtime Gap/Week: ${result.overtimeGapPerWeek.toFixed(1)}h`, 40, 340);
+      pdf.text(`FTE Required: ${result.fteRequired.toFixed(2)}`, 40, 360);
+      pdf.text(`FTE Available: ${result.fteAvailable.toFixed(2)}`, 40, 380);
       
       if (result.surplus !== null) {
-        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 360);
+        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 400);
       }
       
-      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 380);
+      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 420);
       
       // Capture chart if available
       const chartEl = document.querySelector('.recharts-wrapper') as HTMLElement;
       if (chartEl && staffCount && Number(staffCount) > 0) {
         const canvas = await html2canvas(chartEl, { scale: 2, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
-        pdf.addImage(imgData, 'PNG', 40, 410, 500, 250);
+        pdf.addImage(imgData, 'PNG', 40, 450, 500, 250);
       }
       
       // Footer
@@ -563,6 +565,8 @@ const FeasibilityCalculator = () => {
         ['Standard Contract Hours', `${result.standardContractHours}h/week`],
         ['Available Hours/Week', `${result.availableHoursPerWeek.toFixed(1)}h`],
         ['Overtime Gap/Week', `${result.overtimeGapPerWeek.toFixed(1)}h`],
+        ['FTE Required', result.fteRequired.toFixed(2)],
+        ['FTE Available', result.fteAvailable.toFixed(2)],
         ...(result.surplus !== null ? [['Surplus/Deficit', result.surplus > 0 ? `+${result.surplus.toFixed(1)}` : result.surplus.toFixed(1)]] : []),
         ['WTD Compliant', wtdStatus?.success ? 'Yes' : 'No'],
         ...(wtdStatus ? [['17-Week Rolling Avg', `${wtdStatus.metrics.rollingAvg.toFixed(1)}h`]] : []),
@@ -632,6 +636,8 @@ const FeasibilityCalculator = () => {
           standardContractHours: result.standardContractHours,
           availableHoursPerWeek: result.availableHoursPerWeek,
           overtimeGapPerWeek: result.overtimeGapPerWeek,
+          fteRequired: result.fteRequired,
+          fteAvailable: result.fteAvailable,
           isWTDCompliant: wtdStatus?.success ?? false,
           wtdMetrics: wtdStatus ? {
             rollingAvg: wtdStatus.metrics.rollingAvg,
@@ -836,17 +842,19 @@ const FeasibilityCalculator = () => {
 
             {/* Standard Contract Hours */}
             <div className="space-y-2">
-              <Label htmlFor="standardContractHours">Standard Contract Hours (per week)</Label>
+              <Label htmlFor="standardContractHours">Contracted hours per staff per week</Label>
               <Input
                 id="standardContractHours"
                 type="number"
-                min="0"
-                max="60"
+                min="20"
+                max="48"
                 step="0.5"
                 value={standardContractHours}
                 onChange={(e) => setStandardContractHours(Number(e.target.value))}
               />
-              <p className="text-xs text-muted-foreground">Site-level standard hours for all staff (operational capacity baseline)</p>
+              <p className="text-xs text-muted-foreground">
+                Site-level setting used for availability and FTE. Typical values 37–40.
+              </p>
             </div>
 
             {/* Per-Shift Staffing Requirements */}
@@ -1005,6 +1013,14 @@ const FeasibilityCalculator = () => {
                     )}>
                       {result.overtimeGapPerWeek.toFixed(1)}h
                     </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">FTE Required:</span>
+                    <span className="font-medium">{result.fteRequired.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">FTE Available:</span>
+                    <span className="font-medium">{result.fteAvailable.toFixed(2)}</span>
                   </div>
                 </div>
 

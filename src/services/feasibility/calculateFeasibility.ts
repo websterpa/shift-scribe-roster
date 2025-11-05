@@ -45,6 +45,8 @@ export interface FeasibilityResult {
   standardContractHours: number;
   availableHoursPerWeek: number;
   overtimeGapPerWeek: number;
+  fteRequired: number;
+  fteAvailable: number;
   
   // WTD Compliance
   isWTDCompliant: boolean;
@@ -96,6 +98,8 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
       standardContractHours,
       availableHoursPerWeek: 0,
       overtimeGapPerWeek: 0,
+      fteRequired: 0,
+      fteAvailable: 0,
       isWTDCompliant: false,
       wtdViolations: ['Pattern has no work days'],
       wtdChecks: {
@@ -129,6 +133,10 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
   // Calculate operational capacity vs requirement
   const availableHoursPerWeek = standardContractHours * requiredStaff;
   const overtimeGapPerWeek = Math.max(0, weeklyHoursRequired - availableHoursPerWeek);
+  
+  // Calculate FTE (Full-Time Equivalent) based on standard contract hours
+  const fteRequired = weeklyHoursRequired / standardContractHours;
+  const fteAvailable = currentStaffCount ? (currentStaffCount * standardContractHours) / standardContractHours : requiredStaff;
   
   // WTD Validation - Extend sequence to cover 17 weeks for proper validation
   const extendedSequence = generateExtendedSequence(sequence, wtdRules.reference_period_weeks);
@@ -185,6 +193,8 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
     standardContractHours,
     availableHoursPerWeek,
     overtimeGapPerWeek,
+    fteRequired,
+    fteAvailable,
     isWTDCompliant: wtdValidation.valid,
     wtdViolations: wtdValidation.violations,
     wtdChecks,

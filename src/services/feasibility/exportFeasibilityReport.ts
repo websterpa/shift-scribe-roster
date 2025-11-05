@@ -12,6 +12,8 @@ interface ExportData {
   standardContractHours: number;
   availableHoursPerWeek: number;
   overtimeGapPerWeek: number;
+  fteRequired: number;
+  fteAvailable: number;
   wtd: {
     restOk: boolean;
     avgOk: boolean;
@@ -62,6 +64,10 @@ export async function exportToPDF(data: ExportData, chartElement: HTMLElement | 
   pdf.text(`Available Hours/Week: ${data.availableHoursPerWeek.toFixed(1)} h`, 20, y);
   y += 7;
   pdf.text(`Overtime Gap/Week: ${data.overtimeGapPerWeek.toFixed(1)} h`, 20, y);
+  y += 7;
+  pdf.text(`FTE Required: ${data.fteRequired.toFixed(2)}`, 20, y);
+  y += 7;
+  pdf.text(`FTE Available: ${data.fteAvailable.toFixed(2)}`, 20, y);
   y += 10;
   
   // WTD Compliance
@@ -130,6 +136,8 @@ export function exportToCSV(data: ExportData) {
     ['Standard Contract Hours (h/week)', data.standardContractHours.toString()],
     ['Available Hours/Week', data.availableHoursPerWeek.toFixed(1)],
     ['Overtime Gap/Week', data.overtimeGapPerWeek.toFixed(1)],
+    ['FTE Required', data.fteRequired.toFixed(2)],
+    ['FTE Available', data.fteAvailable.toFixed(2)],
     ['', ''],
     ['WTD Compliance', ''],
     ['11h Rest Period', data.wtd.restOk ? 'Compliant' : 'Non-Compliant'],
