@@ -23,11 +23,11 @@ const TopBar = () => {
   };
 
   return (
-    <div className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-48">
+    <div className="w-full border-b bg-white shadow-sm">
+      <div className="mx-auto max-w-screen-2xl px-3 sm:px-4">
+        <div className="flex items-center justify-between gap-3 h-48">
           {/* Logo on the left */}
-          <div className="flex-shrink-0 flex items-center">
+          <div className="shrink-0 flex items-center">
             <img 
               src="/lovable-uploads/4baad420-9f35-41c0-b679-bf3fb947409c.png" 
               alt="ShiftCraft Logo" 
@@ -36,7 +36,8 @@ const TopBar = () => {
           </div>
 
           {/* User profile on the right */}
-          <DropdownMenu>
+          <div className="shrink-0">
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="outline" 
@@ -60,6 +61,7 @@ const TopBar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
     </div>

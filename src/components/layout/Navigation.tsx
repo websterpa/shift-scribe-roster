@@ -28,48 +28,26 @@ const Navigation = () => {
   const visibleItems = navigationItems.filter(item => !item.adminOnly || isAdmin);
 
   return (
-    <nav className="bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 shadow-lg border-b border-blue-100/50 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-4">
-          {/* Desktop Navigation - Horizontal scroll on small screens */}
-          <div className="hidden sm:block overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2 min-w-max">
-              {visibleItems.map((item) => (
+    <nav className="w-full border-b bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 shadow-lg border-blue-100/50 backdrop-blur-sm">
+      <div className="mx-auto max-w-screen-2xl px-3 sm:px-4">
+        <div className="py-3 -mx-2 sm:mx-0">
+          <ul className="flex items-center gap-2 overflow-x-auto whitespace-nowrap px-2 sm:overflow-visible sm:flex-wrap scrollbar-hide">
+            {visibleItems.map((item) => (
+              <li key={item.path} className="shrink-0">
                 <Link
-                  key={item.path}
                   to={item.path}
-                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${
+                  className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                     isActive(item.path)
-                      ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg transform scale-105`
+                      ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg scale-105`
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-md hover:scale-105'
                   }`}
                 >
                   <item.icon className="w-4 h-4 mr-2" />
                   {item.label}
                 </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Mobile Navigation Menu - Horizontal scroll */}
-          <div className="sm:hidden overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2 min-w-max pb-1">
-              {visibleItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 transition-all duration-300 ${
-                    isActive(item.path)
-                      ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg`
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-                  }`}
-                >
-                  <item.icon className="w-4 h-4 mr-2" />
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </nav>
