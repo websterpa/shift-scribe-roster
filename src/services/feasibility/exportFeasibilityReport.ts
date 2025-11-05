@@ -20,6 +20,14 @@ interface ExportData {
   };
   staffCount: number;
   shiftLength: number;
+  // New overtime/slack fields
+  requiredHoursWeek?: number;
+  overtimeWeek?: number;
+  slackWeek?: number;
+  reqFTE?: number;
+  haveFTE?: number;
+  gapFTE?: number;
+  overtime17Weeks?: number;
 }
 
 export async function exportToPDF(data: ExportData, chartElement: HTMLElement | null) {
@@ -68,7 +76,36 @@ export async function exportToPDF(data: ExportData, chartElement: HTMLElement | 
   pdf.text(`FTE Required: ${data.fteRequired.toFixed(2)}`, 20, y);
   y += 7;
   pdf.text(`FTE Available: ${data.fteAvailable.toFixed(2)}`, 20, y);
-  y += 10;
+  y += 7;
+  
+  // New overtime/slack metrics
+  if (data.requiredHoursWeek !== undefined) {
+    pdf.text(`Required Hours/Week: ${data.requiredHoursWeek.toFixed(1)} h`, 20, y);
+    y += 7;
+  }
+  if (data.overtimeWeek !== undefined && data.overtimeWeek > 0) {
+    pdf.setTextColor(255, 128, 0);
+    pdf.text(`Overtime/Week: ${data.overtimeWeek.toFixed(1)} h`, 20, y);
+    pdf.setTextColor(0, 0, 0);
+    y += 7;
+  }
+  if (data.slackWeek !== undefined && data.slackWeek > 0) {
+    pdf.setTextColor(0, 128, 0);
+    pdf.text(`Slack/Week: ${data.slackWeek.toFixed(1)} h`, 20, y);
+    pdf.setTextColor(0, 0, 0);
+    y += 7;
+  }
+  if (data.gapFTE !== undefined) {
+    pdf.text(`FTE Gap: ${data.gapFTE > 0 ? '+' : ''}${data.gapFTE.toFixed(2)}`, 20, y);
+    y += 7;
+  }
+  if (data.overtime17Weeks !== undefined) {
+    pdf.setTextColor(255, 128, 0);
+    pdf.text(`17-Week Overtime: ${data.overtime17Weeks.toFixed(1)} h`, 20, y);
+    pdf.setTextColor(0, 0, 0);
+    y += 7;
+  }
+  y += 3;
   
   // WTD Compliance
   pdf.setFontSize(14);
@@ -138,6 +175,13 @@ export function exportToCSV(data: ExportData) {
     ['Overtime Gap/Week', data.overtimeGapPerWeek.toFixed(1)],
     ['FTE Required', data.fteRequired.toFixed(2)],
     ['FTE Available', data.fteAvailable.toFixed(2)],
+    ...(data.requiredHoursWeek !== undefined ? [['Required Hours/Week', data.requiredHoursWeek.toFixed(1)]] : []),
+    ...(data.overtimeWeek !== undefined ? [['Overtime/Week (hours)', data.overtimeWeek.toFixed(1)]] : []),
+    ...(data.slackWeek !== undefined ? [['Slack/Week (hours)', data.slackWeek.toFixed(1)]] : []),
+    ...(data.reqFTE !== undefined ? [['Required FTE', data.reqFTE.toFixed(2)]] : []),
+    ...(data.haveFTE !== undefined ? [['Available FTE', data.haveFTE.toFixed(2)]] : []),
+    ...(data.gapFTE !== undefined ? [['FTE Gap', data.gapFTE.toFixed(2)]] : []),
+    ...(data.overtime17Weeks !== undefined ? [['17-Week Overtime (hours)', data.overtime17Weeks.toFixed(1)]] : []),
     ['', ''],
     ['WTD Compliance', ''],
     ['11h Rest Period', data.wtd.restOk ? 'Compliant' : 'Non-Compliant'],

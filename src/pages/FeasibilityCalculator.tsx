@@ -8,7 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Slider } from '@/components/ui/slider';
 import { Calculator, ArrowRight, AlertTriangle, CheckCircle2, Save, FileText, Download, Loader2, Trash2 } from 'lucide-react';
-import { calculateFeasibility, type FeasibilityInput } from '@/services/feasibility/calculateFeasibility';
+import { 
+  calculateFeasibility, 
+  requiredHoursPerWeek,
+  availableHoursPerWeek,
+  overtimeSlack,
+  fteGap,
+  requiredHoursOver17Weeks,
+  type FeasibilityInput 
+} from '@/services/feasibility/calculateFeasibility';
 import { UtilisationChart, type UtilisationData } from '@/components/Feasibility/UtilisationChart';
 import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
 import { useQuery } from '@tanstack/react-query';
@@ -318,6 +326,42 @@ const FeasibilityCalculator = () => {
     }
   };
 
+  // Calculate overtime metrics
+  const overtimeMetrics = result && selectedPattern ? (() => {
+    const reqWeek = requiredHoursPerWeek(requiredPerDay, shiftLengthHours);
+    const availWeek = availableHoursPerWeek(
+      staffCount ? Number(staffCount) : result.requiredStaff,
+      standardContractHours
+    );
+    const { overtime, slack } = overtimeSlack(reqWeek, availWeek);
+    const { reqFTE, haveFTE, gapFTE } = fteGap(
+      reqWeek,
+      standardContractHours,
+      staffCount ? Number(staffCount) : result.requiredStaff
+    );
+    const req17 = requiredHoursOver17Weeks(
+      Array.isArray(selectedPattern.sequence) ? (selectedPattern.sequence as string[]) : [],
+      selectedPattern.cycle_length || 1,
+      shiftLengthHours,
+      requiredPerDay
+    );
+    const avail17 = availWeek * 17;
+    const overtime17 = Math.max(0, req17 - avail17);
+    
+    return {
+      reqWeek,
+      availWeek,
+      overtime,
+      slack,
+      reqFTE,
+      haveFTE,
+      gapFTE,
+      req17,
+      avail17,
+      overtime17
+    };
+  })() : null;
+
   // Recalculate on input change
   useEffect(() => {
     if (!selectedPattern) {
@@ -613,18 +657,37 @@ const FeasibilityCalculator = () => {
       pdf.text(`FTE Required: ${result.fteRequired.toFixed(2)}`, 40, 380);
       pdf.text(`FTE Available: ${result.fteAvailable.toFixed(2)}`, 40, 400);
       
-      if (result.surplus !== null) {
-        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 420);
+      // Add overtime metrics if available
+      let yPos = 420;
+      if (overtimeMetrics && Object.keys(requiredPerDay).length > 0) {
+        pdf.text(`Required Hours/Week: ${overtimeMetrics.reqWeek.toFixed(1)}h`, 40, yPos);
+        yPos += 20;
+        if (overtimeMetrics.overtime > 0) {
+          pdf.text(`Overtime/Week: ${overtimeMetrics.overtime.toFixed(1)}h`, 40, yPos);
+        } else {
+          pdf.text(`Slack/Week: ${overtimeMetrics.slack.toFixed(1)}h`, 40, yPos);
+        }
+        yPos += 20;
+        pdf.text(`FTE Gap: ${overtimeMetrics.gapFTE > 0 ? '+' : ''}${overtimeMetrics.gapFTE.toFixed(2)}`, 40, yPos);
+        yPos += 20;
+        pdf.text(`17-Week Overtime: ${overtimeMetrics.overtime17.toFixed(1)}h`, 40, yPos);
+        yPos += 20;
       }
       
-      pdf.text(`WTD Compliant: ${wtdStatus?.success ? 'Yes' : 'No'}`, 40, 440);
+      if (result.surplus !== null) {
+        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, yPos);
+        yPos += 20;
+      }
+      
+      pdf.text(`WTD Compliant: ${wtdStatus?.success ? 'Yes' : 'No'}`, 40, yPos);
+      yPos += 20;
       
       // Capture chart if available
       const chartEl = document.querySelector('.recharts-wrapper') as HTMLElement;
       if (chartEl && staffCount && Number(staffCount) > 0) {
         const canvas = await html2canvas(chartEl, { scale: 2, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
-        pdf.addImage(imgData, 'PNG', 40, 470, 500, 250);
+        pdf.addImage(imgData, 'PNG', 40, yPos + 30, 500, 250);
       }
       
       // Footer
@@ -676,6 +739,13 @@ const FeasibilityCalculator = () => {
         ['Overtime Gap/Week', `${result.overtimeGapPerWeek.toFixed(1)}h`],
         ['FTE Required', result.fteRequired.toFixed(2)],
         ['FTE Available', result.fteAvailable.toFixed(2)],
+        ...(overtimeMetrics && Object.keys(requiredPerDay).length > 0 ? [
+          ['Required Hours/Week', `${overtimeMetrics.reqWeek.toFixed(1)}h`],
+          ['Overtime/Week', `${overtimeMetrics.overtime.toFixed(1)}h`],
+          ['Slack/Week', `${overtimeMetrics.slack.toFixed(1)}h`],
+          ['FTE Gap', overtimeMetrics.gapFTE > 0 ? `+${overtimeMetrics.gapFTE.toFixed(2)}` : overtimeMetrics.gapFTE.toFixed(2)],
+          ['17-Week Overtime', `${overtimeMetrics.overtime17.toFixed(1)}h`]
+        ] : []),
         ...(result.surplus !== null ? [['Surplus/Deficit', result.surplus > 0 ? `+${result.surplus.toFixed(1)}` : result.surplus.toFixed(1)]] : []),
         ['WTD Compliant', wtdStatus?.success ? 'Yes' : 'No'],
         ...(wtdStatus ? [['17-Week Rolling Avg', `${wtdStatus.metrics.rollingAvg.toFixed(1)}h`]] : []),
@@ -1188,6 +1258,64 @@ const FeasibilityCalculator = () => {
                   </div>
                 </div>
 
+                {/* Weekly Availability Card */}
+                {overtimeMetrics && Object.keys(requiredPerDay).length > 0 && (
+                  <Card className="mt-4 border-muted bg-secondary/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Weekly Availability</CardTitle>
+                      <CardDescription className="text-sm">
+                        Hours balance per week
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Required h/week:</span>
+                        <span className="font-medium">{overtimeMetrics.reqWeek.toFixed(1)} h</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Available h/week:</span>
+                        <span className="font-medium">{overtimeMetrics.availWeek.toFixed(1)} h</span>
+                      </div>
+                      {overtimeMetrics.overtime > 0 ? (
+                        <div className="flex justify-between text-sm p-2 bg-red-50 dark:bg-red-950/20 rounded">
+                          <span className="text-red-700 dark:text-red-400 font-medium">Overtime h/week:</span>
+                          <span className="font-bold text-red-700 dark:text-red-400">
+                            {overtimeMetrics.overtime.toFixed(1)} h
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-sm p-2 bg-green-50 dark:bg-green-950/20 rounded">
+                          <span className="text-green-700 dark:text-green-400 font-medium">Slack h/week:</span>
+                          <span className="font-bold text-green-700 dark:text-green-400">
+                            {overtimeMetrics.slack.toFixed(1)} h
+                          </span>
+                        </div>
+                      )}
+                      <div className="pt-2 border-t space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">FTE required:</span>
+                          <span className="font-medium">{overtimeMetrics.reqFTE.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">FTE available:</span>
+                          <span className="font-medium">{overtimeMetrics.haveFTE.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">FTE gap:</span>
+                          <span className={cn(
+                            "font-bold",
+                            overtimeMetrics.gapFTE > 0 
+                              ? "text-red-600 dark:text-red-400" 
+                              : "text-green-600 dark:text-green-400"
+                          )}>
+                            {overtimeMetrics.gapFTE > 0 ? '+' : ''}{overtimeMetrics.gapFTE.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Pattern Workload Distribution */}
                 <div className="mt-4">
                   <UtilisationChart
@@ -1498,6 +1626,26 @@ const FeasibilityCalculator = () => {
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
+                      
+                      {/* 17-Week Overtime Totals */}
+                      {overtimeMetrics && Object.keys(requiredPerDay).length > 0 && (
+                        <div className="pt-3 border-t space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">17-week required total:</span>
+                            <span className="font-medium">{overtimeMetrics.req17.toFixed(1)} h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">17-week available total:</span>
+                            <span className="font-medium">{overtimeMetrics.avail17.toFixed(1)} h</span>
+                          </div>
+                          <div className="flex justify-between p-2 bg-amber-50 dark:bg-amber-950/20 rounded">
+                            <span className="text-amber-700 dark:text-amber-400 font-medium">17-week overtime:</span>
+                            <span className="font-bold text-amber-700 dark:text-amber-400">
+                              {overtimeMetrics.overtime17.toFixed(1)} h
+                            </span>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Recommendations for fixing violations */}
                       {recommendations.length > 0 && wtdStatus && !wtdStatus.success && (

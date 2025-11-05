@@ -64,6 +64,53 @@ export interface FeasibilityResult {
   warnings: string[];
 }
 
+/**
+ * Calculate total required hours per week across all shifts
+ */
+export function requiredHoursPerWeek(requiredPerDay: Record<string, number>, shiftLength: number): number {
+  const perDay = Object.values(requiredPerDay || {}).reduce((a, b) => a + (b || 0), 0);
+  return perDay * 7 * shiftLength; // team-hours/week
+}
+
+/**
+ * Calculate total available hours per week from staff
+ */
+export function availableHoursPerWeek(staffCount: number, standardContractHours: number): number {
+  return Math.max(0, staffCount) * Math.max(0, standardContractHours);
+}
+
+/**
+ * Calculate overtime and slack hours per week
+ */
+export function overtimeSlack(requiredHrsWk: number, availableHrsWk: number): { overtime: number; slack: number } {
+  const overtime = Math.max(0, requiredHrsWk - availableHrsWk);
+  const slack = Math.max(0, availableHrsWk - requiredHrsWk);
+  return { overtime, slack };
+}
+
+/**
+ * Calculate FTE gap
+ */
+export function fteGap(requiredHrsWk: number, standardContractHours: number, staffCount: number): { reqFTE: number; haveFTE: number; gapFTE: number } {
+  const reqFTE = requiredHrsWk / Math.max(1, standardContractHours);
+  const haveFTE = staffCount;
+  return { reqFTE, haveFTE, gapFTE: reqFTE - haveFTE };
+}
+
+/**
+ * Calculate total required hours over 17 weeks
+ * Handles non-uniform cycles by using weekly baseline
+ */
+export function requiredHoursOver17Weeks(
+  patternSeq: string[],
+  cycleLength: number,
+  shiftLength: number,
+  requiredPerDay: Record<string, number>
+): number {
+  const weekly = requiredHoursPerWeek(requiredPerDay, shiftLength);
+  return weekly * 17;
+}
+
 export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult {
   console.log('🧮 Calculating feasibility:', input);
   
