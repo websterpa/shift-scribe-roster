@@ -9,6 +9,9 @@ interface ExportData {
   activeDays: number;
   restDays: number;
   bufferPercent: number;
+  standardContractHours: number;
+  availableHoursPerWeek: number;
+  overtimeGapPerWeek: number;
   wtd: {
     restOk: boolean;
     avgOk: boolean;
@@ -53,6 +56,12 @@ export async function exportToPDF(data: ExportData, chartElement: HTMLElement | 
   pdf.text(`Current Staff Count: ${data.staffCount}`, 20, y);
   y += 7;
   pdf.text(`Buffer Percentage: ${data.bufferPercent}%`, 20, y);
+  y += 7;
+  pdf.text(`Standard Contract Hours: ${data.standardContractHours} h/week`, 20, y);
+  y += 7;
+  pdf.text(`Available Hours/Week: ${data.availableHoursPerWeek.toFixed(1)} h`, 20, y);
+  y += 7;
+  pdf.text(`Overtime Gap/Week: ${data.overtimeGapPerWeek.toFixed(1)} h`, 20, y);
   y += 10;
   
   // WTD Compliance
@@ -118,6 +127,9 @@ export function exportToCSV(data: ExportData) {
     ['Required Staff', data.requiredStaff.toString()],
     ['Current Staff Count', data.staffCount.toString()],
     ['Buffer Percentage', `${data.bufferPercent}%`],
+    ['Standard Contract Hours (h/week)', data.standardContractHours.toString()],
+    ['Available Hours/Week', data.availableHoursPerWeek.toFixed(1)],
+    ['Overtime Gap/Week', data.overtimeGapPerWeek.toFixed(1)],
     ['', ''],
     ['WTD Compliance', ''],
     ['11h Rest Period', data.wtd.restOk ? 'Compliant' : 'Non-Compliant'],

@@ -73,6 +73,7 @@ const FeasibilityCalculator = () => {
   const [requiredShiftsPerDay, setRequiredShiftsPerDay] = useState<number>(3);
   const [bufferPct, setBufferPct] = useState<number>(10);
   const [staffCount, setStaffCount] = useState<string>('');
+  const [standardContractHours, setStandardContractHours] = useState<number>(37.5);
   const wtdRules = DEFAULT_WTD_RULES;
 
   // Result state
@@ -175,7 +176,8 @@ const FeasibilityCalculator = () => {
         total_breaches: wtdStatus?.metrics.breachWeeks.length ?? 0,
         avg_rolling: wtdStatus?.metrics.rollingAvg ?? null,
         max_rolling: wtdStatus?.metrics.maxRolling ?? null,
-        recommendations
+        recommendations,
+        standard_contract_hours: standardContractHours
       };
 
       await saveScenario(scenarioData);
@@ -253,6 +255,7 @@ const FeasibilityCalculator = () => {
         requiredShiftsPerDay,
         bufferPercent: bufferPct,
         currentStaffCount: staffCount ? Number(staffCount) : undefined,
+        standardContractHours,
         wtdRules
       };
 
@@ -360,6 +363,7 @@ const FeasibilityCalculator = () => {
       bufferPct,
       staffCount: staffCount ? Number(staffCount) : null,
       requiredStaff: result.requiredStaff,
+      standardContractHours,
       timestamp: new Date().toISOString(),
       system,
       requiredPerDay
@@ -500,19 +504,22 @@ const FeasibilityCalculator = () => {
       pdf.text(`Weekly Demand: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 240);
       pdf.text(`Required Staff: ${result.requiredStaff.toFixed(1)}`, 40, 260);
       pdf.text(`Utilisation: ${result.utilizationPct.toFixed(1)}%`, 40, 280);
+      pdf.text(`Standard Contract Hours: ${result.standardContractHours}h/week`, 40, 300);
+      pdf.text(`Available Hours/Week: ${result.availableHoursPerWeek.toFixed(1)}h`, 40, 320);
+      pdf.text(`Overtime Gap/Week: ${result.overtimeGapPerWeek.toFixed(1)}h`, 40, 340);
       
       if (result.surplus !== null) {
-        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 300);
+        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 360);
       }
       
-      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 320);
+      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 380);
       
       // Capture chart if available
       const chartEl = document.querySelector('.recharts-wrapper') as HTMLElement;
       if (chartEl && staffCount && Number(staffCount) > 0) {
         const canvas = await html2canvas(chartEl, { scale: 2, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
-        pdf.addImage(imgData, 'PNG', 40, 350, 500, 250);
+        pdf.addImage(imgData, 'PNG', 40, 410, 500, 250);
       }
       
       // Footer
@@ -553,6 +560,9 @@ const FeasibilityCalculator = () => {
         ['Weekly Demand', `${result.weeklyHoursRequired.toFixed(1)}h`],
         ['Required Staff', result.requiredStaff.toString()],
         ['Utilization', `${result.utilizationPct.toFixed(1)}%`],
+        ['Standard Contract Hours', `${result.standardContractHours}h/week`],
+        ['Available Hours/Week', `${result.availableHoursPerWeek.toFixed(1)}h`],
+        ['Overtime Gap/Week', `${result.overtimeGapPerWeek.toFixed(1)}h`],
         ...(result.surplus !== null ? [['Surplus/Deficit', result.surplus > 0 ? `+${result.surplus.toFixed(1)}` : result.surplus.toFixed(1)]] : []),
         ['WTD Compliant', wtdStatus?.success ? 'Yes' : 'No'],
         ...(wtdStatus ? [['17-Week Rolling Avg', `${wtdStatus.metrics.rollingAvg.toFixed(1)}h`]] : []),
@@ -619,6 +629,9 @@ const FeasibilityCalculator = () => {
           requiredStaff: result.requiredStaff,
           utilizationPct: result.utilizationPct,
           surplus: result.surplus,
+          standardContractHours: result.standardContractHours,
+          availableHoursPerWeek: result.availableHoursPerWeek,
+          overtimeGapPerWeek: result.overtimeGapPerWeek,
           isWTDCompliant: wtdStatus?.success ?? false,
           wtdMetrics: wtdStatus ? {
             rollingAvg: wtdStatus.metrics.rollingAvg,
@@ -821,6 +834,21 @@ const FeasibilityCalculator = () => {
               <p className="text-xs text-muted-foreground">Calculate surplus or deficit</p>
             </div>
 
+            {/* Standard Contract Hours */}
+            <div className="space-y-2">
+              <Label htmlFor="standardContractHours">Standard Contract Hours (per week)</Label>
+              <Input
+                id="standardContractHours"
+                type="number"
+                min="0"
+                max="60"
+                step="0.5"
+                value={standardContractHours}
+                onChange={(e) => setStandardContractHours(Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">Site-level standard hours for all staff (operational capacity baseline)</p>
+            </div>
+
             {/* Per-Shift Staffing Requirements */}
             <div className="space-y-4">
               <div>
@@ -955,6 +983,28 @@ const FeasibilityCalculator = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Weekly Hours:</span>
                     <span className="font-medium">{result.weeklyHoursRequired.toFixed(1)}h</span>
+                  </div>
+                </div>
+
+                {/* Operational Capacity */}
+                <div className="space-y-3 pt-4 border-t">
+                  <p className="text-sm font-semibold">Operational Capacity</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Standard Contract Hours/Week:</span>
+                    <span className="font-medium">{result.standardContractHours}h</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Available Hours/Week:</span>
+                    <span className="font-medium">{result.availableHoursPerWeek.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Overtime Gap/Week:</span>
+                    <span className={cn(
+                      "font-medium",
+                      result.overtimeGapPerWeek > 0 ? "text-amber-600" : "text-emerald-600"
+                    )}>
+                      {result.overtimeGapPerWeek.toFixed(1)}h
+                    </span>
                   </div>
                 </div>
 

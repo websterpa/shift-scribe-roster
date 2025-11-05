@@ -501,6 +501,7 @@ export type Database = {
           shift_type: string
           site_start_time: string | null
           staffing_requirements: Json | null
+          standard_contract_hours: number
           start_date: string
           tenant_id: string
           timezone: string | null
@@ -521,6 +522,7 @@ export type Database = {
           shift_type: string
           site_start_time?: string | null
           staffing_requirements?: Json | null
+          standard_contract_hours?: number
           start_date: string
           tenant_id?: string
           timezone?: string | null
@@ -541,6 +543,7 @@ export type Database = {
           shift_type?: string
           site_start_time?: string | null
           staffing_requirements?: Json | null
+          standard_contract_hours?: number
           start_date?: string
           tenant_id?: string
           timezone?: string | null

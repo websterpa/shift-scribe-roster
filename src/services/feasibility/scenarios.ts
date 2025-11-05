@@ -23,6 +23,7 @@ export interface FeasibilityScenario {
   total_breaches: number;
   avg_rolling: number | null;
   max_rolling: number | null;
+  standard_contract_hours?: number;
   recommendations: AdjustmentRecommendation[];
   created_at?: string;
   updated_at?: string;
@@ -43,6 +44,7 @@ export interface SaveScenarioInput {
   total_breaches: number;
   avg_rolling: number | null;
   max_rolling: number | null;
+  standard_contract_hours?: number;
   recommendations: AdjustmentRecommendation[];
 }
 

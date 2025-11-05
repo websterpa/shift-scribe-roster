@@ -26,6 +26,7 @@ export interface FeasibilityInput {
   requiredShiftsPerDay: number;
   bufferPercent?: number;
   currentStaffCount?: number;
+  standardContractHours?: number;
   wtdRules?: WTDRules;
 }
 
@@ -41,6 +42,9 @@ export interface FeasibilityResult {
   requiredStaff: number;
   utilizationPct: number;
   surplus: number | null;
+  standardContractHours: number;
+  availableHoursPerWeek: number;
+  overtimeGapPerWeek: number;
   
   // WTD Compliance
   isWTDCompliant: boolean;
@@ -67,6 +71,7 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
     requiredShiftsPerDay,
     bufferPercent = 10,
     currentStaffCount,
+    standardContractHours = 37.5,
     wtdRules = DEFAULT_WTD_RULES
   } = input;
   
@@ -88,6 +93,9 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
       requiredStaff: 0,
       utilizationPct: 0,
       surplus: null,
+      standardContractHours,
+      availableHoursPerWeek: 0,
+      overtimeGapPerWeek: 0,
       isWTDCompliant: false,
       wtdViolations: ['Pattern has no work days'],
       wtdChecks: {
@@ -117,6 +125,10 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
   
   // Calculate surplus/deficit
   const surplus = currentStaffCount ? currentStaffCount - requiredStaff : null;
+  
+  // Calculate operational capacity vs requirement
+  const availableHoursPerWeek = standardContractHours * requiredStaff;
+  const overtimeGapPerWeek = Math.max(0, weeklyHoursRequired - availableHoursPerWeek);
   
   // WTD Validation - Extend sequence to cover 17 weeks for proper validation
   const extendedSequence = generateExtendedSequence(sequence, wtdRules.reference_period_weeks);
@@ -170,6 +182,9 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
     requiredStaff,
     utilizationPct,
     surplus,
+    standardContractHours,
+    availableHoursPerWeek,
+    overtimeGapPerWeek,
     isWTDCompliant: wtdValidation.valid,
     wtdViolations: wtdValidation.violations,
     wtdChecks,
