@@ -161,6 +161,10 @@ const FeasibilityCalculator = () => {
 
     setIsSaving(true);
     try {
+      // Calculate total from per-shift requirements
+      const totalRequiredPerDay = Object.values(requiredPerDay).reduce((sum, val) => sum + (val || 0), 0);
+      const effectiveRequiredShiftsPerDay = totalRequiredPerDay > 0 ? totalRequiredPerDay : requiredShiftsPerDay;
+      
       const scenarioData: SaveScenarioInput = {
         name,
         pattern_id: selectedPattern.id,
@@ -168,7 +172,7 @@ const FeasibilityCalculator = () => {
         staff_count: staffCount ? Number(staffCount) : null,
         shift_length: shiftLengthHours,
         buffer_percent: bufferPct,
-        required_shifts_per_day: requiredShiftsPerDay,
+        required_shifts_per_day: effectiveRequiredShiftsPerDay, // Save computed total, not legacy field
         avg_weekly_hours: result.hoursPerStaffPerWeek,
         required_staff: result.requiredStaff,
         utilization_pct: result.utilizationPct,
@@ -210,9 +214,39 @@ const FeasibilityCalculator = () => {
     // Restore inputs
     setShiftLengthHours(Number(scenario.shift_length));
     setBufferPct(Number(scenario.buffer_percent));
-    setRequiredShiftsPerDay(scenario.required_shifts_per_day);
+    
+    // Migration: If legacy value exists but per-shift values are empty, migrate
+    const hasPerShiftData = scenario.standard_contract_hours !== undefined; // Use this as proxy for new format
+    const currentSystem: System = detectSystem(Number(scenario.shift_length));
+    
+    if (!hasPerShiftData && scenario.required_shifts_per_day) {
+      // Legacy scenario - migrate to per-shift format
+      const legacyTotal = scenario.required_shifts_per_day;
+      const shifts = activeShiftKeys(currentSystem);
+      const perShift = Math.floor(legacyTotal / shifts.length);
+      const remainder = legacyTotal % shifts.length;
+      
+      const migrated: Partial<Record<ShiftKey, number>> = {};
+      shifts.forEach((key, idx) => {
+        migrated[key] = perShift + (idx < remainder ? 1 : 0);
+      });
+      
+      setRequiredPerDay(migrated);
+      console.log('🔄 Migrated legacy scenario to per-shift format:', migrated);
+      
+      if (remainder > 0) {
+        toast.info(`Migrated legacy value ${legacyTotal} across ${shifts.join('/')} shifts (some rounding applied)`);
+      }
+    } else {
+      setRequiredShiftsPerDay(scenario.required_shifts_per_day);
+    }
+    
     if (scenario.staff_count) {
       setStaffCount(String(scenario.staff_count));
+    }
+    
+    if (scenario.standard_contract_hours) {
+      setStandardContractHours(scenario.standard_contract_hours);
     }
 
     toast.success(`Loaded scenario: ${scenario.name}`);
@@ -242,6 +276,12 @@ const FeasibilityCalculator = () => {
     }
 
     try {
+      // Calculate total required shifts per day from per-shift requirements
+      const totalRequiredPerDay = Object.values(requiredPerDay).reduce((sum, val) => sum + (val || 0), 0);
+      
+      // Use per-shift total if available, otherwise fall back to legacy value
+      const effectiveRequiredShiftsPerDay = totalRequiredPerDay > 0 ? totalRequiredPerDay : requiredShiftsPerDay;
+
       const input: FeasibilityInput = {
         pattern: {
           sequence: Array.isArray(selectedPattern.sequence) 
@@ -252,7 +292,7 @@ const FeasibilityCalculator = () => {
           teams_required: selectedPattern.teams_required
         },
         shiftLengthHours,
-        requiredShiftsPerDay,
+        requiredShiftsPerDay: effectiveRequiredShiftsPerDay,
         bufferPercent: bufferPct,
         currentStaffCount: staffCount ? Number(staffCount) : undefined,
         standardContractHours,
@@ -266,7 +306,7 @@ const FeasibilityCalculator = () => {
       console.error('❌ Error calculating feasibility:', error);
       toast.error('Error calculating feasibility');
     }
-  }, [selectedPattern, shiftLengthHours, requiredShiftsPerDay, wtdRules, bufferPct, staffCount]);
+  }, [selectedPattern, shiftLengthHours, requiredShiftsPerDay, wtdRules, bufferPct, staffCount, requiredPerDay, standardContractHours]);
 
   // Calculate WTD simulation data
   const wtdSimulationData = result && selectedPattern && showWTDSimulation
@@ -489,39 +529,47 @@ const FeasibilityCalculator = () => {
       pdf.setFontSize(12);
       pdf.text(`Pattern: ${selectedPattern.name}`, 40, 70);
       pdf.text(`Shift Length: ${shiftLengthHours}h`, 40, 90);
-      pdf.text(`Required Shifts Per Day: ${requiredShiftsPerDay}`, 40, 110);
-      pdf.text(`Buffer: ${bufferPct}%`, 40, 130);
+      
+      // Per-shift requirements
+      const totalPerDay = Object.values(requiredPerDay).reduce((sum, val) => sum + (val || 0), 0);
+      const perShiftText = Object.entries(requiredPerDay)
+        .filter(([_, val]) => val && val > 0)
+        .map(([key, val]) => `${key}:${val}`)
+        .join(', ');
+      pdf.text(`Per-Shift Required: ${perShiftText || 'Not set'}`, 40, 110);
+      pdf.text(`Total Required/Day: ${totalPerDay || requiredShiftsPerDay}`, 40, 130);
+      pdf.text(`Buffer: ${bufferPct}%`, 40, 150);
       if (staffCount) {
-        pdf.text(`Current Staff: ${staffCount}`, 40, 150);
+        pdf.text(`Current Staff: ${staffCount}`, 40, 170);
       }
       
       // Calculations
       pdf.setFontSize(14);
-      pdf.text('Calculated Results:', 40, 180);
+      pdf.text('Calculated Results:', 40, 200);
       pdf.setFontSize(12);
-      pdf.text(`Work Ratio: ${(result.workRatio * 100).toFixed(1)}%`, 40, 200);
-      pdf.text(`Avg Weekly Hours/Staff: ${result.hoursPerStaffPerWeek.toFixed(1)}h`, 40, 220);
-      pdf.text(`Weekly Demand: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 240);
-      pdf.text(`Required Staff: ${result.requiredStaff.toFixed(1)}`, 40, 260);
-      pdf.text(`Utilisation: ${result.utilizationPct.toFixed(1)}%`, 40, 280);
-      pdf.text(`Standard Contract Hours: ${result.standardContractHours}h/week`, 40, 300);
-      pdf.text(`Available Hours/Week: ${result.availableHoursPerWeek.toFixed(1)}h`, 40, 320);
-      pdf.text(`Overtime Gap/Week: ${result.overtimeGapPerWeek.toFixed(1)}h`, 40, 340);
-      pdf.text(`FTE Required: ${result.fteRequired.toFixed(2)}`, 40, 360);
-      pdf.text(`FTE Available: ${result.fteAvailable.toFixed(2)}`, 40, 380);
+      pdf.text(`Work Ratio: ${(result.workRatio * 100).toFixed(1)}%`, 40, 220);
+      pdf.text(`Avg Weekly Hours/Staff: ${result.hoursPerStaffPerWeek.toFixed(1)}h`, 40, 240);
+      pdf.text(`Weekly Demand: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 260);
+      pdf.text(`Required Staff: ${result.requiredStaff.toFixed(1)}`, 40, 280);
+      pdf.text(`Utilisation: ${result.utilizationPct.toFixed(1)}%`, 40, 300);
+      pdf.text(`Standard Contract Hours: ${result.standardContractHours}h/week`, 40, 320);
+      pdf.text(`Available Hours/Week: ${result.availableHoursPerWeek.toFixed(1)}h`, 40, 340);
+      pdf.text(`Overtime Gap/Week: ${result.overtimeGapPerWeek.toFixed(1)}h`, 40, 360);
+      pdf.text(`FTE Required: ${result.fteRequired.toFixed(2)}`, 40, 380);
+      pdf.text(`FTE Available: ${result.fteAvailable.toFixed(2)}`, 40, 400);
       
       if (result.surplus !== null) {
-        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 400);
+        pdf.text(`Surplus/Deficit: ${result.surplus > 0 ? '+' : ''}${result.surplus.toFixed(1)}`, 40, 420);
       }
       
-      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 420);
+      pdf.text(`WTD Compliant: ${result.isWTDCompliant ? 'Yes' : 'No'}`, 40, 440);
       
       // Capture chart if available
       const chartEl = document.querySelector('.recharts-wrapper') as HTMLElement;
       if (chartEl && staffCount && Number(staffCount) > 0) {
         const canvas = await html2canvas(chartEl, { scale: 2, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
-        pdf.addImage(imgData, 'PNG', 40, 450, 500, 250);
+        pdf.addImage(imgData, 'PNG', 40, 470, 500, 250);
       }
       
       // Footer
@@ -543,6 +591,11 @@ const FeasibilityCalculator = () => {
     if (!result || !selectedPattern) return;
 
     try {
+      const totalPerDay = Object.values(requiredPerDay).reduce((sum, val) => sum + (val || 0), 0);
+      const perShiftRows = Object.entries(requiredPerDay)
+        .filter(([_, val]) => val && val > 0)
+        .map(([key, val]) => [`  ${key} Shift Required/Day`, val.toString()]);
+      
       const rows = [
         ['Shift Scribe – Feasibility Report'],
         ['Generated', new Date().toLocaleString()],
@@ -552,7 +605,8 @@ const FeasibilityCalculator = () => {
         ['System', selectedPattern.system],
         ['Cycle Length (weeks)', selectedPattern.cycle_length.toString()],
         ['Shift Length (hours)', shiftLengthHours.toString()],
-        ['Required Shifts Per Day', requiredShiftsPerDay.toString()],
+        ...perShiftRows,
+        ['Total Required Per Day', (totalPerDay || requiredShiftsPerDay).toString()],
         ['Buffer %', bufferPct.toString()],
         ...(staffCount ? [['Current Staff Count', staffCount]] : []),
         [''],
@@ -621,9 +675,11 @@ const FeasibilityCalculator = () => {
             system: selectedPattern.system
           },
           shiftLengthHours,
-          requiredShiftsPerDay,
+          perShiftRequirements: requiredPerDay,
+          totalRequiredPerDay: Object.values(requiredPerDay).reduce((sum, val) => sum + (val || 0), 0),
           bufferPct,
           staffCount: staffCount ? Number(staffCount) : null,
+          standardContractHours,
           wtdRules
         },
         results: {
@@ -891,19 +947,22 @@ const FeasibilityCalculator = () => {
               ))}
             </div>
 
-            {/* Legacy Required Shifts Per Day (kept for backward compatibility) */}
-            <div className="space-y-2">
-              <Label htmlFor="reqShifts">Required Shifts Per Day (legacy)</Label>
-              <Input
-                id="reqShifts"
-                type="number"
-                min="1"
-                max="10"
-                value={requiredShiftsPerDay}
-                onChange={(e) => setRequiredShiftsPerDay(Number(e.target.value))}
-              />
-              <p className="text-xs text-muted-foreground">Total staff needed per shift period</p>
-            </div>
+            {/* @deprecated: Legacy Required Shifts Per Day - superseded by per-shift requirements */}
+            {process.env.NODE_ENV === 'development' && false && (
+              <div className="space-y-2 opacity-50">
+                <Label htmlFor="reqShifts">Required Shifts Per Day (legacy - deprecated)</Label>
+                <Input
+                  id="reqShifts"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={requiredShiftsPerDay}
+                  onChange={(e) => setRequiredShiftsPerDay(Number(e.target.value))}
+                  disabled
+                />
+                <p className="text-xs text-muted-foreground">This field is deprecated. Use per-shift requirements above.</p>
+              </div>
+            )}
 
             {/* WTD Rules Display */}
             <div className="space-y-2 pt-4 border-t">
