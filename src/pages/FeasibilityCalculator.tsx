@@ -33,6 +33,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { computeWTDStatus, type WTDStatus } from '@/services/feasibility/computeWTDStatus';
 import { firstDateForCycleIndex } from '@/lib/cycleMapping';
 import { format } from 'date-fns';
+import { 
+  detectSystem, 
+  activeShiftKeys, 
+  countShiftsInCycle, 
+  weeklyRequired, 
+  calculateCoverage,
+  type System,
+  type ShiftKey 
+} from '@/services/feasibility/staffingBreakdown';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -84,6 +93,9 @@ const FeasibilityCalculator = () => {
   
   // Unified WTD status
   const [wtdStatus, setWtdStatus] = useState<WTDStatus | null>(null);
+  
+  // Per-shift staffing requirements
+  const [requiredPerDay, setRequiredPerDay] = useState<Partial<Record<ShiftKey, number>>>({});
 
   // Load saved scenarios on mount
   useEffect(() => {
@@ -118,6 +130,23 @@ const FeasibilityCalculator = () => {
   }, []);
 
   const selectedPattern = patterns?.find(p => p.id === selectedPatternId);
+  
+  // Detect shift system
+  const system: System = detectSystem(shiftLengthHours);
+  
+  // Clear irrelevant shift keys when system changes
+  useEffect(() => {
+    const keys = activeShiftKeys(system);
+    setRequiredPerDay(prev => {
+      const updated: Partial<Record<ShiftKey, number>> = {};
+      keys.forEach(k => {
+        if (prev[k] !== undefined) {
+          updated[k] = prev[k];
+        }
+      });
+      return updated;
+    });
+  }, [system]);
 
   // Save current scenario
   const handleSaveScenario = async () => {
@@ -331,7 +360,9 @@ const FeasibilityCalculator = () => {
       bufferPct,
       staffCount: staffCount ? Number(staffCount) : null,
       requiredStaff: result.requiredStaff,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      system,
+      requiredPerDay
     };
 
     localStorage.setItem('feasibilityConfig', JSON.stringify(feasibilityConfig));
@@ -790,9 +821,43 @@ const FeasibilityCalculator = () => {
               <p className="text-xs text-muted-foreground">Calculate surplus or deficit</p>
             </div>
 
-            {/* Required Shifts Per Day */}
+            {/* Per-Shift Staffing Requirements */}
+            <div className="space-y-4">
+              <div>
+                <Label className="text-base font-semibold">Per-Shift Staffing</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {system === '12h' ? '12-hour system uses D/N shifts' : '8-hour system uses E/L/N shifts'}
+                </p>
+              </div>
+              
+              {activeShiftKeys(system).map(shiftKey => (
+                <div key={shiftKey} className="space-y-2">
+                  <Label htmlFor={`shift-${shiftKey}`}>
+                    {shiftKey === 'E' ? 'Early' : shiftKey === 'L' ? 'Late' : shiftKey === 'N' ? 'Night' : 'Day'} 
+                    {' '}({shiftKey}) - Required/Day
+                  </Label>
+                  <Input
+                    id={`shift-${shiftKey}`}
+                    type="number"
+                    min="0"
+                    max="50"
+                    placeholder="0"
+                    value={requiredPerDay[shiftKey] ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? undefined : Number(e.target.value);
+                      setRequiredPerDay(prev => ({
+                        ...prev,
+                        [shiftKey]: val
+                      }));
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Legacy Required Shifts Per Day (kept for backward compatibility) */}
             <div className="space-y-2">
-              <Label htmlFor="reqShifts">Required Shifts Per Day</Label>
+              <Label htmlFor="reqShifts">Required Shifts Per Day (legacy)</Label>
               <Input
                 id="reqShifts"
                 type="number"
@@ -922,6 +987,114 @@ const FeasibilityCalculator = () => {
                     description="Workload distribution across the pattern cycle"
                   />
                 </div>
+
+                {/* Per-Shift Staffing Breakdown */}
+                {selectedPattern && Object.keys(requiredPerDay).length > 0 && (
+                  <Card className="mt-4 border-muted">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Per-Shift Staffing Breakdown</CardTitle>
+                      <CardDescription className="text-sm">
+                        {system === '12h' ? '12-hour system (D/N shifts)' : '8-hour system (E/L/N shifts)'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 px-2 font-semibold">Shift</th>
+                              <th className="text-right py-2 px-2 font-semibold">Req/Day</th>
+                              <th className="text-right py-2 px-2 font-semibold">Req/Week</th>
+                              {selectedPattern.sequence && (
+                                <>
+                                  <th className="text-right py-2 px-2 font-semibold">In Pattern</th>
+                                  {staffCount && Number(staffCount) > 0 && (
+                                    <th className="text-right py-2 px-2 font-semibold">Coverage</th>
+                                  )}
+                                </>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeShiftKeys(system).map(shiftKey => {
+                              const reqPerDay = requiredPerDay[shiftKey] || 0;
+                              const weeklyReq = weeklyRequired(requiredPerDay, system, 7);
+                              const cycleCounts = countShiftsInCycle(
+                                Array.isArray(selectedPattern.sequence) 
+                                  ? (selectedPattern.sequence as string[])
+                                  : [],
+                                system
+                              );
+                              
+                              let coverage = 0;
+                              if (staffCount && Number(staffCount) > 0 && selectedPattern.cycle_length) {
+                                const coverageMap = calculateCoverage(
+                                  cycleCounts,
+                                  weeklyReq,
+                                  selectedPattern.cycle_length,
+                                  Number(staffCount)
+                                );
+                                coverage = coverageMap[shiftKey];
+                              }
+                              
+                              const shiftLabel = 
+                                shiftKey === 'E' ? 'Early' : 
+                                shiftKey === 'L' ? 'Late' : 
+                                shiftKey === 'N' ? 'Night' : 
+                                'Day';
+                              
+                              return (
+                                <tr key={shiftKey} className="border-b last:border-0">
+                                  <td className="py-2 px-2 font-medium">
+                                    {shiftLabel} ({shiftKey})
+                                  </td>
+                                  <td className="text-right py-2 px-2">
+                                    {reqPerDay || '-'}
+                                  </td>
+                                  <td className="text-right py-2 px-2">
+                                    {weeklyReq[shiftKey] || '-'}
+                                  </td>
+                                  {selectedPattern.sequence && (
+                                    <>
+                                      <td className="text-right py-2 px-2">
+                                        {cycleCounts[shiftKey] || 0}
+                                      </td>
+                                      {staffCount && Number(staffCount) > 0 && (
+                                        <td className="text-right py-2 px-2">
+                                          <span className={cn(
+                                            "font-semibold",
+                                            coverage >= 100 ? "text-emerald-600" :
+                                            coverage >= 80 ? "text-amber-600" :
+                                            "text-red-600"
+                                          )}>
+                                            {coverage.toFixed(0)}%
+                                          </span>
+                                        </td>
+                                      )}
+                                    </>
+                                  )}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {staffCount && Number(staffCount) > 0 && (
+                        <div className="mt-4 pt-3 border-t text-xs text-muted-foreground">
+                          <p>
+                            Coverage = (shifts provided per week ÷ shifts required per week) × 100%
+                          </p>
+                          <p className="mt-1">
+                            <span className="text-emerald-600 font-semibold">≥100%</span> = adequate,{' '}
+                            <span className="text-amber-600 font-semibold">80-99%</span> = understaffed,{' '}
+                            <span className="text-red-600 font-semibold">&lt;80%</span> = critical
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Unified WTD Status Banner */}
                 {wtdStatus && (
