@@ -31,14 +31,14 @@ const Navigation = () => {
     <nav className="bg-gradient-to-r from-blue-50 via-purple-50 to-blue-50 shadow-lg border-b border-blue-100/50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-4">
-          {/* Desktop Navigation */}
-          <div className="hidden sm:block">
-            <div className="flex gap-2">
+          {/* Desktop Navigation - Horizontal scroll on small screens */}
+          <div className="hidden sm:block overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2 min-w-max">
               {visibleItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${
+                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${
                     isActive(item.path)
                       ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg transform scale-105`
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/60 hover:shadow-md hover:scale-105'
@@ -51,20 +51,20 @@ const Navigation = () => {
             </div>
           </div>
 
-          {/* Mobile Navigation Menu */}
-          <div className="sm:hidden">
-            <div className="space-y-1">
+          {/* Mobile Navigation Menu - Horizontal scroll */}
+          <div className="sm:hidden overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2 min-w-max pb-1">
               {visibleItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap shrink-0 transition-all duration-300 ${
                     isActive(item.path)
-                      ? `bg-gradient-to-r ${item.gradient} text-white`
+                      ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg`
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
                   }`}
                 >
-                  <item.icon className="w-4 h-4 mr-2 inline" />
+                  <item.icon className="w-4 h-4 mr-2" />
                   {item.label}
                 </Link>
               ))}
