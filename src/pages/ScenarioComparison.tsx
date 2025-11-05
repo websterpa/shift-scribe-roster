@@ -23,7 +23,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { simulateWTD, getWTDSimulationSummary } from '@/utils/feasibility/wtdSimulation';
 import { calculateFeasibility, type FeasibilityInput } from '@/services/feasibility/calculateFeasibility';
 import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
+import { pickBestScenario, type ScenarioEval } from '@/services/feasibility/recommendBest';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -71,6 +73,8 @@ const ScenarioComparison = () => {
     compare1?: EnrichedScenario;
     compare2?: EnrichedScenario;
   }>({});
+  
+  const [recommendedId, setRecommendedId] = useState<string | null>(null);
 
   // Load all scenarios
   useEffect(() => {
@@ -212,6 +216,64 @@ const ScenarioComparison = () => {
     };
   };
 
+  // Recommend best scenario
+  const handleRecommendBest = () => {
+    console.log('🎯 Recommending best scenario...');
+    
+    if (!enrichedScenarios.baseline) {
+      toast.error('Please select a baseline scenario first');
+      return;
+    }
+    
+    const candidates: ScenarioEval[] = [];
+    
+    if (enrichedScenarios.compare1?.computed?.simulationSummary) {
+      candidates.push({
+        id: enrichedScenarios.compare1.id,
+        name: enrichedScenarios.compare1.name,
+        staffCount: enrichedScenarios.compare1.staff_count ?? 0,
+        metrics: {
+          totalBreaches: enrichedScenarios.compare1.computed.simulationSummary.totalBreaches,
+          avgRolling: enrichedScenarios.compare1.computed.simulationSummary.avgRolling
+        }
+      });
+    }
+    
+    if (enrichedScenarios.compare2?.computed?.simulationSummary) {
+      candidates.push({
+        id: enrichedScenarios.compare2.id,
+        name: enrichedScenarios.compare2.name,
+        staffCount: enrichedScenarios.compare2.staff_count ?? 0,
+        metrics: {
+          totalBreaches: enrichedScenarios.compare2.computed.simulationSummary.totalBreaches,
+          avgRolling: enrichedScenarios.compare2.computed.simulationSummary.avgRolling
+        }
+      });
+    }
+    
+    if (candidates.length === 0) {
+      toast.error('Please select at least one comparison scenario');
+      return;
+    }
+    
+    const baselineEval: ScenarioEval = {
+      id: enrichedScenarios.baseline.id,
+      name: enrichedScenarios.baseline.name,
+      staffCount: enrichedScenarios.baseline.staff_count ?? 0,
+      metrics: {
+        totalBreaches: enrichedScenarios.baseline.computed?.simulationSummary?.totalBreaches ?? 0,
+        avgRolling: enrichedScenarios.baseline.computed?.simulationSummary?.avgRolling ?? 0
+      }
+    };
+    
+    const best = pickBestScenario(baselineEval, candidates);
+    
+    if (best) {
+      setRecommendedId(best.id);
+      toast.success(`Recommended: ${best.name}`);
+    }
+  };
+
   // Use baseline in roster setup
   const handleUseBaseline = () => {
     if (!enrichedScenarios.baseline) return;
@@ -239,7 +301,7 @@ const ScenarioComparison = () => {
       ['Scenario Comparison Export'],
       ['Generated', new Date().toLocaleString()],
       [''],
-      ['Scenario', 'Pattern', 'Staff Count', 'Shift Length', 'Buffer %', 'Weekly Hours/Staff', 'Required Staff', 'Total Breaches', 'Avg Rolling', 'WTD Compliant']
+      ['Scenario', 'Pattern', 'Staff Count', 'Shift Length', 'Buffer %', 'Weekly Hours/Staff', 'Required Staff', 'Total Breaches', 'Avg Rolling', 'WTD Compliant', 'Recommended']
     ];
 
     [enrichedScenarios.baseline, enrichedScenarios.compare1, enrichedScenarios.compare2]
@@ -256,7 +318,8 @@ const ScenarioComparison = () => {
           scenario.computed?.requiredStaff.toFixed(1) ?? 'N/A',
           String(scenario.computed?.simulationSummary?.totalBreaches ?? scenario.total_breaches),
           scenario.computed?.simulationSummary?.avgRolling?.toFixed(1) ?? scenario.avg_rolling?.toFixed(1) ?? 'N/A',
-          scenario.computed?.isWTDCompliant ? 'Yes' : 'No'
+          scenario.computed?.isWTDCompliant ? 'Yes' : 'No',
+          scenario.id === recommendedId ? 'Yes' : 'No'
         ]);
       });
 
@@ -291,7 +354,10 @@ const ScenarioComparison = () => {
           if (!scenario) return;
           
           pdf.setFontSize(12);
-          pdf.text(`Scenario ${idx + 1}: ${scenario.name}`, 14, y);
+          const scenarioTitle = scenario.id === recommendedId 
+            ? `Scenario ${idx + 1}: ${scenario.name} ⭐ RECOMMENDED`
+            : `Scenario ${idx + 1}: ${scenario.name}`;
+          pdf.text(scenarioTitle, 14, y);
           y += 6;
           
           pdf.setFontSize(10);
@@ -345,9 +411,21 @@ const ScenarioComparison = () => {
     }
 
     const { computed } = scenario;
+    const isRecommended = scenario.id === recommendedId;
 
     return (
-      <Card className={isBaseline ? 'border-primary' : ''}>
+      <Card className={cn(
+        'relative transition-all',
+        isBaseline && 'border-primary',
+        isRecommended && 'ring-2 ring-green-500 shadow-lg'
+      )}>
+        {isRecommended && (
+          <div className="absolute -top-2 -right-2 z-10">
+            <span className="rounded-full bg-green-600 text-white text-xs px-2 py-1 shadow-md font-medium">
+              ⭐ Recommended
+            </span>
+          </div>
+        )}
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             {label}
@@ -611,6 +689,15 @@ const ScenarioComparison = () => {
             
             <Button 
               variant="secondary" 
+              onClick={handleRecommendBest}
+              disabled={!enrichedScenarios.baseline || (!compareId1 && !compareId2)}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Recommend Best Scenario
+            </Button>
+            
+            <Button 
+              variant="secondary" 
               onClick={handleUseBaseline}
               disabled={!enrichedScenarios.baseline}
             >
@@ -628,6 +715,14 @@ const ScenarioComparison = () => {
               </Button>
             </div>
           </div>
+
+          {recommendedId && (
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg border">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Recommendation criteria (in order):</span> Fewest WTD breaches → Rolling avg ≤48h (or closest) → Minimal staff increase vs baseline.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
