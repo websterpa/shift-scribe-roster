@@ -30,6 +30,7 @@ import {
 import { diagnosePattern, type RestViolation } from '@/engine2/constraints/wtdDiagnostics';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { computeWTDStatus, type WTDStatus } from '@/services/feasibility/computeWTDStatus';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -78,6 +79,9 @@ const FeasibilityCalculator = () => {
 
   // Rest diagnostics state
   const [restViolations, setRestViolations] = useState<RestViolation[]>([]);
+  
+  // Unified WTD status
+  const [wtdStatus, setWtdStatus] = useState<WTDStatus | null>(null);
 
   // Load saved scenarios on mount
   useEffect(() => {
@@ -136,10 +140,10 @@ const FeasibilityCalculator = () => {
         avg_weekly_hours: result.hoursPerStaffPerWeek,
         required_staff: result.requiredStaff,
         utilization_pct: result.utilizationPct,
-        is_wtd_compliant: result.isWTDCompliant,
-        total_breaches: wtdSummary?.totalBreaches ?? 0,
-        avg_rolling: wtdSummary?.avgRolling ?? null,
-        max_rolling: wtdSummary?.maxRolling ?? null,
+        is_wtd_compliant: wtdStatus?.success ?? false,
+        total_breaches: wtdStatus?.metrics.breachWeeks.length ?? 0,
+        avg_rolling: wtdStatus?.metrics.rollingAvg ?? null,
+        max_rolling: wtdStatus?.metrics.maxRolling ?? null,
         recommendations
       };
 
@@ -248,13 +252,27 @@ const FeasibilityCalculator = () => {
     ? ((17 - nonCompliantWeeks) / 17 * 100).toFixed(1) 
     : '0';
 
-  // Update WTD summary and recommendations when simulation data changes
+  // Compute unified WTD status when simulation data or pattern changes
   useEffect(() => {
-    if (wtdSimulationData && wtdSimulationData.length > 0) {
+    if (wtdSimulationData && wtdSimulationData.length > 0 && selectedPattern) {
       const summary = getWTDSimulationSummary(wtdSimulationData);
       setWtdSummary(summary);
       
-      if (summary.totalBreaches > 0 && selectedPattern) {
+      // Compute unified WTD status
+      const status = computeWTDStatus({
+        pattern: {
+          sequence: Array.isArray(selectedPattern.sequence)
+            ? (selectedPattern.sequence as string[])
+            : []
+        },
+        shiftLength: shiftLengthHours,
+        simulation: wtdSimulationData,
+        wtdRules
+      });
+      setWtdStatus(status);
+      
+      // Generate recommendations if there are violations
+      if (!status.success && selectedPattern) {
         const recs = recommendAdjustments(
           selectedPattern,
           summary.totalBreaches,
@@ -267,11 +285,12 @@ const FeasibilityCalculator = () => {
       }
     } else {
       setWtdSummary(null);
+      setWtdStatus(null);
       setRecommendations([]);
     }
-  }, [wtdSimulationData, selectedPattern]);
+  }, [wtdSimulationData, selectedPattern, shiftLengthHours, wtdRules]);
 
-  // Diagnose rest violations when pattern or shift config changes
+  // Diagnose rest violations when pattern or shift config changes (for chip highlighting)
   useEffect(() => {
     if (!selectedPattern || !selectedPattern.sequence) {
       setRestViolations([]);
@@ -293,6 +312,11 @@ const FeasibilityCalculator = () => {
     
     console.log('🔬 Rest diagnostics:', diagnostics);
   }, [selectedPattern, shiftLengthHours]);
+  
+  // Clear stale WTD status when inputs change
+  useEffect(() => {
+    setWtdStatus(null);
+  }, [selectedPattern?.id, shiftLengthHours, bufferPct]);
 
   const handleSaveSetup = () => {
     if (!result || !selectedPattern) return;
@@ -445,7 +469,11 @@ const FeasibilityCalculator = () => {
         ['Required Staff', result.requiredStaff.toString()],
         ['Utilization', `${result.utilizationPct.toFixed(1)}%`],
         ...(result.surplus !== null ? [['Surplus/Deficit', result.surplus > 0 ? `+${result.surplus.toFixed(1)}` : result.surplus.toFixed(1)]] : []),
-        ['WTD Compliant', result.isWTDCompliant ? 'Yes' : 'No'],
+        ['WTD Compliant', wtdStatus?.success ? 'Yes' : 'No'],
+        ...(wtdStatus ? [['17-Week Rolling Avg', `${wtdStatus.metrics.rollingAvg.toFixed(1)}h`]] : []),
+        ...(wtdStatus && wtdStatus.metrics.breachWeeks.length > 0 
+          ? [['Weeks Exceeding Limit', wtdStatus.metrics.breachWeeks.length.toString()]] 
+          : []),
         [''],
         ['WTD Constraints'],
         ['Max Weekly Hours', `${wtdRules.max_weekly_hours}h`],
@@ -506,7 +534,13 @@ const FeasibilityCalculator = () => {
           requiredStaff: result.requiredStaff,
           utilizationPct: result.utilizationPct,
           surplus: result.surplus,
-          isWTDCompliant: result.isWTDCompliant,
+          isWTDCompliant: wtdStatus?.success ?? false,
+          wtdMetrics: wtdStatus ? {
+            rollingAvg: wtdStatus.metrics.rollingAvg,
+            maxRolling: wtdStatus.metrics.maxRolling,
+            breachWeeks: wtdStatus.metrics.breachWeeks,
+            violations: wtdStatus.messages
+          } : null,
           warnings: result.warnings
         }
       };
@@ -823,72 +857,63 @@ const FeasibilityCalculator = () => {
                   />
                 </div>
 
-                {/* WTD Compliance Status */}
-                <Card className="mt-4">
-                  <CardHeader>
-                    <CardTitle className="text-base">WTD Compliance Checks</CardTitle>
-                    <CardDescription>
-                      {result.isWTDCompliant 
-                        ? '✅ Pattern meets all WTD requirements' 
-                        : '⚠️ Pattern has WTD violations'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between py-2 border-b">
-                        <span>11h Daily Rest</span>
-                        <span className={result.wtdChecks.restPeriodsOk ? 'text-green-600' : 'text-red-600'}>
-                          {result.wtdChecks.restPeriodsOk ? '✅ OK' : '⚠️ Violation'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between py-2 border-b">
-                        <span>48h Weekly Average</span>
-                        <span className={result.wtdChecks.weeklyAverageOk ? 'text-green-600' : 'text-red-600'}>
-                          {result.wtdChecks.weeklyAverageOk ? '✅ OK' : '⚠️ Violation'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between py-2 border-b">
-                        <span>Consecutive Days Limit</span>
-                        <span className={result.wtdChecks.consecutiveDaysOk ? 'text-green-600' : 'text-red-600'}>
-                          {result.wtdChecks.consecutiveDaysOk ? '✅ OK' : '⚠️ Violation'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between py-2 border-b">
-                        <span>Consecutive Nights Limit</span>
-                        <span className={result.wtdChecks.consecutiveNightsOk ? 'text-green-600' : 'text-red-600'}>
-                          {result.wtdChecks.consecutiveNightsOk ? '✅ OK' : '⚠️ Violation'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between py-2">
-                        <span>Weekly Rest Period</span>
-                        <span className={result.wtdChecks.weeklyRestOk ? 'text-green-600' : 'text-red-600'}>
-                          {result.wtdChecks.weeklyRestOk ? '✅ OK' : '⚠️ Violation'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {result.wtdViolations.length > 0 && (
-                      <Alert className="mt-4">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription>
-                          <div className="text-sm space-y-1">
-                            <p className="font-medium">Violations detected:</p>
-                            <ul className="list-disc pl-4 space-y-1">
-                              {result.wtdViolations.slice(0, 3).map((v, i) => (
-                                <li key={i} className="text-xs">{v}</li>
-                              ))}
-                            </ul>
-                            {result.wtdViolations.length > 3 && (
-                              <p className="text-xs text-muted-foreground">
-                                +{result.wtdViolations.length - 3} more violations
-                              </p>
-                            )}
+                {/* Unified WTD Status Banner */}
+                {wtdStatus && (
+                  <div className="mt-4">
+                    {wtdStatus.level === 'success' && (
+                      <Alert className="bg-emerald-50 border-emerald-200">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <AlertDescription className="text-emerald-800">
+                          <p className="font-semibold">{wtdStatus.messages[0]}</p>
+                          <div className="text-xs mt-2 space-y-1">
+                            <p>• 17-week rolling average: {wtdStatus.metrics.rollingAvg.toFixed(1)}h/week (limit: 48h)</p>
+                            <p>• Daily rest (11h): ✓ Compliant</p>
+                            <p>• Weekly rest (24h): ✓ Compliant</p>
+                            <p>• Consecutive limits: ✓ Compliant</p>
                           </div>
                         </AlertDescription>
                       </Alert>
                     )}
-                  </CardContent>
-                </Card>
+                    
+                    {wtdStatus.level === 'warning' && (
+                      <Alert className="bg-amber-50 border-amber-200">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800">
+                          <p className="font-semibold">⚠ WTD Compliance Warnings</p>
+                          <ul className="text-xs mt-2 space-y-1 list-disc pl-4">
+                            {wtdStatus.messages.map((msg, i) => (
+                              <li key={i}>{msg}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {wtdStatus.level === 'error' && (
+                      <Alert variant="destructive" className="bg-red-50 border-red-200">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-800">
+                          <p className="font-semibold">🚫 WTD Compliance Violations</p>
+                          <ul className="text-xs mt-2 space-y-1 list-disc pl-4">
+                            {wtdStatus.messages.map((msg, i) => (
+                              <li key={i}>{msg}</li>
+                            ))}
+                          </ul>
+                          <div className="text-xs mt-3 pt-2 border-t border-red-300">
+                            <p className="font-medium">Key Metrics:</p>
+                            <div className="mt-1 space-y-0.5">
+                              <p>• 17-week rolling average: <strong>{wtdStatus.metrics.rollingAvg.toFixed(1)}h/week</strong> {wtdStatus.metrics.rollingAvg > 48 && '(exceeds 48h limit)'}</p>
+                              <p>• Peak rolling average: <strong>{wtdStatus.metrics.maxRolling.toFixed(1)}h/week</strong></p>
+                              {wtdStatus.metrics.breachWeeks.length > 0 && (
+                                <p>• Weeks exceeding limit: {wtdStatus.metrics.breachWeeks.length} week(s)</p>
+                              )}
+                            </div>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
 
                 {/* Utilisation Chart */}
                 {staffCount && Number(staffCount) > 0 && (
@@ -1005,100 +1030,56 @@ const FeasibilityCalculator = () => {
                         </ResponsiveContainer>
                       </div>
                       
-                      {nonCompliantWeeks > 0 && wtdSummary ? (
-                        <div className="space-y-3">
-                          <Alert variant="destructive" className="border-l-4 border-destructive">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertDescription>
-                              <div className="space-y-2">
-                                <p className="font-semibold">
-                                  ⚠ {wtdSummary.totalBreaches} week(s) exceed the 48-hour WTD limit
-                                </p>
-                                <div className="text-sm space-y-1">
-                                  <p>• Average rolling workload: <strong>{wtdSummary.avgRolling}h/week</strong></p>
-                                  <p>• Peak rolling workload: <strong>{wtdSummary.maxRolling}h/week</strong></p>
-                                  <p>• Breach weeks: {wtdSummary.breachWeeks.join(', ')}</p>
-                                </div>
-                              </div>
-                            </AlertDescription>
-                          </Alert>
-
-                          {recommendations.length > 0 && (
-                            <Card className="border-orange-200 bg-orange-50/50">
-                              <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-orange-600" />
-                                  Suggested Corrective Actions
-                                </CardTitle>
-                                <CardDescription className="text-sm">
-                                  Apply these adjustments to restore WTD compliance
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent className="space-y-2">
-                                {recommendations.map((rec, idx) => (
-                                  <div 
-                                    key={idx} 
-                                    className="flex items-start justify-between gap-3 p-3 bg-card rounded-lg border"
-                                  >
-                                    <div className="flex-1 space-y-1">
-                                      <p className="font-medium text-sm">{rec.action}</p>
-                                      <p className="text-xs text-muted-foreground">{rec.description}</p>
-                                      <div className="flex gap-2 items-center mt-1">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                          rec.priority === 'high' 
-                                            ? 'bg-red-100 text-red-700' 
-                                            : rec.priority === 'medium'
-                                            ? 'bg-orange-100 text-orange-700'
-                                            : 'bg-blue-100 text-blue-700'
-                                        }`}>
-                                          {rec.priority} priority
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="default"
-                                      size="sm"
-                                      onClick={() => applyRecommendation(rec)}
-                                      className="shrink-0"
-                                    >
-                                      Apply
-                                    </Button>
+                      {/* Recommendations for fixing violations */}
+                      {recommendations.length > 0 && wtdStatus && !wtdStatus.success && (
+                        <Card className="border-orange-200 bg-orange-50/50 mt-3">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-orange-600" />
+                              Suggested Corrective Actions
+                            </CardTitle>
+                            <CardDescription className="text-sm">
+                              Apply these adjustments to restore WTD compliance
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            {recommendations.map((rec, idx) => (
+                              <div 
+                                key={idx} 
+                                className="flex items-start justify-between gap-3 p-3 bg-card rounded-lg border"
+                              >
+                                <div className="flex-1 space-y-1">
+                                  <p className="font-medium text-sm">{rec.action}</p>
+                                  <p className="text-xs text-muted-foreground">{rec.description}</p>
+                                  <div className="flex gap-2 items-center mt-1">
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                      rec.priority === 'high' 
+                                        ? 'bg-red-100 text-red-700' 
+                                        : rec.priority === 'medium'
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {rec.priority} priority
+                                    </span>
                                   </div>
-                                ))}
-                              </CardContent>
-                            </Card>
-                          )}
-                        </div>
-                      ) : nonCompliantWeeks === 0 ? (
-                        <Alert className="bg-green-50 border-green-200">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <AlertDescription className="text-green-800">
-                            ✅ Fully compliant across 17 weeks.
-                          </AlertDescription>
-                        </Alert>
-                      ) : null}
+                                </div>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => applyRecommendation(rec)}
+                                  className="shrink-0"
+                                >
+                                  Apply
+                                </Button>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
                     </CardContent>
                   </Card>
                 )}
 
-                {/* WTD Compliance */}
-                <div className="pt-4 border-t">
-                  {result.isWTDCompliant ? (
-                    <Alert className="bg-green-50 border-green-200">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-800">
-                        Pattern is WTD compliant
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        Pattern exceeds WTD limits
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
 
                 {/* Warnings */}
                 {result.warnings.length > 0 && (
