@@ -24,6 +24,16 @@ export interface FeasibilityScenario {
   avg_rolling: number | null;
   max_rolling: number | null;
   standard_contract_hours?: number;
+  // Overtime/capacity metrics
+  contracted_hours?: number;
+  required_hours_week?: number;
+  available_hours_week?: number;
+  overtime_week?: number;
+  slack_week?: number;
+  reqFTE?: number;
+  haveFTE?: number;
+  gapFTE?: number;
+  overtime_17_weeks?: number;
   recommendations: AdjustmentRecommendation[];
   created_at?: string;
   updated_at?: string;
@@ -45,6 +55,16 @@ export interface SaveScenarioInput {
   avg_rolling: number | null;
   max_rolling: number | null;
   standard_contract_hours?: number;
+  // Overtime/capacity metrics
+  contracted_hours?: number;
+  required_hours_week?: number;
+  available_hours_week?: number;
+  overtime_week?: number;
+  slack_week?: number;
+  reqFTE?: number;
+  haveFTE?: number;
+  gapFTE?: number;
+  overtime_17_weeks?: number;
   recommendations: AdjustmentRecommendation[];
 }
 

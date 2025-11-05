@@ -21,7 +21,15 @@ import {
 import { loadScenarios, type FeasibilityScenario } from '@/services/feasibility/scenarios';
 import { supabase } from '@/integrations/supabase/client';
 import { simulateWTD, getWTDSimulationSummary } from '@/utils/feasibility/wtdSimulation';
-import { calculateFeasibility, type FeasibilityInput } from '@/services/feasibility/calculateFeasibility';
+import { 
+  calculateFeasibility, 
+  type FeasibilityInput,
+  requiredHoursPerWeek,
+  availableHoursPerWeek,
+  overtimeSlack,
+  fteGap,
+  requiredHoursOver17Weeks
+} from '@/services/feasibility/calculateFeasibility';
 import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
 import { pickBestScenario, type ScenarioEval } from '@/services/feasibility/recommendBest';
 import { toast } from 'sonner';
@@ -52,6 +60,16 @@ interface EnrichedScenario extends FeasibilityScenario {
     wtdChecks: any;
     simulation: any[];
     simulationSummary: any;
+    // Overtime/capacity metrics (computed on the fly if missing)
+    contracted_hours: number;
+    required_hours_week: number;
+    available_hours_week: number;
+    overtime_week: number;
+    slack_week: number;
+    reqFTE: number;
+    haveFTE: number;
+    gapFTE: number;
+    overtime_17_weeks: number;
   };
 }
 
@@ -136,6 +154,7 @@ const ScenarioComparison = () => {
           requiredShiftsPerDay: scenario.required_shifts_per_day,
           bufferPercent: Number(scenario.buffer_percent),
           currentStaffCount: scenario.staff_count ? Number(scenario.staff_count) : undefined,
+          standardContractHours: scenario.standard_contract_hours ?? 37.5,
           wtdRules: DEFAULT_WTD_RULES
         };
 
@@ -149,13 +168,34 @@ const ScenarioComparison = () => {
         
         const simulationSummary = getWTDSimulationSummary(simulation);
 
+        // Compute overtime/capacity metrics (fallback if not in saved scenario)
+        const contractedHours = scenario.contracted_hours ?? scenario.standard_contract_hours ?? 37.5;
+        const requiredHrsWeek = scenario.required_hours_week ?? feasibility.weeklyHoursRequired;
+        const availableHrsWeek = scenario.available_hours_week ?? feasibility.availableHoursPerWeek;
+        const overtimeWeek = scenario.overtime_week ?? feasibility.overtimeGapPerWeek;
+        const slackWeek = scenario.slack_week ?? Math.max(0, availableHrsWeek - requiredHrsWeek);
+        const reqFTE = scenario.reqFTE ?? feasibility.fteRequired;
+        const haveFTE = scenario.haveFTE ?? feasibility.fteAvailable;
+        const gapFTE = scenario.gapFTE ?? (reqFTE - haveFTE);
+        const overtime17Weeks = scenario.overtime_17_weeks ?? (overtimeWeek * 17);
+
         computed = {
           hoursPerStaffPerWeek: feasibility.hoursPerStaffPerWeek,
           requiredStaff: feasibility.requiredStaff,
           isWTDCompliant: feasibility.isWTDCompliant,
           wtdChecks: feasibility.wtdChecks,
           simulation,
-          simulationSummary
+          simulationSummary,
+          // Overtime/capacity metrics
+          contracted_hours: contractedHours,
+          required_hours_week: requiredHrsWeek,
+          available_hours_week: availableHrsWeek,
+          overtime_week: overtimeWeek,
+          slack_week: slackWeek,
+          reqFTE,
+          haveFTE,
+          gapFTE,
+          overtime_17_weeks: overtime17Weeks
         };
       } catch (error) {
         console.error('❌ Error computing feasibility:', error);
@@ -337,27 +377,37 @@ const ScenarioComparison = () => {
   // Export CSV
   const exportCSV = () => {
     const rows = [
-          ['Scenario Comparison Export'],
+      ['Scenario Comparison Export'],
       ['Generated', new Date().toLocaleString()],
       [''],
-      ['Scenario', 'Pattern', 'Staff Count', 'Shift Length', 'Buffer %', 'Weekly Hours/Staff', 'Required Staff', 'Total Breaches', 'Avg Rolling', 'WTD Compliant', 'Baseline', 'Recommended']
+      ['Scenario', 'Pattern', 'Staff Count', 'Shift Length', 'Buffer %', 'Contract h/w', 'Req h/w', 'Avail h/w', 'OT h/w', 'Slack h/w', 'Req FTE', 'Have FTE', 'Gap FTE', 'OT 17w h', 'Weekly Hours/Staff', 'Required Staff', 'Total Breaches', 'Avg Rolling', 'WTD Compliant', 'Baseline', 'Recommended']
     ];
 
     [enrichedScenarios.baseline, enrichedScenarios.compare1, enrichedScenarios.compare2]
       .filter(Boolean)
       .forEach(scenario => {
         if (!scenario) return;
+        const c = scenario.computed;
         rows.push([
           scenario.name,
           scenario.pattern_name,
           String(scenario.staff_count ?? 'N/A'),
           String(scenario.shift_length),
           String(scenario.buffer_percent),
-          scenario.computed?.hoursPerStaffPerWeek.toFixed(1) ?? 'N/A',
-          scenario.computed?.requiredStaff.toFixed(1) ?? 'N/A',
-          String(scenario.computed?.simulationSummary?.totalBreaches ?? scenario.total_breaches),
-          scenario.computed?.simulationSummary?.avgRolling?.toFixed(1) ?? scenario.avg_rolling?.toFixed(1) ?? 'N/A',
-          scenario.computed?.isWTDCompliant ? 'Yes' : 'No',
+          c?.contracted_hours?.toFixed(1) ?? 'N/A',
+          c?.required_hours_week?.toFixed(1) ?? 'N/A',
+          c?.available_hours_week?.toFixed(1) ?? 'N/A',
+          c?.overtime_week?.toFixed(1) ?? 'N/A',
+          c?.slack_week?.toFixed(1) ?? 'N/A',
+          c?.reqFTE?.toFixed(1) ?? 'N/A',
+          c?.haveFTE?.toFixed(1) ?? 'N/A',
+          c?.gapFTE?.toFixed(1) ?? 'N/A',
+          c?.overtime_17_weeks?.toFixed(1) ?? 'N/A',
+          c?.hoursPerStaffPerWeek?.toFixed(1) ?? 'N/A',
+          c?.requiredStaff?.toFixed(1) ?? 'N/A',
+          String(c?.simulationSummary?.totalBreaches ?? scenario.total_breaches),
+          c?.simulationSummary?.avgRolling?.toFixed(1) ?? scenario.avg_rolling?.toFixed(1) ?? 'N/A',
+          c?.isWTDCompliant ? 'Yes' : 'No',
           scenario.id === baselineId ? 'Yes' : 'No',
           scenario.id === recommendedId ? 'Yes' : 'No'
         ]);
@@ -408,7 +458,18 @@ const ScenarioComparison = () => {
           pdf.text(`Weekly Hours/Staff: ${scenario.computed?.hoursPerStaffPerWeek.toFixed(1) ?? 'N/A'}h`, 20, y);
           y += 5;
           pdf.text(`Breaches: ${scenario.computed?.simulationSummary?.totalBreaches ?? scenario.total_breaches}, Avg Rolling: ${scenario.computed?.simulationSummary?.avgRolling?.toFixed(1) ?? scenario.avg_rolling?.toFixed(1) ?? 'N/A'}h`, 20, y);
-          y += 8;
+          y += 5;
+          
+          // Overtime/capacity metrics
+          const c = scenario.computed;
+          if (c) {
+            pdf.text(`Contract: ${c.contracted_hours?.toFixed(1)}h/w, Req: ${c.required_hours_week?.toFixed(1)}h/w, Avail: ${c.available_hours_week?.toFixed(1)}h/w`, 20, y);
+            y += 5;
+            pdf.text(`OT: ${c.overtime_week?.toFixed(1)}h/w, Slack: ${c.slack_week?.toFixed(1)}h/w, Gap FTE: ${c.gapFTE?.toFixed(1)}, OT 17w: ${c.overtime_17_weeks?.toFixed(1)}h`, 20, y);
+            y += 8;
+          } else {
+            y += 3;
+          }
         });
 
       // Capture charts if available
@@ -782,6 +843,84 @@ const ScenarioComparison = () => {
         {renderScenarioCard(enrichedScenarios.compare1, 'Compare (B)', false)}
         {renderScenarioCard(enrichedScenarios.compare2, 'Compare (C)', false)}
       </div>
+
+      {/* Comprehensive Comparison Table */}
+      {enrichedScenarios.baseline && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Overtime & Capacity Analysis</CardTitle>
+            <CardDescription>Sortable comparison of staffing metrics across scenarios</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 font-medium">Scenario</th>
+                    <th className="text-right p-2 font-medium">Contract h/w</th>
+                    <th className="text-right p-2 font-medium">Req h/w</th>
+                    <th className="text-right p-2 font-medium">Avail h/w</th>
+                    <th className="text-right p-2 font-medium">OT h/w</th>
+                    <th className="text-right p-2 font-medium">Slack h/w</th>
+                    <th className="text-right p-2 font-medium">Req FTE</th>
+                    <th className="text-right p-2 font-medium">Have FTE</th>
+                    <th className="text-right p-2 font-medium">Gap FTE</th>
+                    <th className="text-right p-2 font-medium">OT (17w) h</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[enrichedScenarios.baseline, enrichedScenarios.compare1, enrichedScenarios.compare2]
+                    .filter(Boolean)
+                    .map((scenario, idx) => {
+                      if (!scenario) return null;
+                      const c = scenario.computed;
+                      const isBaseline = scenario.id === baselineId;
+                      const isRecommended = scenario.id === recommendedId;
+                      return (
+                        <tr 
+                          key={scenario.id} 
+                          className={cn(
+                            'border-b',
+                            isBaseline && 'bg-primary/5',
+                            isRecommended && 'bg-green-50'
+                          )}
+                        >
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{scenario.name}</span>
+                              {isBaseline && <Badge variant="default" className="text-xs">Baseline</Badge>}
+                              {isRecommended && <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">⭐</Badge>}
+                            </div>
+                          </td>
+                          <td className="text-right p-2">{c?.contracted_hours?.toFixed(1) ?? '—'}</td>
+                          <td className="text-right p-2">{c?.required_hours_week?.toFixed(1) ?? '—'}</td>
+                          <td className="text-right p-2">{c?.available_hours_week?.toFixed(1) ?? '—'}</td>
+                          <td className={cn('text-right p-2', c && c.overtime_week > 0 && 'text-destructive font-semibold')}>
+                            {c?.overtime_week != null ? c.overtime_week.toFixed(1) : '—'}
+                          </td>
+                          <td className={cn('text-right p-2', c && c.slack_week > 0 && 'text-green-600 font-semibold')}>
+                            {c?.slack_week != null ? c.slack_week.toFixed(1) : '—'}
+                          </td>
+                          <td className="text-right p-2">{c?.reqFTE?.toFixed(1) ?? '—'}</td>
+                          <td className="text-right p-2">{c?.haveFTE?.toFixed(1) ?? '—'}</td>
+                          <td className={cn('text-right p-2', c && c.gapFTE > 0 && 'text-destructive font-semibold', c && c.gapFTE < 0 && 'text-green-600')}>
+                            {c?.gapFTE != null ? (c.gapFTE > 0 ? `+${c.gapFTE.toFixed(1)}` : c.gapFTE.toFixed(1)) : '—'}
+                          </td>
+                          <td className={cn('text-right p-2', c && c.overtime_17_weeks > 0 && 'text-destructive font-semibold')}>
+                            {c?.overtime_17_weeks != null ? c.overtime_17_weeks.toFixed(1) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 text-xs text-muted-foreground">
+              <p><span className="font-medium">Legend:</span> Red = Overtime/Gap (needs more staff), Green = Slack/Surplus (capacity available)</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delta Analysis */}
       {enrichedScenarios.baseline && (enrichedScenarios.compare1 || enrichedScenarios.compare2) && (

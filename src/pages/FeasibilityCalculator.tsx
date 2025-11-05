@@ -223,6 +223,17 @@ const FeasibilityCalculator = () => {
       const totalRequiredPerDay = Object.values(requiredPerDay).reduce((sum, val) => sum + (val || 0), 0);
       const effectiveRequiredShiftsPerDay = totalRequiredPerDay > 0 ? totalRequiredPerDay : requiredShiftsPerDay;
       
+      // Compute overtime/capacity metrics from result
+      const contractedHours = standardContractHours;
+      const requiredHrsWeek = result.weeklyHoursRequired;
+      const availableHrsWeek = result.availableHoursPerWeek;
+      const overtimeWeek = result.overtimeGapPerWeek;
+      const slackWeek = Math.max(0, availableHrsWeek - requiredHrsWeek);
+      const reqFTE = result.fteRequired;
+      const haveFTE = result.fteAvailable;
+      const gapFTE = reqFTE - haveFTE;
+      const overtime17Weeks = overtimeWeek * 17;
+
       const scenarioData: SaveScenarioInput = {
         name,
         pattern_id: selectedPattern.id,
@@ -239,7 +250,17 @@ const FeasibilityCalculator = () => {
         avg_rolling: wtdStatus?.metrics.rollingAvg ?? null,
         max_rolling: wtdStatus?.metrics.maxRolling ?? null,
         recommendations,
-        standard_contract_hours: standardContractHours
+        standard_contract_hours: standardContractHours,
+        // Overtime/capacity metrics
+        contracted_hours: contractedHours,
+        required_hours_week: requiredHrsWeek,
+        available_hours_week: availableHrsWeek,
+        overtime_week: overtimeWeek,
+        slack_week: slackWeek,
+        reqFTE,
+        haveFTE,
+        gapFTE,
+        overtime_17_weeks: overtime17Weeks
       };
 
       await saveScenario(scenarioData);
