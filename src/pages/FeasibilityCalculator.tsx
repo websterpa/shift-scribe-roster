@@ -14,7 +14,7 @@ import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, Legend, LabelList, Cell, ReferenceLine } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { simulateWTD, getWTDSimulationSummary, type WTDSimulationSummary } from '@/utils/feasibility/wtdSimulation';
@@ -27,6 +27,9 @@ import {
   type FeasibilityScenario,
   type SaveScenarioInput 
 } from '@/services/feasibility/scenarios';
+import { diagnosePattern, type RestViolation } from '@/engine2/constraints/wtdDiagnostics';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -72,6 +75,9 @@ const FeasibilityCalculator = () => {
   const [scenarios, setScenarios] = useState<FeasibilityScenario[]>([]);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isLoadingScenarios, setIsLoadingScenarios] = useState<boolean>(false);
+
+  // Rest diagnostics state
+  const [restViolations, setRestViolations] = useState<RestViolation[]>([]);
 
   // Load saved scenarios on mount
   useEffect(() => {
@@ -264,6 +270,29 @@ const FeasibilityCalculator = () => {
       setRecommendations([]);
     }
   }, [wtdSimulationData, selectedPattern]);
+
+  // Diagnose rest violations when pattern or shift config changes
+  useEffect(() => {
+    if (!selectedPattern || !selectedPattern.sequence) {
+      setRestViolations([]);
+      return;
+    }
+
+    const sequence = Array.isArray(selectedPattern.sequence)
+      ? (selectedPattern.sequence as string[])
+      : [];
+
+    if (sequence.length === 0) {
+      setRestViolations([]);
+      return;
+    }
+
+    const shiftSystem = shiftLengthHours === 12 ? '12h' : '8h';
+    const diagnostics = diagnosePattern(sequence, { shiftSystem });
+    setRestViolations(diagnostics.violations);
+    
+    console.log('🔬 Rest diagnostics:', diagnostics);
+  }, [selectedPattern, shiftLengthHours]);
 
   const handleSaveSetup = () => {
     if (!result || !selectedPattern) return;
@@ -541,11 +570,78 @@ const FeasibilityCalculator = () => {
                 </SelectContent>
               </Select>
               {selectedPattern && (
-                <div className="mt-2 p-3 bg-muted rounded-md">
-                  <p className="text-sm font-medium">Pattern: {Array.isArray(selectedPattern.sequence) ? selectedPattern.sequence.join(' ') : ''}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Cycle: {selectedPattern.cycle_length} weeks • System: {selectedPattern.system}
-                  </p>
+                <div className="mt-2 space-y-2">
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Cycle: {selectedPattern.cycle_length} weeks • System: {selectedPattern.system}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      <TooltipProvider>
+                        {Array.isArray(selectedPattern.sequence) && selectedPattern.sequence.map((code, i) => {
+                          const codeStr = String(code);
+                          const isViolationTo = restViolations.some(v => v.toIdx === i);
+                          const isViolationFrom = restViolations.some(v => v.fromIdx === i);
+                          const violation = restViolations.find(v => v.toIdx === i);
+                          
+                          const chipClasses = cn(
+                            "inline-flex items-center px-2 py-1 rounded text-xs font-medium transition-all",
+                            isViolationTo 
+                              ? "ring-2 ring-red-500 bg-red-50 text-red-900" 
+                              : isViolationFrom
+                              ? "ring-1 ring-red-300 bg-red-50/50 text-red-800"
+                              : "bg-muted text-foreground"
+                          );
+                          
+                          const chip = (
+                            <span key={i} className={chipClasses}>
+                              {codeStr}
+                              <small className="ml-1 opacity-60">{i + 1}</small>
+                            </span>
+                          );
+                          
+                          if (violation) {
+                            return (
+                              <Tooltip key={i}>
+                                <TooltipTrigger asChild>
+                                  {chip}
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="font-semibold text-red-600">⚠ Rest Violation</p>
+                                  <p className="text-xs mt-1">
+                                    Day {violation.toIdx + 1}: {violation.fromCode}→{violation.toCode} only{' '}
+                                    <strong>{violation.restHours.toFixed(1)}h</strong> rest
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    (needs ≥ 11h between shifts)
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          }
+                          
+                          return chip;
+                        })}
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                  
+                  {restViolations.length > 0 && (
+                    <Alert variant="destructive" className="py-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        <p className="font-semibold mb-1">
+                          {restViolations.length} rest violation{restViolations.length > 1 ? 's' : ''} detected
+                        </p>
+                        <ul className="text-xs space-y-0.5 ml-4 list-disc">
+                          {restViolations.map((v, idx) => (
+                            <li key={idx}>
+                              Day {v.toIdx + 1}: {v.fromCode}→{v.toCode} only {v.restHours.toFixed(1)}h rest (needs ≥ 11h)
+                            </li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               )}
             </div>
@@ -827,7 +923,7 @@ const FeasibilityCalculator = () => {
                         >
                           <XAxis dataKey="name" />
                           <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                          <Tooltip 
+                          <ChartTooltip 
                             formatter={(value: number) => `${value.toFixed(1)} h`}
                             contentStyle={{ 
                               backgroundColor: 'hsl(var(--card))',
@@ -883,7 +979,7 @@ const FeasibilityCalculator = () => {
                               domain={[30, 60]} 
                               label={{ value: 'Hours', angle: -90, position: 'insideLeft' }}
                             />
-                            <Tooltip 
+                            <ChartTooltip 
                               formatter={(value: number) => `${value} h`}
                               contentStyle={{ 
                                 backgroundColor: 'hsl(var(--card))',
