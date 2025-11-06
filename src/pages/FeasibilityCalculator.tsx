@@ -110,6 +110,10 @@ const FeasibilityCalculator = () => {
   
   // Per-shift staffing requirements
   const [requiredPerDay, setRequiredPerDay] = useState<Partial<Record<ShiftKey, number>>>({});
+  
+  // Form validation state
+  const [formError, setFormError] = useState<{ title: string; details: string } | null>(null);
+  const [invalidShiftKeys, setInvalidShiftKeys] = useState<ShiftKey[]>([]);
 
   // Load saved scenarios on mount
   useEffect(() => {
@@ -211,6 +215,14 @@ const FeasibilityCalculator = () => {
   const handleSaveScenario = async () => {
     if (!selectedPattern || !result) {
       toast.error('No results to save - please select a pattern first');
+      return;
+    }
+    
+    // Validation guard: prevent saving invalid scenarios
+    if (formError || invalidShiftKeys.length > 0) {
+      toast.error('Cannot save invalid scenario', {
+        description: 'All active shift types must have ≥ 1 staff assigned'
+      });
       return;
     }
 
@@ -387,6 +399,8 @@ const FeasibilityCalculator = () => {
   useEffect(() => {
     if (!selectedPattern) {
       setResult(null);
+      setFormError(null);
+      setInvalidShiftKeys([]);
       return;
     }
 
@@ -396,6 +410,24 @@ const FeasibilityCalculator = () => {
       
       // Use per-shift total if available, otherwise fall back to legacy value
       const effectiveRequiredShiftsPerDay = totalRequiredPerDay > 0 ? totalRequiredPerDay : requiredShiftsPerDay;
+      
+      // VALIDATION: Block zero-staff requirements for active shift types
+      const activeCodes = activeShiftKeys(system);
+      const zeros = activeCodes.filter(c => (requiredPerDay?.[c] ?? 0) <= 0);
+      
+      if (zeros.length > 0) {
+        setFormError({
+          title: 'Invalid staffing for selected system',
+          details: `These shift types must be ≥ 1: ${zeros.join(', ')}`
+        });
+        setInvalidShiftKeys(zeros);
+        setResult(null);
+        return;
+      }
+      
+      // Clear validation errors
+      setFormError(null);
+      setInvalidShiftKeys([]);
       
       // Guard: warn if using legacy field instead of per-shift requirements
       if (totalRequiredPerDay === 0 && requiredShiftsPerDay > 0) {
@@ -514,6 +546,14 @@ const FeasibilityCalculator = () => {
 
   const handleSaveSetup = () => {
     if (!result || !selectedPattern) return;
+    
+    // Validation guard: prevent saving invalid config
+    if (formError || invalidShiftKeys.length > 0) {
+      toast.error('Cannot save invalid configuration', {
+        description: 'All active shift types must have ≥ 1 staff assigned'
+      });
+      return;
+    }
 
     const feasibilityConfig = {
       patternId: selectedPatternId,
@@ -636,6 +676,14 @@ const FeasibilityCalculator = () => {
 
   const exportPDF = async () => {
     if (!result || !selectedPattern) return;
+    
+    // Validation guard: prevent exporting invalid data
+    if (formError || invalidShiftKeys.length > 0) {
+      toast.error('Cannot export invalid data', {
+        description: 'All active shift types must have ≥ 1 staff assigned'
+      });
+      return;
+    }
 
     setIsExporting(true);
     try {
@@ -1133,29 +1181,43 @@ const FeasibilityCalculator = () => {
                 </p>
               </div>
               
-              {activeShiftKeys(system).map(shiftKey => (
-                <div key={shiftKey} className="space-y-2">
-                  <Label htmlFor={`shift-${shiftKey}`}>
-                    {shiftKey === 'E' ? 'Early' : shiftKey === 'L' ? 'Late' : shiftKey === 'N' ? 'Night' : 'Day'} 
-                    {' '}({shiftKey}) - Required/Day
-                  </Label>
-                  <Input
-                    id={`shift-${shiftKey}`}
-                    type="number"
-                    min="0"
-                    max="50"
-                    placeholder="0"
-                    value={requiredPerDay[shiftKey] ?? ''}
-                    onChange={(e) => {
-                      const val = e.target.value === '' ? undefined : Number(e.target.value);
-                      setRequiredPerDay(prev => ({
-                        ...prev,
-                        [shiftKey]: val
-                      }));
-                    }}
-                  />
-                </div>
-              ))}
+              {activeShiftKeys(system).map(shiftKey => {
+                const isInvalid = invalidShiftKeys.includes(shiftKey);
+                return (
+                  <div key={shiftKey} className="space-y-2">
+                    <Label htmlFor={`shift-${shiftKey}`} className={cn(isInvalid && "text-destructive")}>
+                      {shiftKey === 'E' ? 'Early' : shiftKey === 'L' ? 'Late' : shiftKey === 'N' ? 'Night' : 'Day'} 
+                      {' '}({shiftKey}) - Required/Day
+                    </Label>
+                    <Input
+                      id={`shift-${shiftKey}`}
+                      type="number"
+                      min="0"
+                      max="50"
+                      placeholder="0"
+                      value={requiredPerDay[shiftKey] ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? undefined : Number(e.target.value);
+                        setRequiredPerDay(prev => ({
+                          ...prev,
+                          [shiftKey]: val
+                        }));
+                      }}
+                      className={cn(isInvalid && "border-destructive focus-visible:ring-destructive")}
+                    />
+                  </div>
+                );
+              })}
+              
+              {formError && (
+                <Alert variant="destructive" className="py-3">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    <p className="font-semibold mb-1">{formError.title}</p>
+                    <p className="text-xs">{formError.details}</p>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             {/* @deprecated: Legacy Required Shifts Per Day - superseded by per-shift requirements */}
@@ -1782,7 +1844,7 @@ const FeasibilityCalculator = () => {
                       onClick={exportPDF} 
                       variant="default"
                       size="sm"
-                      disabled={isExporting || !(wtdStatus?.success ?? false)}
+                      disabled={isExporting || !(wtdStatus?.success ?? false) || formError !== null}
                     >
                       {isExporting ? (
                         <Loader2 className="w-4 h-4 mr-1 animate-spin" />
@@ -1795,7 +1857,7 @@ const FeasibilityCalculator = () => {
                       onClick={exportCSV} 
                       variant="outline"
                       size="sm"
-                      disabled={isExporting}
+                      disabled={isExporting || formError !== null}
                     >
                       <Download className="w-4 h-4 mr-1" />
                       CSV
@@ -1804,7 +1866,7 @@ const FeasibilityCalculator = () => {
                       onClick={exportJSON} 
                       variant="outline"
                       size="sm"
-                      disabled={isExporting}
+                      disabled={isExporting || formError !== null}
                     >
                       <Download className="w-4 h-4 mr-1" />
                       JSON
@@ -1816,7 +1878,7 @@ const FeasibilityCalculator = () => {
                 <Button 
                   onClick={handleSaveSetup} 
                   className="w-full"
-                  disabled={!(wtdStatus?.success ?? false) || result.requiredStaff === 0}
+                  disabled={!(wtdStatus?.success ?? false) || result.requiredStaff === 0 || formError !== null}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Use This Setup
@@ -1858,7 +1920,7 @@ const FeasibilityCalculator = () => {
                   />
                   <Button
                     onClick={handleSaveScenario}
-                    disabled={isSaving || !result}
+                    disabled={isSaving || !result || formError !== null}
                     variant="secondary"
                   >
                     {isSaving ? (

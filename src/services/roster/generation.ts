@@ -322,6 +322,34 @@ export async function generateAndSaveRoster(
   });
 
   logger.info('Requirements validated', { daysCount: days.length });
+  
+  // GUARDRAIL: Block zero-staff requirements for active shift types
+  // This prevents false data and roster generation failures
+  const activeCodes = Array.from(validShiftTypes);
+  const sampleDay = days[0];
+  const sampleReqs = requirements[sampleDay];
+  const zeros = activeCodes.filter(code => (sampleReqs as any)[code] <= 0);
+  
+  if (zeros.length > 0) {
+    const errorMsg = `Invalid staffing requirements: All active shift types must have ≥ 1 staff assigned. Zero-staff shifts detected: ${zeros.join(', ')} (${shiftSystem} mode requires ${activeCodes.join('/')})`;
+    console.error("[BLOCK] ❌ Zero-staff requirements detected", {
+      shiftSystem,
+      activeCodes,
+      zeros,
+      sampleReqs
+    });
+    logger.error(new Error('Zero-staff requirements'), {
+      shiftSystem,
+      activeCodes,
+      zeros,
+      sampleDate: sampleDay,
+      requirements: sampleReqs
+    });
+    throw new Error(errorMsg);
+  }
+  
+  console.info("[REQUIREMENTS] ✅ All active shift types have ≥ 1 staff required");
+  logger.info('Requirements validated (no zero-staff shifts)', { shiftSystem, activeCodes });
 
   // Diagnostic logging for staff pool and configuration
   console.info("[DIAG] staff.count", correctiveStaff.length);
