@@ -4,6 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { copyWeekdayToWeekend, weekendDiffersFromWeekday } from "./requirementsHelpers";
 
 const SHIFT_CODES = {
   "8h": ["E", "L", "N"],
@@ -39,6 +42,7 @@ export default function RequirementsMiniComposer({
   onFrameworkChange,
   onChange
 }: RequirementsMiniComposerProps) {
+  const { toast } = useToast();
   const [values, setValues] = useState<Record<DayType, DayTypeValues>>({
     weekdays: { E: 2, L: 2, N: 1, D: 2 },
     saturday: { E: 1, L: 1, N: 1, D: 1 },
@@ -84,6 +88,31 @@ export default function RequirementsMiniComposer({
       ...prev,
       [dayType]: { ...prev[dayType], [code]: Math.max(0, Math.min(10, val)) }
     }));
+  }
+
+  // Copy weekday to weekend
+  function handleCopyToWeekend() {
+    const differs = weekendDiffersFromWeekday(values, framework);
+    
+    if (differs && !confirm('Overwrite Saturday & Sunday with Weekday values?')) {
+      return;
+    }
+    
+    if (!differs) {
+      toast({
+        title: "No changes needed",
+        description: "Weekend already matches weekdays",
+      });
+      return;
+    }
+    
+    const updated = copyWeekdayToWeekend(values, framework);
+    setValues(updated);
+    
+    toast({
+      title: "Requirements copied",
+      description: "Weekend requirements now match weekdays",
+    });
   }
 
   // Reset to defaults
@@ -188,7 +217,19 @@ export default function RequirementsMiniComposer({
 
       {/* Day-type Sliders */}
       <div>
-        <Label className="text-sm font-medium mb-2 block">Staff Requirements</Label>
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-sm font-medium">Staff Requirements</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleCopyToWeekend}
+            className="h-7 gap-1.5 text-xs"
+          >
+            <Copy className="h-3 w-3" />
+            Copy weekday → weekend
+          </Button>
+        </div>
         <Card>
           <CardContent className="pt-4 space-y-4">
             {(["weekdays", "saturday", "sunday"] as DayType[]).map(dayType => (
