@@ -7,8 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Info, X, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { detectConfigDrift, type FeasibilitySnapshot, type LiveConfig } from "@/services/feasibility/snapshotDiff";
 import { checkConfig, type ConsistencyIssue } from "@/utils/consistency/checkConfig";
+import { reconcileToFeasibility, reconcileToBuilder } from "@/services/config/reconcile";
+import { useToast } from "@/hooks/use-toast";
 import type { RequirementsV2 } from "@/types/requirementsV2";
 
 interface ConfigData {
@@ -42,6 +45,9 @@ export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBanner
   const [dismissed, setDismissed] = useState(false);
   const [driftExpanded, setDriftExpanded] = useState(false);
   const [issuesExpanded, setIssuesExpanded] = useState(false);
+  const [openFixFeas, setOpenFixFeas] = useState(false);
+  const [openFixBuilder, setOpenFixBuilder] = useState(false);
+  const { toast } = useToast();
   const fromFeasibility = searchParams.get('from') === 'feasibility';
   const versionId = searchParams.get('version');
 
@@ -198,6 +204,62 @@ export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBanner
     : fromFeasibility
     ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300'
     : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200';
+
+  const handleReconcileToFeasibility = async () => {
+    try {
+      await reconcileToFeasibility({
+        config: {
+          id: config?.pattern_id,
+          tenant_id: config?.tenant_id,
+          requirements_v2: config?.requirements_v2 ?? null,
+          shift_length_hours: config?.shift_type === '8h' ? 8 : 12,
+          buffer_pct: config?.buffer_pct ?? null,
+          standard_contract_hours: config?.standard_contract_hours ?? null,
+          auto_reduce_enabled: config?.auto_reduce ?? null,
+          pattern_id: config?.pattern_id ?? null,
+        },
+        snapshot: {
+          requirements_v2: snapshot?.requirements_v2 ?? null,
+          shift_length_hours: snapshot?.framework === '8h' ? 8 : 12,
+          buffer_pct: snapshot?.buffer_pct ?? null,
+          standard_contract_hours: snapshot?.standard_contract_hours ?? null,
+          auto_reduce_enabled: snapshot?.auto_reduce_enabled ?? null,
+          pattern_id: snapshot?.pattern_id ?? null,
+        },
+      });
+      await loadConfig();
+      toast({ title: 'Reconciled', description: 'Config now matches Feasibility snapshot.' });
+      setOpenFixFeas(false);
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleReconcileToBuilder = async () => {
+    try {
+      await reconcileToBuilder({
+        config: {
+          id: config?.pattern_id,
+          tenant_id: config?.tenant_id,
+          requirements_v2: config?.requirements_v2 ?? null,
+          shift_length_hours: config?.shift_type === '8h' ? 8 : 12,
+          buffer_pct: config?.buffer_pct ?? null,
+          standard_contract_hours: config?.standard_contract_hours ?? null,
+          auto_reduce_enabled: config?.auto_reduce ?? null,
+          pattern_id: config?.pattern_id ?? null,
+        },
+        builder: {
+          requirements_v2: builderState?.requirements_v2 ?? null,
+          shift_length_hours: builderState?.shift_length_hours ?? null,
+        },
+      });
+      await loadConfig();
+      toast({ title: 'Reconciled', description: 'Config now matches Builder state.' });
+      setOpenFixBuilder(false);
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+  };
 
   return (
     <Card className={`mb-4 ${bannerClass}`}>
@@ -384,6 +446,48 @@ export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBanner
           </div>
           
           <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setOpenFixFeas(true)}
+                      disabled={!snapshot || !hasDrift}
+                      className="shrink-0"
+                    >
+                      Fix to Feasibility
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!snapshot && (
+                  <TooltipContent>No feasibility snapshot saved</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setOpenFixBuilder(true)}
+                      disabled={!builderState || totalIssues === 0}
+                      className="shrink-0"
+                    >
+                      Fix to Builder
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!builderState && (
+                  <TooltipContent>Builder state not available</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+
             <Button
               size="sm"
               variant="outline"
@@ -405,6 +509,40 @@ export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBanner
           </div>
         </div>
       </div>
+
+      <AlertDialog open={openFixFeas} onOpenChange={setOpenFixFeas}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overwrite config from Feasibility snapshot?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="mt-2 text-sm text-muted-foreground">
+            This will copy: requirements, shift length, buffer, contract hours, auto-reduce, and pattern.
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReconcileToFeasibility}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={openFixBuilder} onOpenChange={setOpenFixBuilder}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overwrite config from Builder state?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="mt-2 text-sm text-muted-foreground">
+            This will copy: requirements and shift length from the current Builder inputs.
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReconcileToBuilder}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
