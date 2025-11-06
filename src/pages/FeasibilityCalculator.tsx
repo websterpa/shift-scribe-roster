@@ -58,7 +58,7 @@ import {
 import { suggestForZeros, type Suggestion } from '@/services/feasibility/suggestCompatiblePattern';
 import { applySetupFromFeasibility } from '@/services/feasibility/applySetup';
 import { createDraftFromConfig } from '@/services/roster/createDraftFromConfig';
-import { createFeasibilitySnapshot } from '@/services/feasibility/snapshotDiff';
+import type { FeasibilitySnapshot } from '@/services/feasibility/snapshotDiff';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -665,15 +665,16 @@ const FeasibilityCalculator = () => {
         const targetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         
         // Create feasibility snapshot for drift detection
-        const snapshot = createFeasibilitySnapshot(
-          selectedPatternId,
-          selectedPattern?.name ?? 'Unknown',
-          requirementsV2.framework,
-          requirementsV2,
-          bufferPct,
-          standardContractHours,
-          autoReduce
-        );
+        const snapshot: FeasibilitySnapshot = {
+          pattern_id: selectedPatternId,
+          pattern_name: selectedPattern?.name ?? 'Unknown',
+          framework: requirementsV2.framework,
+          requirements_v2: requirementsV2,
+          buffer_pct: bufferPct,
+          standard_contract_hours: standardContractHours,
+          auto_reduce_enabled: autoReduce,
+          timestamp: new Date().toISOString(),
+        };
         
         const draft = await createDraftFromConfig({
           tenantId: cfg.tenant_id,

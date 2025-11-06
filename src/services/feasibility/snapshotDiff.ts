@@ -1,10 +1,10 @@
 /**
- * Feasibility Snapshot Comparison
+ * Feasibility Snapshot Drift Detection
  * 
- * Detects drift between a feasibility snapshot and current live configuration.
+ * Compares feasibility snapshots with live config to detect changes.
  */
 
-import type { RequirementsV2 } from "@/types/requirementsV2";
+import type { RequirementsV2 } from '@/types/requirementsV2';
 
 export interface FeasibilitySnapshot {
   pattern_id: string;
@@ -30,130 +30,119 @@ export interface LiveConfig {
 export interface ConfigDiff {
   field: string;
   label: string;
-  snapshot: string | number;
-  current: string | number;
+  snapshot: string;
+  current: string;
 }
 
 /**
- * Compare a feasibility snapshot with current live config.
- * Returns null if no snapshot, or a list of differences.
+ * Detect configuration drift between snapshot and live config
+ * Returns array of differences, empty if no drift
  */
 export function detectConfigDrift(
   snapshot: FeasibilitySnapshot | null,
-  live: LiveConfig
+  liveConfig: LiveConfig
 ): ConfigDiff[] | null {
-  if (!snapshot) return null;
+  if (!snapshot) {
+    return null;
+  }
 
   const diffs: ConfigDiff[] = [];
 
-  // Pattern mismatch
-  if (snapshot.pattern_id !== live.pattern_id) {
+  // Pattern drift
+  if (snapshot.pattern_id !== liveConfig.pattern_id) {
     diffs.push({
       field: 'pattern',
       label: 'Pattern',
       snapshot: snapshot.pattern_name,
-      current: live.pattern_name,
+      current: liveConfig.pattern_name,
     });
   }
 
-  // Framework mismatch
-  if (snapshot.framework !== live.framework) {
+  // Framework drift
+  if (snapshot.framework !== liveConfig.framework) {
     diffs.push({
       field: 'framework',
       label: 'Framework',
       snapshot: snapshot.framework,
-      current: live.framework,
+      current: liveConfig.framework,
     });
   }
 
-  // Requirements v2 comparison (day-type level)
-  if (live.requirements_v2) {
+  // Requirements v2 drift
+  if (snapshot.requirements_v2 && liveConfig.requirements_v2) {
     const snapshotReqs = snapshot.requirements_v2;
-    const liveReqs = live.requirements_v2;
+    const currentReqs = liveConfig.requirements_v2;
 
-    if (snapshotReqs.framework === liveReqs.framework) {
-      // Compare each day type
-      for (const dayType of ['weekdays', 'saturday', 'sunday'] as const) {
-        const snapDay = (snapshotReqs.days as any)[dayType];
-        const liveDay = (liveReqs.days as any)[dayType];
+    // Compare weekdays
+    if (JSON.stringify(snapshotReqs.days.weekdays) !== JSON.stringify(currentReqs.days.weekdays)) {
+      diffs.push({
+        field: 'requirements_weekdays',
+        label: 'Weekday Requirements',
+        snapshot: formatDayReq(snapshotReqs.days.weekdays),
+        current: formatDayReq(currentReqs.days.weekdays),
+      });
+    }
 
-        // Get shift keys based on framework
-        const shiftKeys = snapshotReqs.framework === '8h' ? ['E', 'L', 'N'] : ['D', 'N'];
+    // Compare saturday
+    if (JSON.stringify(snapshotReqs.days.saturday) !== JSON.stringify(currentReqs.days.saturday)) {
+      diffs.push({
+        field: 'requirements_saturday',
+        label: 'Saturday Requirements',
+        snapshot: formatDayReq(snapshotReqs.days.saturday),
+        current: formatDayReq(currentReqs.days.saturday),
+      });
+    }
 
-        for (const shift of shiftKeys) {
-          const snapVal = snapDay[shift] ?? 0;
-          const liveVal = liveDay[shift] ?? 0;
-
-          if (snapVal !== liveVal) {
-            diffs.push({
-              field: `${dayType}_${shift}`,
-              label: `${capitalize(dayType)} ${shift}`,
-              snapshot: snapVal,
-              current: liveVal,
-            });
-          }
-        }
-      }
+    // Compare sunday
+    if (JSON.stringify(snapshotReqs.days.sunday) !== JSON.stringify(currentReqs.days.sunday)) {
+      diffs.push({
+        field: 'requirements_sunday',
+        label: 'Sunday Requirements',
+        snapshot: formatDayReq(snapshotReqs.days.sunday),
+        current: formatDayReq(currentReqs.days.sunday),
+      });
     }
   }
 
-  // Buffer percentage
-  if (snapshot.buffer_pct !== live.buffer_pct) {
+  // Buffer drift
+  if (snapshot.buffer_pct !== liveConfig.buffer_pct) {
     diffs.push({
       field: 'buffer_pct',
       label: 'Buffer %',
-      snapshot: snapshot.buffer_pct,
-      current: live.buffer_pct,
+      snapshot: `${snapshot.buffer_pct}%`,
+      current: `${liveConfig.buffer_pct}%`,
     });
   }
 
-  // Contract hours
-  if (snapshot.standard_contract_hours !== live.standard_contract_hours) {
+  // Contract hours drift
+  if (snapshot.standard_contract_hours !== liveConfig.standard_contract_hours) {
     diffs.push({
-      field: 'contract_hours',
+      field: 'standard_contract_hours',
       label: 'Contract Hours',
-      snapshot: snapshot.standard_contract_hours,
-      current: live.standard_contract_hours,
+      snapshot: `${snapshot.standard_contract_hours}h`,
+      current: `${liveConfig.standard_contract_hours}h`,
     });
   }
 
-  // Auto-reduce setting
-  if (snapshot.auto_reduce_enabled !== live.auto_reduce_enabled) {
+  // Auto-reduce drift
+  if (snapshot.auto_reduce_enabled !== liveConfig.auto_reduce_enabled) {
     diffs.push({
       field: 'auto_reduce',
       label: 'Auto-reduce',
       snapshot: snapshot.auto_reduce_enabled ? 'ON' : 'OFF',
-      current: live.auto_reduce_enabled ? 'ON' : 'OFF',
+      current: liveConfig.auto_reduce_enabled ? 'ON' : 'OFF',
     });
   }
 
   return diffs;
 }
 
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 /**
- * Create a snapshot from current feasibility state
+ * Format day requirements object for display
  */
-export function createFeasibilitySnapshot(
-  patternId: string,
-  patternName: string,
-  framework: '8h' | '12h',
-  requirementsV2: RequirementsV2,
-  bufferPct: number,
-  standardContractHours: number,
-  autoReduceEnabled: boolean
-): FeasibilitySnapshot {
-  return {
-    pattern_id: patternId,
-    pattern_name: patternName,
-    framework,
-    requirements_v2: requirementsV2,
-    buffer_pct: bufferPct,
-    standard_contract_hours: standardContractHours,
-    auto_reduce_enabled: autoReduceEnabled,
-    timestamp: new Date().toISOString(),
-  };
+function formatDayReq(dayReq: any): string {
+  return Object.entries(dayReq as Record<string, number>)
+    .filter(([_, val]) => val > 0)
+    .map(([key, val]) => `${key}:${val}`)
+    .join(', ') || 'None';
 }
