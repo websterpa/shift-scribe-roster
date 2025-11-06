@@ -50,6 +50,7 @@ import {
   type System,
   type ShiftKey 
 } from '@/services/feasibility/staffingBreakdown';
+import { suggestForZeros, type Suggestion } from '@/services/feasibility/suggestCompatiblePattern';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -114,6 +115,7 @@ const FeasibilityCalculator = () => {
   // Form validation state
   const [formError, setFormError] = useState<{ title: string; details: string } | null>(null);
   const [invalidShiftKeys, setInvalidShiftKeys] = useState<ShiftKey[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
   // Load saved scenarios on mount
   useEffect(() => {
@@ -421,13 +423,19 @@ const FeasibilityCalculator = () => {
           details: `These shift types must be ≥ 1: ${zeros.join(', ')}`
         });
         setInvalidShiftKeys(zeros);
+        
+        // Generate suggestions for fixing zero-staff requirements
+        const generatedSuggestions = suggestForZeros(system, requiredPerDay);
+        setSuggestions(generatedSuggestions);
+        
         setResult(null);
         return;
       }
       
-      // Clear validation errors
+      // Clear validation errors and suggestions
       setFormError(null);
       setInvalidShiftKeys([]);
+      setSuggestions([]);
       
       // Guard: warn if using legacy field instead of per-shift requirements
       if (totalRequiredPerDay === 0 && requiredShiftsPerDay > 0) {
@@ -635,6 +643,47 @@ const FeasibilityCalculator = () => {
       return { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'Deficit' };
     }
     return { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', label: 'Balanced' };
+  };
+
+  // Suggestion handlers
+  const handleSwitchSystem = (suggestion: Extract<Suggestion, { kind: 'switch-system' }>) => {
+    const targetShiftLength = suggestion.target === '12h' ? 12 : 8;
+    
+    if (window.confirm(`Switch to ${suggestion.target} system? ${suggestion.reason}`)) {
+      console.log(`🔄 Switching to ${suggestion.target} system (${targetShiftLength}h shifts)`);
+      setShiftLengthHours(targetShiftLength);
+      setPatternFilterScope(suggestion.target);
+      toast.success(`Switched to ${suggestion.target} system`, {
+        description: 'Please select a compatible pattern'
+      });
+    }
+  };
+
+  const applyFixInput = (suggestion: Extract<Suggestion, { kind: 'fix-input' }>) => {
+    console.log(`🔧 Applying fix: Set ${suggestion.shiftCode} = ${suggestion.setTo}`);
+    setRequiredPerDay(prev => ({
+      ...prev,
+      [suggestion.shiftCode]: suggestion.setTo
+    }));
+    toast.success(`Set ${suggestion.shiftCode} to ${suggestion.setTo}`, {
+      description: suggestion.reason
+    });
+  };
+
+  const openPatternPicker = (scope: '8h' | '12h') => {
+    console.log(`📋 Opening pattern picker for ${scope} patterns`);
+    setPatternFilterScope(scope);
+    
+    // Scroll to pattern selector
+    const patternSelector = document.getElementById('pattern');
+    if (patternSelector) {
+      patternSelector.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      patternSelector.focus();
+    }
+    
+    toast.info(`Showing ${scope} patterns`, {
+      description: 'Select a compatible pattern from the list'
+    });
   };
 
   const applyRecommendation = (rec: AdjustmentRecommendation) => {
@@ -1208,6 +1257,59 @@ const FeasibilityCalculator = () => {
                   </div>
                 );
               })}
+              
+              {/* Smart Suggestion Banner */}
+              {suggestions.length > 0 && (
+                <div 
+                  className="mt-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 text-sm"
+                  role="alert"
+                  aria-live="polite"
+                >
+                  <div className="mb-3 font-medium text-amber-900 dark:text-amber-100">
+                    💡 This setup looks incompatible with the selected system
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.some(s => s.kind === 'switch-system') && (
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        onClick={() => {
+                          const suggestion = suggestions.find(s => s.kind === 'switch-system') as Extract<Suggestion, { kind: 'switch-system' }>;
+                          if (suggestion) handleSwitchSystem(suggestion);
+                        }}
+                        className="bg-secondary hover:bg-secondary/80"
+                      >
+                        Switch to {(suggestions.find(s => s.kind === 'switch-system') as any)?.target}
+                      </Button>
+                    )}
+                    {suggestions.filter(s => s.kind === 'fix-input').slice(0, 1).map((s, i) => {
+                      const fixSuggestion = s as Extract<Suggestion, { kind: 'fix-input' }>;
+                      return (
+                        <Button 
+                          key={i} 
+                          size="sm" 
+                          onClick={() => applyFixInput(fixSuggestion)}
+                          variant="default"
+                        >
+                          Set {fixSuggestion.shiftCode} = {fixSuggestion.setTo}
+                        </Button>
+                      );
+                    })}
+                    {suggestions.some(s => s.kind === 'open-picker') && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          const pickerSuggestion = suggestions.find(s => s.kind === 'open-picker') as Extract<Suggestion, { kind: 'open-picker' }>;
+                          if (pickerSuggestion) openPatternPicker(pickerSuggestion.scope);
+                        }}
+                      >
+                        Choose compatible pattern…
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {formError && (
                 <Alert variant="destructive" className="py-3">
