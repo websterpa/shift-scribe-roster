@@ -44,12 +44,22 @@ export async function applySetupFromFeasibility(
     throw new Error(`Pattern not found: ${patternError?.message}`);
   }
 
-  // Use v2 requirements directly
+  // Ensure all day buckets are properly set
   const shiftType = input.requirementsV2.framework;
+  
+  // Ensure saturday and sunday exist, default to weekdays if missing
+  const normalizedReqV2 = {
+    framework: input.requirementsV2.framework,
+    days: {
+      weekdays: input.requirementsV2.days.weekdays,
+      saturday: input.requirementsV2.days.saturday || input.requirementsV2.days.weekdays,
+      sunday: input.requirementsV2.days.sunday || input.requirementsV2.days.weekdays,
+    }
+  };
   
   // Keep legacy staffing_requirements for backward compatibility
   const staffingRequirements: any = {};
-  const { weekdays } = input.requirementsV2.days;
+  const { weekdays } = normalizedReqV2.days;
   
   if (shiftType === '8h') {
     const day8h = weekdays as { E: number; L: number; N: number };
@@ -90,8 +100,8 @@ export async function applySetupFromFeasibility(
     config_name: `Feasibility ${pattern.name} ${new Date().toISOString().slice(0, 10)}`,
     cycle_length_weeks: pattern.cycle_length || 17,
     shift_type: shiftType,
-    staffing_requirements: staffingRequirements, // Legacy field
-    requirements_v2: input.requirementsV2, // New unified schema
+    staffing_requirements: staffingRequirements, // Legacy field (kept for old code)
+    requirements_v2: normalizedReqV2, // New unified schema with all day buckets
     standard_contract_hours: input.standardContractHours,
     timezone: 'Europe/London',
     site_start_time: '07:00',

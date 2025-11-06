@@ -91,27 +91,52 @@ export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBanner
         
         const reqV2 = configData.requirements_v2 as unknown as RequirementsV2 | null;
         
-        // Trace the config loaded from database
         if (reqV2) {
+          // Normalize: ensure saturday and sunday exist, default to weekdays if missing
+          let normalizedReqV2: RequirementsV2;
+          
+          if (reqV2.framework === '8h') {
+            normalizedReqV2 = {
+              framework: '8h',
+              days: {
+                weekdays: reqV2.days.weekdays as { E: number; L: number; N: number },
+                saturday: (reqV2.days.saturday as { E: number; L: number; N: number }) || (reqV2.days.weekdays as { E: number; L: number; N: number }),
+                sunday: (reqV2.days.sunday as { E: number; L: number; N: number }) || (reqV2.days.weekdays as { E: number; L: number; N: number }),
+              }
+            };
+          } else {
+            normalizedReqV2 = {
+              framework: '12h',
+              days: {
+                weekdays: reqV2.days.weekdays as { D: number; N: number },
+                saturday: (reqV2.days.saturday as { D: number; N: number }) || (reqV2.days.weekdays as { D: number; N: number }),
+                sunday: (reqV2.days.sunday as { D: number; N: number }) || (reqV2.days.weekdays as { D: number; N: number }),
+              }
+            };
+          }
+          
+          // Trace the config loaded from database
           trace("builder.loaded.requirements_v2.database", {
-            framework: reqV2.framework,
-            weekdays: reqV2.days.weekdays,
-            saturday: reqV2.days.saturday,
-            sunday: reqV2.days.sunday,
+            framework: normalizedReqV2.framework,
+            weekdays: normalizedReqV2.days.weekdays,
+            saturday: normalizedReqV2.days.saturday,
+            sunday: normalizedReqV2.days.sunday,
           });
+          
+          setConfig({
+            pattern_id: (configData.site_patterns as any)?.id || "",
+            pattern_name: (configData.site_patterns as any)?.name || "Unknown",
+            shift_type: configData.shift_type,
+            staffing_requirements: configData.staffing_requirements,
+            requirements_v2: normalizedReqV2,
+            standard_contract_hours: configData.standard_contract_hours,
+            buffer_pct: bufferPct,
+            auto_reduce: autoReduce,
+            tenant_id: "00000000-0000-0000-0000-000000000001"
+          });
+        } else {
+          setConfig(null);
         }
-        
-        setConfig({
-          pattern_id: (configData.site_patterns as any)?.id || "",
-          pattern_name: (configData.site_patterns as any)?.name || "Unknown",
-          shift_type: configData.shift_type,
-          staffing_requirements: configData.staffing_requirements,
-          requirements_v2: reqV2,
-          standard_contract_hours: configData.standard_contract_hours,
-          buffer_pct: bufferPct,
-          auto_reduce: autoReduce,
-          tenant_id: "00000000-0000-0000-0000-000000000001"
-        });
       } else {
         setConfig(null);
       }

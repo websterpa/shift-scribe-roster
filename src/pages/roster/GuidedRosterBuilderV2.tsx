@@ -120,31 +120,55 @@ export default function GuidedRosterBuilderV2() {
         const config = JSON.parse(stored);
         console.log('✅ Feasibility config loaded:', config);
         
-        // Trace the loaded requirements
+        // Use requirementsV2 as the single source of truth
         if (config.requirementsV2) {
+          const reqV2 = config.requirementsV2;
+          
           trace("builder.loaded.requirements_v2.localStorage", {
-            framework: config.requirementsV2.framework,
-            weekdays: config.requirementsV2.days.weekdays,
-            saturday: config.requirementsV2.days.saturday,
-            sunday: config.requirementsV2.days.sunday,
+            framework: reqV2.framework,
+            weekdays: reqV2.days.weekdays,
+            saturday: reqV2.days.saturday,
+            sunday: reqV2.days.sunday,
           });
-        }
-        
-        // Determine system based on shift length
-        const system = config.shiftLength === 12 ? '12h' : '8h';
-        form.setValue('system', system);
-        
-        // Map required shifts to staffing format
-        if (config.requiredShifts) {
+          
+          // Set system from framework
+          const system = reqV2.framework;
+          form.setValue('system', system);
+          
+          // Map all day buckets to staffing format
           const staffing = form.getValues('staffing');
+          
           staffing.forEach((day: any) => {
-            day.need = {
-              E: config.requiredShifts.E || 0,
-              L: config.requiredShifts.L || 0,
-              N: config.requiredShifts.N || 0,
-              D: config.requiredShifts.D || 0
-            };
+            let dayBucket;
+            if (day.dow === 0) {
+              // Sunday
+              dayBucket = reqV2.days.sunday;
+            } else if (day.dow === 6) {
+              // Saturday
+              dayBucket = reqV2.days.saturday;
+            } else {
+              // Weekdays (Mon-Fri)
+              dayBucket = reqV2.days.weekdays;
+            }
+            
+            // Set needs based on framework
+            if (system === '8h') {
+              day.need = {
+                E: (dayBucket as any).E || 0,
+                L: (dayBucket as any).L || 0,
+                N: (dayBucket as any).N || 0,
+                D: 0
+              };
+            } else {
+              day.need = {
+                E: 0,
+                L: 0,
+                N: (dayBucket as any).N || 0,
+                D: (dayBucket as any).D || 0
+              };
+            }
           });
+          
           form.setValue('staffing', staffing);
         }
         
@@ -203,7 +227,31 @@ export default function GuidedRosterBuilderV2() {
       if (error) throw error;
       
       if (data?.requirements_v2) {
-        const reqV2 = data.requirements_v2 as unknown as RequirementsV2;
+        const rawReqV2 = data.requirements_v2 as unknown as RequirementsV2;
+        
+        // Normalize: ensure saturday and sunday exist, default to weekdays if missing
+        let reqV2: RequirementsV2;
+        
+        if (rawReqV2.framework === '8h') {
+          reqV2 = {
+            framework: '8h',
+            days: {
+              weekdays: rawReqV2.days.weekdays as { E: number; L: number; N: number },
+              saturday: (rawReqV2.days.saturday as { E: number; L: number; N: number }) || (rawReqV2.days.weekdays as { E: number; L: number; N: number }),
+              sunday: (rawReqV2.days.sunday as { E: number; L: number; N: number }) || (rawReqV2.days.weekdays as { E: number; L: number; N: number }),
+            }
+          };
+        } else {
+          reqV2 = {
+            framework: '12h',
+            days: {
+              weekdays: rawReqV2.days.weekdays as { D: number; N: number },
+              saturday: (rawReqV2.days.saturday as { D: number; N: number }) || (rawReqV2.days.weekdays as { D: number; N: number }),
+              sunday: (rawReqV2.days.sunday as { D: number; N: number }) || (rawReqV2.days.weekdays as { D: number; N: number }),
+            }
+          };
+        }
+        
         setSavedConfigRequirements(reqV2);
         
         // Trace the saved config
