@@ -52,6 +52,8 @@ import {
   type ShiftKey 
 } from '@/services/feasibility/staffingBreakdown';
 import { suggestForZeros, type Suggestion } from '@/services/feasibility/suggestCompatiblePattern';
+import { applySetupFromFeasibility } from '@/services/feasibility/applySetup';
+import { createDraftFromConfig } from '@/services/roster/createDraftFromConfig';
 
 const FeasibilityCalculator = () => {
   console.log('🧮 FeasibilityCalculator component rendered');
@@ -124,6 +126,10 @@ const FeasibilityCalculator = () => {
     return v ? v === '1' : true; // default ON
   });
   const [optimisedFrom, setOptimisedFrom] = useState<number | null>(null);
+  
+  // Generate draft roster toggle
+  const [generateNow, setGenerateNow] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   useEffect(() => {
     localStorage.setItem('feasibility.autoReduce', autoReduce ? '1' : '0');
@@ -617,7 +623,7 @@ const FeasibilityCalculator = () => {
     setWtdStatus(null);
   }, [selectedPattern?.id, shiftLengthHours, bufferPct]);
 
-  const handleSaveSetup = () => {
+  const handleSaveSetup = async () => {
     if (!result || !selectedPattern) return;
     
     // Validation guard: prevent saving invalid config
@@ -628,22 +634,46 @@ const FeasibilityCalculator = () => {
       return;
     }
 
-    const feasibilityConfig = {
-      patternId: selectedPatternId,
-      patternName: selectedPattern.name,
-      shiftLength: shiftLengthHours,
-      requiredShiftsPerDay,
-      bufferPct,
-      staffCount: staffCount ? Number(staffCount) : null,
-      requiredStaff: result.requiredStaff,
-      standardContractHours,
-      timestamp: new Date().toISOString(),
-      system,
-      requiredPerDay
-    };
+    setIsSubmitting(true);
+    try {
+      // Save config to roster_config table
+      const cfg = await applySetupFromFeasibility({
+        patternId: selectedPatternId,
+        shiftLengthHours,
+        requiredPerDay,
+        bufferPct,
+        standardContractHours,
+        autoReduceEnabled: autoReduce
+      });
 
-    localStorage.setItem('feasibilityConfig', JSON.stringify(feasibilityConfig));
-    toast.success('Configuration saved! Use it in Roster Setup.');
+      console.log('✅ Config applied:', cfg);
+
+      // If requested, create draft and navigate to it
+      if (generateNow) {
+        const now = new Date();
+        const targetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        
+        const draft = await createDraftFromConfig({
+          tenantId: cfg.tenant_id,
+          month: targetMonth,
+          configSnapshot: cfg
+        });
+
+        toast.success('Draft roster created from Feasibility setup');
+        navigate(`/rosters?month=${targetMonth}&version=${draft.versionId}`);
+        return;
+      }
+
+      // Otherwise, navigate to roster builder landing
+      toast.success('Setup applied. Opening Roster Builder…');
+      navigate(`/rosters?from=feasibility&ts=${Date.now()}`);
+      
+    } catch (err: any) {
+      console.error('❌ Error applying setup:', err);
+      toast.error(err?.message ?? 'Failed to apply setup');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Jump to first violation in monthly calendar (if calendar is rendered)
@@ -2172,14 +2202,34 @@ const FeasibilityCalculator = () => {
                   </div>
                 </div>
 
+                {/* Generate draft option */}
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={generateNow} 
+                    onChange={e => setGenerateNow(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Generate draft roster now (and open it)
+                </label>
+
                 {/* Action Button */}
                 <Button 
                   onClick={handleSaveSetup} 
-                  className="w-full"
-                  disabled={!(wtdStatus?.success ?? false) || result.requiredStaff === 0 || formError !== null}
+                  className="w-full mt-2"
+                  disabled={!(wtdStatus?.success ?? false) || result.requiredStaff === 0 || formError !== null || isSubmitting}
                 >
-                  <Save className="w-4 h-4 mr-2" />
-                  Use This Setup
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {generateNow ? 'Creating Draft...' : 'Applying...'}
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Use This Setup
+                    </>
+                  )}
                 </Button>
 
                 {/* Compare Scenarios Link */}

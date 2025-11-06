@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Info } from "lucide-react";
+import { RefreshCw, Info, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ConfigData {
@@ -15,8 +16,11 @@ interface ConfigData {
 }
 
 export function ActiveConfigBanner() {
+  const [searchParams] = useSearchParams();
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dismissed, setDismissed] = useState(false);
+  const fromFeasibility = searchParams.get('from') === 'feasibility';
 
   const loadConfig = async () => {
     setLoading(true);
@@ -66,7 +70,7 @@ export function ActiveConfigBanner() {
     return null;
   }
 
-  if (!config) {
+  if (!config || dismissed) {
     return null;
   }
 
@@ -77,12 +81,14 @@ export function ActiveConfigBanner() {
     : `D ${staffReq.day_shift_staff || 0} / N ${staffReq.night_shift_staff || 0}`;
 
   return (
-    <Card className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+    <Card className={`mb-4 ${fromFeasibility ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'}`}>
       <div className="p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-sm font-semibold text-foreground">Active Configuration</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {fromFeasibility ? '✓ Loaded from Feasibility' : 'Active Configuration'}
+              </h3>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -125,16 +131,26 @@ export function ActiveConfigBanner() {
             </div>
           </div>
           
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={loadConfig}
-            disabled={loading}
-            className="shrink-0"
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Resync
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={loadConfig}
+              disabled={loading}
+              className="shrink-0"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Resync
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDismissed(true)}
+              className="shrink-0"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       </div>
     </Card>
