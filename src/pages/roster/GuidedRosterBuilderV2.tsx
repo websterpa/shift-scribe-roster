@@ -33,6 +33,8 @@ import { useNavigate } from 'react-router-dom';
 import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 import { EligibilityInspector } from '@/features/roster/debug/EligibilityInspector';
 import { ActiveConfigBanner } from '@/features/roster/monthly/ActiveConfigBanner';
+import { ConfigDiffPanel } from '@/components/roster/ConfigDiffPanel';
+import { trace } from '@/lib/devTrace';
 
 interface PreviewData {
   requirements?: Record<string, number>;
@@ -52,6 +54,7 @@ export default function GuidedRosterBuilderV2() {
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [ackWarnings, setAckWarnings] = useState(false);
   const [hasFeasibilityConfig, setHasFeasibilityConfig] = useState(false);
+  const [savedConfigRequirements, setSavedConfigRequirements] = useState<RequirementsV2 | null>(null);
   const [openSections, setOpenSections] = useState({
     basics: true,
     pattern: true,
@@ -84,6 +87,7 @@ export default function GuidedRosterBuilderV2() {
   useEffect(() => {
     loadStaffAndSettings();
     loadFeasibilityConfig();
+    loadSavedConfig();
   }, []);
 
   // Update staffing defaults when system changes
@@ -115,6 +119,16 @@ export default function GuidedRosterBuilderV2() {
       if (stored) {
         const config = JSON.parse(stored);
         console.log('✅ Feasibility config loaded:', config);
+        
+        // Trace the loaded requirements
+        if (config.requirementsV2) {
+          trace("builder.loaded.requirements_v2.localStorage", {
+            framework: config.requirementsV2.framework,
+            weekdays: config.requirementsV2.days.weekdays,
+            saturday: config.requirementsV2.days.saturday,
+            sunday: config.requirementsV2.days.sunday,
+          });
+        }
         
         // Determine system based on shift length
         const system = config.shiftLength === 12 ? '12h' : '8h';
@@ -173,6 +187,35 @@ export default function GuidedRosterBuilderV2() {
         description: "Failed to load staff and settings data",
         variant: "destructive"
       });
+    }
+  };
+
+  const loadSavedConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('roster_config')
+        .select('requirements_v2')
+        .eq('tenant_id', '00000000-0000-0000-0000-000000000001')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data?.requirements_v2) {
+        const reqV2 = data.requirements_v2 as unknown as RequirementsV2;
+        setSavedConfigRequirements(reqV2);
+        
+        // Trace the saved config
+        trace("builder.savedConfig.loaded", {
+          framework: reqV2.framework,
+          weekdays: reqV2.days.weekdays,
+          saturday: reqV2.days.saturday,
+          sunday: reqV2.days.sunday,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error loading saved config:', error);
     }
   };
 
@@ -383,6 +426,18 @@ export default function GuidedRosterBuilderV2() {
     }
   }, [watchedValues.staffing, watchedValues.system]);
 
+  // Trace builder state changes (dev only)
+  useEffect(() => {
+    if (builderRequirementsV2) {
+      trace("builder.current.requirements_v2", {
+        framework: builderRequirementsV2.framework,
+        weekdays: builderRequirementsV2.days.weekdays,
+        saturday: builderRequirementsV2.days.saturday,
+        sunday: builderRequirementsV2.days.sunday,
+      });
+    }
+  }, [builderRequirementsV2]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -422,6 +477,14 @@ export default function GuidedRosterBuilderV2() {
               sequence: form.watch('pattern').split(''),
             } : null}
           />
+          
+          {/* Dev-only Config Diff Panel */}
+          <div className="mt-4">
+            <ConfigDiffPanel
+              savedConfig={savedConfigRequirements}
+              builderState={builderRequirementsV2}
+            />
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { RequirementsV2 } from "@/types/requirementsV2";
+import { trace } from "@/lib/devTrace";
 
 export interface ApplySetupInput {
   patternId: string;
@@ -75,6 +76,14 @@ export async function applySetupFromFeasibility(
     nextMonday.setDate(today.getDate() + diff);
     return nextMonday.toISOString().split('T')[0];
   };
+
+  // Trace the requirements being applied
+  trace("feasibility.applied.requirements_v2", {
+    framework: input.requirementsV2.framework,
+    weekdays: input.requirementsV2.days.weekdays,
+    saturday: input.requirementsV2.days.saturday,
+    sunday: input.requirementsV2.days.sunday,
+  });
 
   const configData = {
     tenant_id: tenantId,

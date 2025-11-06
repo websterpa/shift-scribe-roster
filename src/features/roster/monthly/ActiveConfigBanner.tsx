@@ -13,6 +13,7 @@ import { checkConfig, type ConsistencyIssue } from "@/utils/consistency/checkCon
 import { reconcileToFeasibility, reconcileToBuilder } from "@/services/config/reconcile";
 import { useToast } from "@/hooks/use-toast";
 import type { RequirementsV2 } from "@/types/requirementsV2";
+import { trace } from "@/lib/devTrace";
 
 interface ConfigData {
   pattern_id: string;
@@ -88,12 +89,24 @@ export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBanner
           }
         }
         
+        const reqV2 = configData.requirements_v2 as unknown as RequirementsV2 | null;
+        
+        // Trace the config loaded from database
+        if (reqV2) {
+          trace("builder.loaded.requirements_v2.database", {
+            framework: reqV2.framework,
+            weekdays: reqV2.days.weekdays,
+            saturday: reqV2.days.saturday,
+            sunday: reqV2.days.sunday,
+          });
+        }
+        
         setConfig({
           pattern_id: (configData.site_patterns as any)?.id || "",
           pattern_name: (configData.site_patterns as any)?.name || "Unknown",
           shift_type: configData.shift_type,
           staffing_requirements: configData.staffing_requirements,
-          requirements_v2: configData.requirements_v2 as unknown as RequirementsV2 | null,
+          requirements_v2: reqV2,
           standard_contract_hours: configData.standard_contract_hours,
           buffer_pct: bufferPct,
           auto_reduce: autoReduce,
