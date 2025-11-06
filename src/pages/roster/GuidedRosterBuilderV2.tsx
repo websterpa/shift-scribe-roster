@@ -18,6 +18,7 @@ import {
 } from '@/domain/invariants';
 import { assertShiftToken, LABEL_FROM_TOKEN, allowedTokens, LABEL } from '@/domain/shifts';
 import type { StaffMember } from '@/types/roster';
+import type { RequirementsV2 } from '@/types/requirementsV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,7 @@ import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock, Cal
 import { useNavigate } from 'react-router-dom';
 import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 import { EligibilityInspector } from '@/features/roster/debug/EligibilityInspector';
+import { ActiveConfigBanner } from '@/features/roster/monthly/ActiveConfigBanner';
 
 interface PreviewData {
   requirements?: Record<string, number>;
@@ -334,6 +336,53 @@ export default function GuidedRosterBuilderV2() {
     return true;
   }, [fatalErrors.length, warnings.length, ackWarnings, isLoadingPreview, isGenerating]);
 
+  // Convert staffing array to RequirementsV2 for consistency checking
+  const builderRequirementsV2 = useMemo<RequirementsV2 | null>(() => {
+    const values = form.getValues();
+    const framework = values.system;
+    
+    if (!values.staffing || values.staffing.length === 0) return null;
+
+    // Group by day type
+    const weekdayData: Record<string, number> = {};
+    const saturdayData: Record<string, number> = {};
+    const sundayData: Record<string, number> = {};
+
+    values.staffing.forEach(day => {
+      const target = 
+        day.dow === 0 ? sundayData :
+        day.dow === 6 ? saturdayData :
+        weekdayData;
+      
+      Object.entries(day.need).forEach(([shift, count]) => {
+        if (count > 0) {
+          target[shift] = count;
+        }
+      });
+    });
+
+    // Ensure all keys are present with defaults
+    if (framework === '8h') {
+      return {
+        framework: '8h',
+        days: {
+          weekdays: { E: weekdayData.E || 0, L: weekdayData.L || 0, N: weekdayData.N || 0 },
+          saturday: { E: saturdayData.E || 0, L: saturdayData.L || 0, N: saturdayData.N || 0 },
+          sunday: { E: sundayData.E || 0, L: sundayData.L || 0, N: sundayData.N || 0 },
+        },
+      };
+    } else {
+      return {
+        framework: '12h',
+        days: {
+          weekdays: { D: weekdayData.D || 0, N: weekdayData.N || 0 },
+          saturday: { D: saturdayData.D || 0, N: saturdayData.N || 0 },
+          sunday: { D: sundayData.D || 0, N: sundayData.N || 0 },
+        },
+      };
+    }
+  }, [watchedValues.staffing, watchedValues.system]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -361,6 +410,18 @@ export default function GuidedRosterBuilderV2() {
               </AlertDescription>
             </Alert>
           )}
+          
+          {/* Consistency Banner */}
+          <ActiveConfigBanner
+            builderState={{
+              requirements_v2: builderRequirementsV2,
+              shift_length_hours: form.watch('system') === '8h' ? 8 : 12,
+            }}
+            pattern={form.watch('pattern') ? {
+              id: 'current',
+              sequence: form.watch('pattern').split(''),
+            } : null}
+          />
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -514,7 +575,7 @@ export default function GuidedRosterBuilderV2() {
                       </div>
                     )}
                     
-                    <RequirementsMiniComposer
+                     <RequirementsMiniComposer
                       framework={form.watch('system')}
                       onFrameworkChange={(fw) => {
                         form.setValue('system', fw);
@@ -534,6 +595,22 @@ export default function GuidedRosterBuilderV2() {
                         form.setValue('staffing', staffingArray);
                       }}
                     />
+                    
+                    {/* Save button for builder state */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      data-testid="builder-save"
+                      onClick={() => {
+                        // Trigger validation
+                        updatePreview();
+                        validateInputs();
+                      }}
+                    >
+                      Save & Validate
+                    </Button>
                   </CardContent>
                 </CollapsibleContent>
               </Collapsible>

@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Info, X, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { RefreshCw, Info, X, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { detectConfigDrift, type FeasibilitySnapshot, type LiveConfig } from "@/services/feasibility/snapshotDiff";
+import { checkConfig, type ConsistencyIssue } from "@/utils/consistency/checkConfig";
 import type { RequirementsV2 } from "@/types/requirementsV2";
 
 interface ConfigData {
@@ -18,15 +20,28 @@ interface ConfigData {
   standard_contract_hours: number;
   buffer_pct?: number;
   auto_reduce?: boolean;
+  tenant_id?: string;
 }
 
-export function ActiveConfigBanner() {
+interface ActiveConfigBannerProps {
+  builderState?: {
+    requirements_v2: RequirementsV2 | null;
+    shift_length_hours?: number;
+  };
+  pattern?: {
+    id: string;
+    sequence: string[];
+  } | null;
+}
+
+export function ActiveConfigBanner({ builderState, pattern }: ActiveConfigBannerProps = {}) {
   const [searchParams] = useSearchParams();
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [snapshot, setSnapshot] = useState<FeasibilitySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState(false);
   const [driftExpanded, setDriftExpanded] = useState(false);
+  const [issuesExpanded, setIssuesExpanded] = useState(false);
   const fromFeasibility = searchParams.get('from') === 'feasibility';
   const versionId = searchParams.get('version');
 
@@ -75,7 +90,8 @@ export function ActiveConfigBanner() {
           requirements_v2: configData.requirements_v2 as unknown as RequirementsV2 | null,
           standard_contract_hours: configData.standard_contract_hours,
           buffer_pct: bufferPct,
-          auto_reduce: autoReduce
+          auto_reduce: autoReduce,
+          tenant_id: "00000000-0000-0000-0000-000000000001"
         });
       } else {
         setConfig(null);
@@ -131,6 +147,44 @@ export function ActiveConfigBanner() {
 
   const diffs = detectConfigDrift(snapshot, liveConfig);
   const hasDrift = diffs && diffs.length > 0;
+
+  // Run consistency checks
+  const consistencyIssues = useMemo<ConsistencyIssue[]>(() => {
+    if (!config) return [];
+    
+    const shiftLengthHours = config.shift_type === '8h' ? 8 : 12;
+    
+    return checkConfig({
+      tenantId: config.tenant_id,
+      config: {
+        tenant_id: config.tenant_id,
+        shift_length_hours: shiftLengthHours,
+        buffer_pct: config.buffer_pct ?? 10,
+        standard_contract_hours: config.standard_contract_hours,
+        auto_reduce_enabled: config.auto_reduce ?? false,
+        pattern_id: config.pattern_id,
+        requirements_v2: config.requirements_v2,
+      },
+      builder: builderState || {
+        requirements_v2: config.requirements_v2,
+        shift_length_hours: shiftLengthHours,
+      },
+      pattern: pattern,
+      snapshot: snapshot ? {
+        requirements_v2: snapshot.requirements_v2,
+        shift_length_hours: snapshot.framework === '8h' ? 8 : 12,
+        buffer_pct: snapshot.buffer_pct,
+        standard_contract_hours: snapshot.standard_contract_hours,
+        auto_reduce_enabled: snapshot.auto_reduce_enabled,
+        pattern_id: snapshot.pattern_id,
+      } : null,
+    });
+  }, [config, builderState, pattern, snapshot]);
+
+  const errorCount = consistencyIssues.filter(i => i.severity === 'error').length;
+  const warnCount = consistencyIssues.filter(i => i.severity === 'warn').length;
+  const infoCount = consistencyIssues.filter(i => i.severity === 'info').length;
+  const totalIssues = consistencyIssues.length;
 
   const is8h = config.shift_type === "8h";
   const staffReq = config.staffing_requirements || {};
@@ -217,6 +271,83 @@ export function ActiveConfigBanner() {
                 </span>
               </div>
             </div>
+
+            {/* Consistency Issues */}
+            {totalIssues > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-foreground">Issues:</span>
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs"
+                    data-testid="config-issues-count"
+                  >
+                    {totalIssues}
+                  </Badge>
+                  {errorCount > 0 && (
+                    <Badge variant="destructive" className="text-xs" data-severity="error">
+                      {errorCount} error{errorCount !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {warnCount > 0 && (
+                    <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800" data-severity="warn">
+                      {warnCount} warning{warnCount !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  {infoCount > 0 && (
+                    <Badge variant="secondary" className="text-xs" data-severity="info">
+                      {infoCount} info
+                    </Badge>
+                  )}
+                </div>
+                
+                <Collapsible open={issuesExpanded} onOpenChange={setIssuesExpanded}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-xs px-0 h-auto">
+                      {issuesExpanded ? "Hide" : "Show"} details
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div 
+                      className="bg-white/60 rounded-md border border-gray-200 p-3 space-y-2"
+                      data-testid="config-issues-list"
+                    >
+                      {consistencyIssues.map((issue, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`flex items-start gap-2 text-xs p-2 rounded ${
+                            issue.severity === 'error' 
+                              ? 'bg-red-50 border border-red-200' 
+                              : issue.severity === 'warn'
+                              ? 'bg-amber-50 border border-amber-200'
+                              : 'bg-gray-50 border border-gray-200'
+                          }`}
+                        >
+                          {issue.severity === 'error' ? (
+                            <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                          ) : issue.severity === 'warn' ? (
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <Info className="h-4 w-4 text-gray-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1">
+                            <div className="font-medium">{issue.message}</div>
+                            {issue.details && (
+                              <div className="text-muted-foreground mt-1">{issue.details}</div>
+                            )}
+                            {issue.path && (
+                              <div className="text-muted-foreground font-mono text-[10px] mt-1">
+                                {issue.path}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            )}
 
             {/* Drift details */}
             {hasDrift && diffs && (
