@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { routes } from '@/navigation/routes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -659,14 +660,30 @@ const FeasibilityCalculator = () => {
           configSnapshot: cfg
         });
 
+        // Guard: ensure we have a valid version ID before navigating
+        if (!draft.versionId) {
+          console.error('❌ Draft created but no version ID returned:', draft);
+          toast.error('Draft creation failed - missing version ID');
+          return;
+        }
+
+        const targetPath = routes.rosterMonthly({ 
+          month: targetMonth, 
+          versionId: draft.versionId 
+        });
+        
+        console.debug('🚀 Navigating to draft roster:', targetPath);
         toast.success('Draft roster created from Feasibility setup');
-        navigate(`/rosters?month=${targetMonth}&version=${draft.versionId}`);
+        navigate(targetPath);
         return;
       }
 
       // Otherwise, navigate to roster builder landing
+      const targetPath = `${routes.rosterBuilder}?from=feasibility&ts=${Date.now()}`;
+      
+      console.debug('🚀 Navigating to roster builder:', targetPath);
       toast.success('Setup applied. Opening Roster Builder…');
-      navigate(`/rosters?from=feasibility&ts=${Date.now()}`);
+      navigate(targetPath);
       
     } catch (err: any) {
       console.error('❌ Error applying setup:', err);

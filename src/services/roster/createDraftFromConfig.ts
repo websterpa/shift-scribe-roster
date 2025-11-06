@@ -7,6 +7,10 @@ export interface CreateDraftInput {
   configSnapshot: RosterConfigRow;
 }
 
+/**
+ * Result of creating a draft roster.
+ * Guarantees a stable versionId field for navigation.
+ */
 export interface CreateDraftResult {
   versionId: string;
   configId: string;
@@ -39,6 +43,12 @@ export async function createDraftFromConfig(
   if (versionError || !version) {
     console.error('❌ Error creating roster version:', versionError);
     throw new Error(`Failed to create draft: ${versionError?.message}`);
+  }
+
+  // Guard: ensure we have a valid ID before returning
+  if (!version.id) {
+    console.error('❌ Version created but no ID returned:', version);
+    throw new Error('Draft created but version ID is missing');
   }
 
   console.log('✅ Draft roster version created:', version);

@@ -49,6 +49,11 @@ export function AppRouter() {
             <Route path="/privacy" element={<PrivacyPage />} />
             
             {/* Authenticated routes with layout */}
+            {/* 
+              CANONICAL ROUTE PATHS (keep in sync with src/navigation/routes.ts):
+              - /roster/builder → Roster Builder landing (GuidedRosterBuilderV2)
+              - /roster/monthly?month=YYYY-MM&version=uuid → Monthly roster view (MonthlyPage)
+            */}
             <Route path="/" element={<ProtectedRoute><AuthenticatedLayout /></ProtectedRoute>}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="staff" element={<Staff />} />
