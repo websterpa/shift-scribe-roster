@@ -35,15 +35,15 @@ export interface FeasibilityResult {
   workRatio: number;
   activeDaysInCycle: number;
   restDaysInCycle: number;
-  hoursPerStaffPerWeek: number;
+  hoursPerStaffPerWeek: number; // Pattern-derived (informational only)
   weeklyHoursRequired: number;
   
-  // Staffing metrics
-  requiredStaff: number;
-  utilizationPct: number;
+  // Staffing metrics (CONTRACT-BASED)
+  requiredStaff: number; // Based on standardContractHours
+  utilizationPct: number; // Based on standardContractHours
   surplus: number | null;
-  standardContractHours: number;
-  availableHoursPerWeek: number;
+  standardContractHours: number; // Contract basis for all capacity calculations
+  availableHoursPerWeek: number; // requiredStaff * standardContractHours
   overtimeGapPerWeek: number;
   fteRequired: number;
   fteAvailable: number;
@@ -161,24 +161,26 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
     };
   }
   
-  // Calculate hours per staff per week
+  // Feasibility is contract-based; pattern per-staff hours are informational only.
+  // Calculate pattern-based hours per staff per week (for reference/display only)
   const hoursPerStaffPerWeek = (activeDays / cycleLength) * 7 * shiftLengthHours;
   
-  // Calculate weekly demand
+  // Calculate weekly demand (team-level requirement)
   const weeklyHoursRequired = requiredShiftsPerDay * 7 * shiftLengthHours;
   
-  // Calculate required staff (with buffer)
+  // Calculate required staff (CONTRACT-BASED with buffer)
   const bufferMultiplier = 1 + (bufferPercent / 100);
-  const requiredStaff = Math.ceil((weeklyHoursRequired / hoursPerStaffPerWeek) * bufferMultiplier);
+  const requiredStaff = Math.ceil((weeklyHoursRequired / standardContractHours) * bufferMultiplier);
   
-  // Calculate utilization
-  const utilizationPct = (weeklyHoursRequired / (requiredStaff * hoursPerStaffPerWeek)) * 100;
+  // Calculate utilization (CONTRACT-BASED)
+  const availableHoursPerWeekCalc = requiredStaff * standardContractHours;
+  const utilizationPct = (weeklyHoursRequired / availableHoursPerWeekCalc) * 100;
   
   // Calculate surplus/deficit
   const surplus = currentStaffCount ? currentStaffCount - requiredStaff : null;
   
-  // Calculate operational capacity vs requirement
-  const availableHoursPerWeek = standardContractHours * requiredStaff;
+  // Calculate operational capacity vs requirement (CONTRACT-BASED)
+  const availableHoursPerWeek = requiredStaff * standardContractHours;
   const overtimeGapPerWeek = Math.max(0, weeklyHoursRequired - availableHoursPerWeek);
   
   // Calculate FTE (Full-Time Equivalent) based on standard contract hours
@@ -208,15 +210,17 @@ export function calculateFeasibility(input: FeasibilityInput): FeasibilityResult
     weeklyRestOk: weeklyRestCheck.valid
   };
   
-  // Generate warnings
+  // Generate warnings (pattern hours are informational only - not used for capacity)
   const warnings: string[] = [];
   
-  if (hoursPerStaffPerWeek < 30) {
-    warnings.push('Low weekly hours per staff - may indicate underutilization');
+  // Note: hoursPerStaffPerWeek is pattern-derived and informational only
+  // Warnings based on contract hours instead
+  if (standardContractHours < 30) {
+    warnings.push('Low contracted hours - check contract configuration');
   }
   
-  if (hoursPerStaffPerWeek > 48) {
-    warnings.push('High weekly hours per staff - WTD compliance at risk');
+  if (weeklyHoursRequired / requiredStaff > 48) {
+    warnings.push('Required workload exceeds 48h/staff/week - WTD compliance at risk');
   }
   
   if (utilizationPct < 70) {

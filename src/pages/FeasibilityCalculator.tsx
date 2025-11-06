@@ -665,21 +665,33 @@ const FeasibilityCalculator = () => {
       
       // Calculations
       pdf.setFontSize(14);
-      pdf.text('Calculated Results:', 40, 200);
+      pdf.text('Calculated Results (contract-based):', 40, 200);
       pdf.setFontSize(12);
       pdf.text(`Work Ratio: ${(result.workRatio * 100).toFixed(1)}%`, 40, 220);
-      pdf.text(`Avg Weekly Hours/Staff: ${result.hoursPerStaffPerWeek.toFixed(1)}h`, 40, 240);
-      pdf.text(`Weekly Demand: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 260);
-      pdf.text(`Required Staff: ${result.requiredStaff.toFixed(1)}`, 40, 280);
-      pdf.text(`Utilisation: ${result.utilizationPct.toFixed(1)}%`, 40, 300);
-      pdf.text(`Standard Contract Hours: ${result.standardContractHours}h/week`, 40, 320);
-      pdf.text(`Available Hours/Week: ${result.availableHoursPerWeek.toFixed(1)}h`, 40, 340);
-      pdf.text(`Overtime Gap/Week: ${result.overtimeGapPerWeek.toFixed(1)}h`, 40, 360);
-      pdf.text(`FTE Required: ${result.fteRequired.toFixed(2)}`, 40, 380);
-      pdf.text(`FTE Available: ${result.fteAvailable.toFixed(2)}`, 40, 400);
+      pdf.text(`Planning Basis (Contract): ${result.standardContractHours}h/week`, 40, 240);
+      pdf.text(`Pattern Workload (info): ${result.hoursPerStaffPerWeek.toFixed(1)}h/week`, 40, 260);
+      pdf.text(`Weekly Demand: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 280);
+      pdf.text(`Required Staff: ${result.requiredStaff.toFixed(1)}`, 40, 300);
+      pdf.text(`Utilisation: ${result.utilizationPct.toFixed(1)}%`, 40, 320);
+      
+      // Operational Capacity Section
+      pdf.setFontSize(14);
+      pdf.text('Operational Capacity:', 40, 350);
+      pdf.setFontSize(12);
+      pdf.text(`Standard Contract Hours/Week: ${result.standardContractHours}h`, 40, 370);
+      pdf.text(`Required Hours/Week: ${result.weeklyHoursRequired.toFixed(1)}h`, 40, 390);
+      pdf.text(`Available Hours/Week: ${result.availableHoursPerWeek.toFixed(1)}h`, 40, 410);
+      if (result.overtimeGapPerWeek > 0) {
+        pdf.text(`Overtime Gap/Week: ${result.overtimeGapPerWeek.toFixed(1)}h`, 40, 430);
+      } else {
+        pdf.text(`Slack/Week: ${(result.availableHoursPerWeek - result.weeklyHoursRequired).toFixed(1)}h`, 40, 430);
+      }
+      pdf.text(`FTE Required: ${result.fteRequired.toFixed(2)}`, 40, 450);
+      pdf.text(`FTE Available: ${result.fteAvailable.toFixed(2)}`, 40, 470);
+      pdf.text(`FTE Gap: ${(result.fteRequired - result.fteAvailable).toFixed(2)}`, 40, 490);
       
       // Add overtime metrics if available
-      let yPos = 420;
+      let yPos = 510;
       if (overtimeMetrics && Object.keys(requiredPerDay).length > 0) {
         pdf.text(`Required Hours/Week: ${overtimeMetrics.reqWeek.toFixed(1)}h`, 40, yPos);
         yPos += 20;
@@ -751,15 +763,18 @@ const FeasibilityCalculator = () => {
         [''],
         ['Results'],
         ['Work Ratio', `${(result.workRatio * 100).toFixed(1)}%`],
-        ['Avg Weekly Hours Per Staff', `${result.hoursPerStaffPerWeek.toFixed(1)}h`],
+        ['Planning Basis (Contract)', `${result.standardContractHours}h/week`],
+        ['Pattern Workload (info)', `${result.hoursPerStaffPerWeek.toFixed(1)}h/week`],
         ['Weekly Demand', `${result.weeklyHoursRequired.toFixed(1)}h`],
         ['Required Staff', result.requiredStaff.toString()],
         ['Utilization', `${result.utilizationPct.toFixed(1)}%`],
         ['Standard Contract Hours', `${result.standardContractHours}h/week`],
         ['Available Hours/Week', `${result.availableHoursPerWeek.toFixed(1)}h`],
         ['Overtime Gap/Week', `${result.overtimeGapPerWeek.toFixed(1)}h`],
+        ['Slack/Week', `${Math.max(0, result.availableHoursPerWeek - result.weeklyHoursRequired).toFixed(1)}h`],
         ['FTE Required', result.fteRequired.toFixed(2)],
         ['FTE Available', result.fteAvailable.toFixed(2)],
+        ['FTE Gap', (result.fteRequired - result.fteAvailable).toFixed(2)],
         ...(overtimeMetrics && Object.keys(requiredPerDay).length > 0 ? [
           ['Required Hours/Week', `${overtimeMetrics.reqWeek.toFixed(1)}h`],
           ['Overtime/Week', `${overtimeMetrics.overtime.toFixed(1)}h`],
@@ -1240,35 +1255,49 @@ const FeasibilityCalculator = () => {
                     <span className="font-medium">{(result.workRatio * 100).toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Hours per Staff/Week:</span>
-                    <span className="font-medium">{result.hoursPerStaffPerWeek.toFixed(1)}h</span>
+                    <span className="text-muted-foreground">Planning basis (contract):</span>
+                    <span className="font-medium">{result.standardContractHours}h/week</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Weekly Hours:</span>
+                    <span className="text-muted-foreground">Total Weekly Demand:</span>
                     <span className="font-medium">{result.weeklyHoursRequired.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground text-xs italic">Pattern workload (info):</span>
+                    <span className="font-medium text-xs text-muted-foreground">{result.hoursPerStaffPerWeek.toFixed(1)}h/week</span>
                   </div>
                 </div>
 
-                {/* Operational Capacity */}
+                {/* Operational Capacity (contract-based) */}
                 <div className="space-y-3 pt-4 border-t">
-                  <p className="text-sm font-semibold">Operational Capacity</p>
+                  <p className="text-sm font-semibold">Operational Capacity (contract-based)</p>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Standard Contract Hours/Week:</span>
                     <span className="font-medium">{result.standardContractHours}h</span>
                   </div>
                   <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Required Hours/Week:</span>
+                    <span className="font-medium">{result.weeklyHoursRequired.toFixed(1)}h</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Available Hours/Week:</span>
                     <span className="font-medium">{result.availableHoursPerWeek.toFixed(1)}h</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Overtime Gap/Week:</span>
-                    <span className={cn(
-                      "font-medium",
-                      result.overtimeGapPerWeek > 0 ? "text-amber-600" : "text-emerald-600"
-                    )}>
-                      {result.overtimeGapPerWeek.toFixed(1)}h
-                    </span>
-                  </div>
+                  {result.overtimeGapPerWeek > 0 ? (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Overtime Gap/Week:</span>
+                      <span className="font-medium text-amber-600">
+                        {result.overtimeGapPerWeek.toFixed(1)}h
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Slack h/week:</span>
+                      <span className="font-medium text-emerald-600">
+                        {(result.availableHoursPerWeek - result.weeklyHoursRequired).toFixed(1)}h
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">FTE Required:</span>
                     <span className="font-medium">{result.fteRequired.toFixed(2)}</span>
@@ -1276,6 +1305,15 @@ const FeasibilityCalculator = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">FTE Available:</span>
                     <span className="font-medium">{result.fteAvailable.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">FTE Gap:</span>
+                    <span className={cn(
+                      "font-medium",
+                      (result.fteRequired - result.fteAvailable) > 0 ? "text-amber-600" : "text-emerald-600"
+                    )}>
+                      {(result.fteRequired - result.fteAvailable).toFixed(2)}
+                    </span>
                   </div>
                 </div>
 
