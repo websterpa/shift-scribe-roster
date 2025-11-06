@@ -979,20 +979,22 @@ const FeasibilityCalculator = () => {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
+    <div className="mx-auto max-w-screen-2xl px-3 sm:px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+        <h1 className="text-3xl font-bold flex items-center gap-3">
           <Calculator className="w-8 h-8 text-primary" />
           Feasibility Calculator
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-muted-foreground mt-2">
           Calculate minimum staff requirements based on patterns, shift durations, and WTD constraints
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Input Panel */}
-        <Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
+        {/* LEFT COLUMN */}
+        <div className="flex flex-col gap-6">
+          {/* Configuration Card */}
+          <Card>
           <CardHeader>
             <CardTitle>Configuration</CardTitle>
             <CardDescription>Define your roster requirements</CardDescription>
@@ -1352,8 +1354,97 @@ const FeasibilityCalculator = () => {
           </CardContent>
         </Card>
 
-        {/* Results Panel */}
-        <Card>
+          {/* Save or Load Scenario Card */}
+          {result && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Save or Load Scenario</CardTitle>
+                <CardDescription>Persist and compare different configuration setups</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Save Section */}
+                <div className="space-y-2">
+                  <Label htmlFor="scenarioName">Save Current Configuration</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="scenarioName"
+                      placeholder="Enter scenario name (optional)"
+                      value={scenarioName}
+                      onChange={(e) => setScenarioName(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleSaveScenario}
+                      disabled={isSaving || !result || formError !== null}
+                      variant="secondary"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-generated name if left blank: {selectedPattern?.name} – {new Date().toLocaleDateString()}
+                  </p>
+                </div>
+
+                {/* Load Section */}
+                <div className="space-y-2 pt-4 border-t">
+                  <Label>Load Saved Scenario ({scenarios.length})</Label>
+                  {isLoadingScenarios ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : scenarios.length > 0 ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {scenarios.map((scenario) => (
+                        <div
+                          key={scenario.id}
+                          className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                          onClick={() => handleLoadScenario(scenario.id!)}
+                        >
+                          <div className="flex-1 space-y-1">
+                            <p className="font-medium text-sm">{scenario.name}</p>
+                            <div className="flex gap-4 text-xs text-muted-foreground">
+                              <span>{scenario.pattern_name}</span>
+                              <span>Staff: {scenario.staff_count ?? 'N/A'}</span>
+                              <span>Shift: {scenario.shift_length}h</span>
+                              <span className={scenario.is_wtd_compliant ? 'text-green-600' : 'text-destructive'}>
+                                {scenario.is_wtd_compliant ? '✅ Compliant' : '⚠️ Breaches: ' + scenario.total_breaches}
+                              </span>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleDeleteScenario(scenario.id!, e)}
+                            className="shrink-0 ml-2"
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Alert>
+                      <AlertDescription className="text-sm">
+                        No saved scenarios yet. Configure a pattern and click "Save" above.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div className="flex flex-col gap-6">
+          {/* Results Panel */}
+          <Card>
           <CardHeader>
             <CardTitle>Analysis Results</CardTitle>
             <CardDescription>Calculated staffing requirements</CardDescription>
@@ -2000,92 +2091,7 @@ const FeasibilityCalculator = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Scenario Management */}
-        {result && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Save or Load Scenario</CardTitle>
-              <CardDescription>Persist and compare different configuration setups</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Save Section */}
-              <div className="space-y-2">
-                <Label htmlFor="scenarioName">Save Current Configuration</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="scenarioName"
-                    placeholder="Enter scenario name (optional)"
-                    value={scenarioName}
-                    onChange={(e) => setScenarioName(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleSaveScenario}
-                    disabled={isSaving || !result || formError !== null}
-                    variant="secondary"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Auto-generated name if left blank: {selectedPattern?.name} – {new Date().toLocaleDateString()}
-                </p>
-              </div>
-
-              {/* Load Section */}
-              <div className="space-y-2 pt-4 border-t">
-                <Label>Load Saved Scenario ({scenarios.length})</Label>
-                {isLoadingScenarios ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : scenarios.length > 0 ? (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {scenarios.map((scenario) => (
-                      <div
-                        key={scenario.id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                        onClick={() => handleLoadScenario(scenario.id!)}
-                      >
-                        <div className="flex-1 space-y-1">
-                          <p className="font-medium text-sm">{scenario.name}</p>
-                          <div className="flex gap-4 text-xs text-muted-foreground">
-                            <span>{scenario.pattern_name}</span>
-                            <span>Staff: {scenario.staff_count ?? 'N/A'}</span>
-                            <span>Shift: {scenario.shift_length}h</span>
-                            <span className={scenario.is_wtd_compliant ? 'text-green-600' : 'text-destructive'}>
-                              {scenario.is_wtd_compliant ? '✅ Compliant' : '⚠️ Breaches: ' + scenario.total_breaches}
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDeleteScenario(scenario.id!, e)}
-                          className="shrink-0 ml-2"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Alert>
-                    <AlertDescription className="text-sm">
-                      No saved scenarios yet. Configure a pattern and click "Save" above.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        </div>
       </div>
     </div>
   );
