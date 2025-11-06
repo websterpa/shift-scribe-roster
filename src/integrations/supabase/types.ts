@@ -498,6 +498,7 @@ export type Database = {
           pattern: Json | null
           pattern_locked: boolean | null
           required_shifts: string[] | null
+          requirements_v2: Json | null
           shift_type: string
           site_start_time: string | null
           staffing_requirements: Json | null
@@ -519,6 +520,7 @@ export type Database = {
           pattern?: Json | null
           pattern_locked?: boolean | null
           required_shifts?: string[] | null
+          requirements_v2?: Json | null
           shift_type: string
           site_start_time?: string | null
           staffing_requirements?: Json | null
@@ -540,6 +542,7 @@ export type Database = {
           pattern?: Json | null
           pattern_locked?: boolean | null
           required_shifts?: string[] | null
+          requirements_v2?: Json | null
           shift_type?: string
           site_start_time?: string | null
           staffing_requirements?: Json | null

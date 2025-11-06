@@ -1,9 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { RequirementsV2 } from "@/types/requirementsV2";
 
 export interface ApplySetupInput {
   patternId: string;
   shiftLengthHours: number;
-  requiredPerDay: Partial<Record<string, number>>;
+  requirementsV2: RequirementsV2;
   bufferPct: number;
   standardContractHours: number;
   autoReduceEnabled: boolean;
@@ -42,22 +43,27 @@ export async function applySetupFromFeasibility(
     throw new Error(`Pattern not found: ${patternError?.message}`);
   }
 
-  // Map per-shift requirements to staffing_requirements format
+  // Use v2 requirements directly
+  const shiftType = input.requirementsV2.framework;
+  
+  // Keep legacy staffing_requirements for backward compatibility
   const staffingRequirements: any = {};
-  const shiftType = input.shiftLengthHours === 8 ? '8h' : '12h';
+  const { weekdays } = input.requirementsV2.days;
   
   if (shiftType === '8h') {
-    staffingRequirements.early_shift_staff = input.requiredPerDay.E || 0;
-    staffingRequirements.late_shift_staff = input.requiredPerDay.L || 0;
-    staffingRequirements.night_shift_staff = input.requiredPerDay.N || 0;
+    const day8h = weekdays as { E: number; L: number; N: number };
+    staffingRequirements.early_shift_staff = day8h.E || 0;
+    staffingRequirements.late_shift_staff = day8h.L || 0;
+    staffingRequirements.night_shift_staff = day8h.N || 0;
   } else {
-    staffingRequirements.day_shift_staff = input.requiredPerDay.D || 0;
-    staffingRequirements.night_shift_staff = input.requiredPerDay.N || 0;
+    const day12h = weekdays as { D: number; N: number };
+    staffingRequirements.day_shift_staff = day12h.D || 0;
+    staffingRequirements.night_shift_staff = day12h.N || 0;
   }
 
-  // Required shifts array for pattern matching
-  const requiredShifts = Object.keys(input.requiredPerDay).filter(
-    k => (input.requiredPerDay as any)[k] > 0
+  // Required shifts array for pattern matching (from weekdays)
+  const requiredShifts = Object.keys(weekdays).filter(
+    k => (weekdays as any)[k] > 0
   );
 
   // Calculate start date (next Monday)
@@ -75,7 +81,8 @@ export async function applySetupFromFeasibility(
     config_name: `Feasibility ${pattern.name} ${new Date().toISOString().slice(0, 10)}`,
     cycle_length_weeks: pattern.cycle_length || 17,
     shift_type: shiftType,
-    staffing_requirements: staffingRequirements,
+    staffing_requirements: staffingRequirements, // Legacy field
+    requirements_v2: input.requirementsV2, // New unified schema
     standard_contract_hours: input.standardContractHours,
     timezone: 'Europe/London',
     site_start_time: '07:00',
@@ -94,7 +101,7 @@ export async function applySetupFromFeasibility(
 
   const { data: savedConfig, error: insertError } = await supabase
     .from('roster_config')
-    .insert(configData)
+    .insert(configData as any) // Cast to any due to JSONB field type complexity
     .select()
     .single();
 
@@ -114,7 +121,7 @@ export async function applySetupFromFeasibility(
     standardContractHours: input.standardContractHours,
     timestamp: new Date().toISOString(),
     system: shiftType,
-    requiredPerDay: input.requiredPerDay,
+    requirementsV2: input.requirementsV2,
     autoReduceEnabled: input.autoReduceEnabled
   }));
 

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { routes } from '@/navigation/routes';
+import type { RequirementsV2 } from '@/types/requirementsV2';
+import { createDefaultRequirementsV2, requirementsV2ToDayOfWeek } from '@/types/requirementsV2';
+import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,7 +83,7 @@ const FeasibilityCalculator = () => {
     }
   });
 
-  // Form state
+  // Form state - keep legacy for calculations, add v2 for persistence
   const [selectedPatternId, setSelectedPatternId] = useState<string>('');
   const [shiftLengthHours, setShiftLengthHours] = useState<number>(8);
   const [requiredShiftsPerDay, setRequiredShiftsPerDay] = useState<number>(3);
@@ -93,6 +96,12 @@ const FeasibilityCalculator = () => {
     return '8h'; // Default to 8h
   });
   const wtdRules = DEFAULT_WTD_RULES;
+  
+  // V2 requirements (for persistence only)
+  const [requirementsV2, setRequirementsV2] = useState<RequirementsV2>(
+    createDefaultRequirementsV2('8h')
+  );
+  const [requiredPerDay, setRequiredPerDay] = useState<Partial<Record<ShiftKey, number>>>({});
 
   // Result state
   const [result, setResult] = useState<ReturnType<typeof calculateFeasibility> | null>(null);
@@ -114,7 +123,7 @@ const FeasibilityCalculator = () => {
   const [wtdStatus, setWtdStatus] = useState<WTDStatus | null>(null);
   
   // Per-shift staffing requirements
-  const [requiredPerDay, setRequiredPerDay] = useState<Partial<Record<ShiftKey, number>>>({});
+  // Removed: requiredPerDay now derived from requirementsV2
   
   // Form validation state
   const [formError, setFormError] = useState<{ title: string; details: string } | null>(null);
@@ -641,7 +650,7 @@ const FeasibilityCalculator = () => {
       const cfg = await applySetupFromFeasibility({
         patternId: selectedPatternId,
         shiftLengthHours,
-        requiredPerDay,
+        requirementsV2,
         bufferPct,
         standardContractHours,
         autoReduceEnabled: autoReduce
