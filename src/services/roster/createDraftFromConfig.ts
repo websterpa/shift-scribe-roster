@@ -1,10 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { RosterConfigRow } from "@/services/feasibility/applySetup";
+import type { FeasibilitySnapshot } from "@/services/feasibility/snapshotDiff";
 
 export interface CreateDraftInput {
   tenantId: string;
   month: string; // YYYY-MM format
   configSnapshot: RosterConfigRow;
+  feasibilitySnapshot?: FeasibilitySnapshot | null;
 }
 
 /**
@@ -22,21 +24,28 @@ export async function createDraftFromConfig(
 ): Promise<CreateDraftResult> {
   console.log('📋 Creating draft roster from config...', input);
 
-  const { configSnapshot, tenantId, month } = input;
+  const { configSnapshot, tenantId, month, feasibilitySnapshot } = input;
 
-  // Create a roster version
+  // Create a roster version with optional feasibility snapshot
   const versionLabel = `Draft ${month} (from Feasibility)`;
+  
+  const versionData: any = {
+    config_id: configSnapshot.id,
+    tenant_id: tenantId,
+    version_number: 1,
+    version_name: versionLabel,
+    label: versionLabel,
+    generated_at: new Date().toISOString(),
+  };
+
+  // Attach feasibility snapshot if provided
+  if (feasibilitySnapshot) {
+    versionData.feasibility_snapshot = feasibilitySnapshot;
+  }
   
   const { data: version, error: versionError } = await supabase
     .from('roster_versions')
-    .insert({
-      config_id: configSnapshot.id,
-      tenant_id: tenantId,
-      version_number: 1,
-      version_name: versionLabel,
-      label: versionLabel,
-      generated_at: new Date().toISOString()
-    })
+    .insert(versionData)
     .select()
     .single();
 

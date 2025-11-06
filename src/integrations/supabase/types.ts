@@ -556,6 +556,7 @@ export type Database = {
       roster_versions: {
         Row: {
           config_id: string
+          feasibility_snapshot: Json | null
           generated_at: string | null
           id: string
           label: string | null
@@ -565,6 +566,7 @@ export type Database = {
         }
         Insert: {
           config_id: string
+          feasibility_snapshot?: Json | null
           generated_at?: string | null
           id?: string
           label?: string | null
@@ -574,6 +576,7 @@ export type Database = {
         }
         Update: {
           config_id?: string
+          feasibility_snapshot?: Json | null
           generated_at?: string | null
           id?: string
           label?: string | null
