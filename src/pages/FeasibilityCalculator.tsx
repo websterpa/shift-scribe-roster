@@ -15,10 +15,11 @@ import {
   overtimeSlack,
   fteGap,
   requiredHoursOver17Weeks,
+  optimiseHeadcount,
   type FeasibilityInput 
 } from '@/services/feasibility/calculateFeasibility';
 import { UtilisationChart, type UtilisationData } from '@/components/Feasibility/UtilisationChart';
-import { DEFAULT_WTD_RULES } from '@/engine2/constraints/wtdRules';
+import { DEFAULT_WTD_RULES, validateStaffWTD } from '@/engine2/constraints/wtdRules';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -116,6 +117,17 @@ const FeasibilityCalculator = () => {
   const [formError, setFormError] = useState<{ title: string; details: string } | null>(null);
   const [invalidShiftKeys, setInvalidShiftKeys] = useState<ShiftKey[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  
+  // Auto-reduce headcount toggle with localStorage persistence
+  const [autoReduce, setAutoReduce] = useState<boolean>(() => {
+    const v = localStorage.getItem('feasibility.autoReduce');
+    return v ? v === '1' : true; // default ON
+  });
+  const [optimisedFrom, setOptimisedFrom] = useState<number | null>(null);
+  
+  useEffect(() => {
+    localStorage.setItem('feasibility.autoReduce', autoReduce ? '1' : '0');
+  }, [autoReduce]);
 
   // Load saved scenarios on mount
   useEffect(() => {
@@ -459,7 +471,60 @@ const FeasibilityCalculator = () => {
         wtdRules
       };
 
-      const calculatedResult = calculateFeasibility(input);
+      let calculatedResult = calculateFeasibility(input);
+      const baselineStaff = calculatedResult.requiredStaff;
+      
+      // Apply headcount optimisation if enabled
+      if (autoReduce && baselineStaff > 0) {
+        // WTD validation function for candidate headcount
+        const passesWtd = (candidateStaff: number): boolean => {
+          // Generate extended sequence for validation (17 weeks = 119 days)
+          const seq = Array.isArray(selectedPattern.sequence)
+            ? (selectedPattern.sequence as string[])
+            : [];
+          
+          if (seq.length === 0) return true;
+          
+          const extendedSeq: string[] = [];
+          for (let i = 0; i < 17 * 7; i++) {
+            extendedSeq.push(seq[i % seq.length]);
+          }
+          
+          // Use the same WTD validation as the main calculation
+          const validation = validateStaffWTD(extendedSeq, wtdRules);
+          return validation.valid;
+        };
+        
+        const optimisedStaff = optimiseHeadcount({
+          requiredHrs: calculatedResult.weeklyHoursRequired,
+          contractHrs: standardContractHours,
+          bufferPct: bufferPct,
+          baseRequiredStaff: baselineStaff,
+          minMultiple: selectedPattern.teams_required,
+          passesWtd
+        });
+        
+        // If optimisation reduced headcount, recalculate metrics
+        if (optimisedStaff < baselineStaff) {
+          console.log('🎯 Headcount optimised:', baselineStaff, '→', optimisedStaff);
+          setOptimisedFrom(baselineStaff);
+          
+          // Recalculate metrics with optimised headcount
+          calculatedResult = {
+            ...calculatedResult,
+            requiredStaff: optimisedStaff,
+            availableHoursPerWeek: optimisedStaff * standardContractHours,
+            utilizationPct: (calculatedResult.weeklyHoursRequired / (optimisedStaff * standardContractHours)) * 100,
+            fteAvailable: optimisedStaff,
+            overtimeGapPerWeek: Math.max(0, calculatedResult.weeklyHoursRequired - (optimisedStaff * standardContractHours))
+          };
+        } else {
+          setOptimisedFrom(null);
+        }
+      } else {
+        setOptimisedFrom(null);
+      }
+      
       setResult(calculatedResult);
       console.log('📊 Feasibility calculated:', calculatedResult);
     } catch (error) {
@@ -1449,15 +1514,43 @@ const FeasibilityCalculator = () => {
             <CardTitle>Analysis Results</CardTitle>
             <CardDescription>Calculated staffing requirements</CardDescription>
             {result && (
-              <div className="flex items-center gap-2 pt-2">
-                <Switch 
-                  id="wtd-simulation" 
-                  checked={showWTDSimulation}
-                  onCheckedChange={setShowWTDSimulation}
-                />
-                <Label htmlFor="wtd-simulation" className="text-sm cursor-pointer">
-                  Show 17-Week WTD Simulation
-                </Label>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2">
+                  <Switch 
+                    id="wtd-simulation" 
+                    checked={showWTDSimulation}
+                    onCheckedChange={setShowWTDSimulation}
+                  />
+                  <Label htmlFor="wtd-simulation" className="text-sm cursor-pointer">
+                    Show 17-Week WTD Simulation
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch 
+                    id="auto-reduce" 
+                    checked={autoReduce}
+                    onCheckedChange={setAutoReduce}
+                    disabled={!result}
+                  />
+                  <Label htmlFor="auto-reduce" className="text-sm cursor-pointer">
+                    Auto-reduce headcount when slack ≥ 1 FTE
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 ml-1">
+                          <span className="text-xs text-muted-foreground">?</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-xs">
+                          When enabled, automatically reduces required staff by 1+ if there's at least 1 FTE of slack,
+                          while ensuring coverage, WTD compliance, and crew-multiple constraints are maintained.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
             )}
           </CardHeader>
@@ -1473,8 +1566,20 @@ const FeasibilityCalculator = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-primary/5 rounded-lg">
                     <p className="text-sm text-muted-foreground">Required Staff</p>
-                    <p className="text-3xl font-bold text-primary">{result.requiredStaff}</p>
-                    <p className="text-xs text-muted-foreground mt-1">with {result.bufferPct}% buffer</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-3xl font-bold text-primary">{result.requiredStaff}</p>
+                      {optimisedFrom && (
+                        <span className="text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full font-medium">
+                          ↓ from {optimisedFrom}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {optimisedFrom 
+                        ? 'Auto-reduced (buffer retained)' 
+                        : `Rounded up for buffer${selectedPattern?.teams_required ? ' & crew multiple' : ''}`
+                      }
+                    </p>
                   </div>
                   <div className="p-4 bg-secondary/10 rounded-lg">
                     <p className="text-sm text-muted-foreground">Utilization</p>

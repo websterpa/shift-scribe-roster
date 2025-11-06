@@ -277,3 +277,85 @@ function generateExtendedSequence(sequence: string[], weeks: number): string[] {
   
   return extended;
 }
+
+/**
+ * Optimize headcount by reducing staff while maintaining constraints
+ * Tries to reduce by 1+ if slack ≥ 1.0 FTE while coverage/WTD/crew-multiple constraints still pass
+ */
+export function optimiseHeadcount(opts: {
+  requiredHrs: number;
+  contractHrs: number;
+  bufferPct: number;
+  baseRequiredStaff: number;
+  minMultiple?: number;
+  passesWtd: (n: number) => boolean;
+}): number {
+  const multiple = Math.max(1, opts.minMultiple ?? 1);
+  let n = opts.baseRequiredStaff;
+
+  console.log('🔧 Optimising headcount:', { 
+    base: opts.baseRequiredStaff, 
+    requiredHrs: opts.requiredHrs, 
+    contractHrs: opts.contractHrs,
+    minMultiple: multiple 
+  });
+
+  // Try reducing 1 at a time while constraints hold
+  for (;;) {
+    const candidate = n - 1;
+    if (candidate < multiple) {
+      console.log('⛔ Cannot reduce below minimum multiple:', multiple);
+      break;
+    }
+
+    // If we have a crew multiple requirement, ensure we stay on multiples
+    if (candidate % multiple !== 0 && multiple > 1) {
+      // Step down to the next multiple
+      const to = Math.floor(candidate / multiple) * multiple;
+      if (to < multiple) {
+        console.log('⛔ Next multiple below minimum:', to);
+        break;
+      }
+      
+      const avail = to * opts.contractHrs;
+      if (avail < opts.requiredHrs) {
+        console.log('⛔ Coverage fails at multiple', to);
+        break;
+      }
+      if (!opts.passesWtd(to)) {
+        console.log('⛔ WTD fails at multiple', to);
+        break;
+      }
+      
+      console.log('✅ Reduced to multiple:', to);
+      n = to;
+      continue;
+    }
+
+    // Check if current slack is ≥ 1 FTE before trying to reduce
+    const currentSlackHrs = (n * opts.contractHrs) - opts.requiredHrs;
+    if (currentSlackHrs < opts.contractHrs) {
+      console.log('⛔ Slack below 1 FTE:', currentSlackHrs.toFixed(1), 'h');
+      break;
+    }
+
+    // Verify candidate still meets coverage
+    const avail = candidate * opts.contractHrs;
+    if (avail < opts.requiredHrs) {
+      console.log('⛔ Coverage fails at', candidate);
+      break;
+    }
+
+    // Verify WTD still passes
+    if (!opts.passesWtd(candidate)) {
+      console.log('⛔ WTD fails at', candidate);
+      break;
+    }
+
+    console.log('✅ Reduced to:', candidate);
+    n = candidate;
+  }
+
+  console.log('🎯 Final optimised headcount:', n, 'from base:', opts.baseRequiredStaff);
+  return n;
+}
