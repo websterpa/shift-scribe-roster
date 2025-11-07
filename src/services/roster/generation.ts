@@ -1022,6 +1022,11 @@ export async function generateAndSaveRoster(
       }));
       
       // Apply auto-corrections if enabled
+      const patternMode = (configData.pattern_adherence_mode as 'locked' | 'guided') || 'locked';
+      
+      console.log(`🔒 Pattern adherence mode: ${patternMode}`);
+      logger.info('Pattern adherence mode', { mode: patternMode });
+      
       if (autoCorrectEnabled) {
         console.log('🔧 Applying automatic corrections...');
         
@@ -1031,25 +1036,30 @@ export async function generateAndSaveRoster(
           weeklyAverageCompliant: {},
           avgHoursPerWeek: {},
           staffSummary: [],
-          overallCompliance: { avgCompliance: 100, totalShifts: 0, fullyCompliant: 0 }
+          overallCompliance: { avgCompliance: 100, totalShifts: 0, fullyCompliant: 0 },
+          patternMode
         };
         
         const correctionResult = await autoApplyCorrections(
           engineAssignments, 
           basicDiagnostics,
           versionData.id,
-          undefined // tenantId - to be added when tenant isolation is complete
+          undefined, // tenantId - to be added when tenant isolation is complete
+          patternMode === 'locked' // restOnlyMode flag
         );
         engineAssignments = correctionResult.roster;
         autoCorrectionsApplied = correctionResult.changelog.length;
         
-        console.log(`✅ Applied ${autoCorrectionsApplied} automatic corrections`);
-        logger.info('Auto-corrections applied', { count: autoCorrectionsApplied });
+        console.log(`✅ Applied ${autoCorrectionsApplied} automatic corrections (mode: ${patternMode})`);
+        logger.info('Auto-corrections applied', { 
+          count: autoCorrectionsApplied,
+          mode: patternMode 
+        });
       }
       
-      // Apply AI fairness balancing if enabled
-      if (aiBalanceEnabled) {
-        console.log('⚖️ Applying AI fairness balancing...');
+      // Apply AI fairness balancing only in guided mode
+      if (aiBalanceEnabled && patternMode === 'guided') {
+        console.log('⚖️ Applying AI fairness balancing (guided mode)...');
         
         // Load historical roster data (last 3 months)
         const threeMonthsAgo = new Date(days[0] + 'T00:00:00');
@@ -1079,6 +1089,9 @@ export async function generateAndSaveRoster(
           count: aiBalancingApplied,
           historicalRecords: historicalRoster.length 
         });
+      } else if (patternMode === 'locked') {
+        console.log('🔒 Skipping AI fairness balancing (locked mode - strict pattern adherence)');
+        logger.info('AI balancing skipped', { reason: 'locked mode' });
       }
       
       // Update database with corrected assignments if any changes were made

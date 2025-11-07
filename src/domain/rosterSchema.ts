@@ -10,6 +10,7 @@ export const RosterBuilderInput = z.object({
   system: ShiftSystem,                                      // 8h => E/L/N; 12h => D/N
   horizonWeeks: z.number().int().min(1).max(17).default(17),
   pattern: z.string().min(1),                               // token string like "DDNNRRRR" or "ELNR..."
+  patternMode: z.enum(['locked', 'guided']).default('locked'), // Pattern adherence mode
   staffing: z.array(z.object({                              // per weekday
     dow: z.number().int().min(0).max(6),
     need: z.record(ShiftToken, z.number().int().min(0).default(0))

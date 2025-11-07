@@ -496,6 +496,7 @@ export type Database = {
           id: string
           operational_hours_per_day: number
           pattern: Json | null
+          pattern_adherence_mode: string
           pattern_locked: boolean | null
           required_shifts: string[] | null
           requirements_v2: Json | null
@@ -518,6 +519,7 @@ export type Database = {
           id?: string
           operational_hours_per_day: number
           pattern?: Json | null
+          pattern_adherence_mode?: string
           pattern_locked?: boolean | null
           required_shifts?: string[] | null
           requirements_v2?: Json | null
@@ -540,6 +542,7 @@ export type Database = {
           id?: string
           operational_hours_per_day?: number
           pattern?: Json | null
+          pattern_adherence_mode?: string
           pattern_locked?: boolean | null
           required_shifts?: string[] | null
           requirements_v2?: Json | null

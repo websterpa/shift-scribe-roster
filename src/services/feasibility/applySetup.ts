@@ -113,6 +113,7 @@ export async function applySetupFromFeasibility(
     default_ot_hours: null,
     default_ot_start_local_time: null,
     pattern_locked: true,
+    pattern_adherence_mode: 'locked', // Default to locked mode for feasibility setups
     cycle_index: 0
   };
 

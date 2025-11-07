@@ -48,7 +48,8 @@ export async function autoApplyCorrections(
   roster: RosterAssignment[],
   diagnostics: RosterDiagnostics,
   versionId?: string,
-  tenantId?: string
+  tenantId?: string,
+  restOnlyMode: boolean = false
 ): Promise<AutoApplyResult> {
   perf.start('AutoCorrections');
   logger.info('[autoApplyCorrections] Starting automatic correction application');
@@ -66,11 +67,23 @@ export async function autoApplyCorrections(
     const isRestViolation = suggestion.issue.toLowerCase().includes('rest') ||
                            suggestion.issue.toLowerCase().includes('11h');
     
-    if (isRestViolation && (suggestion.severity === 'critical' || suggestion.severity === 'warning')) {
+    // In rest-only mode (locked pattern adherence), only apply corrections that set 'R'
+    // All rest corrections will set 'R', so we can check if it's a rest violation
+    const shouldApply = isRestViolation && 
+                       (suggestion.severity === 'critical' || suggestion.severity === 'warning');
+    
+    // In rest-only mode, skip if not a rest violation
+    if (restOnlyMode && !isRestViolation) {
+      skippedCount++;
+      continue;
+    }
+    
+    if (shouldApply) {
       logger.info('[autoApplyCorrections] Applying rest violation fix', {
         staffId: suggestion.staffId,
         dayIndex: suggestion.dayIndex,
-        issue: suggestion.issue
+        issue: suggestion.issue,
+        mode: restOnlyMode ? 'locked (rest only)' : 'guided (all fixes)'
       });
 
       // Find the assignment to update

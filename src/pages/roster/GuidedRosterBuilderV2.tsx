@@ -70,6 +70,7 @@ export default function GuidedRosterBuilderV2() {
       siteStartHour: 6,
       horizonWeeks: 17,
       pattern: "EELLNNRRRR",
+      patternMode: "locked",
       staffing: DEFAULT_STAFFING_8H,
       rates: {
         staff: 18,
@@ -361,7 +362,8 @@ export default function GuidedRosterBuilderV2() {
             )
           ])
         ),
-        pattern: values.pattern.split('')
+        pattern: values.pattern.split(''),
+        pattern_adherence_mode: values.patternMode
       };
 
       const { data: config, error: configError } = await supabase
@@ -377,7 +379,11 @@ export default function GuidedRosterBuilderV2() {
       
       const result = await generateAndSaveRoster(
         staffList, 
-        { ...config, start_date: configData.start_date }, 
+        { 
+          ...config, 
+          start_date: configData.start_date,
+          pattern_adherence_mode: configData.pattern_adherence_mode 
+        }, 
         'Initial Generation'
       );
 
@@ -631,6 +637,40 @@ export default function GuidedRosterBuilderV2() {
                       <Label htmlFor="pattern">Pattern Sequence</Label>
                       <Input {...form.register('pattern')} placeholder="e.g., DDNNRRRR" />
                     </div>
+                    
+                    {/* Pattern Adherence Mode */}
+                    <div className="space-y-3 p-3 bg-slate-50 rounded-md border border-slate-200">
+                      <Label htmlFor="patternMode" className="text-base font-semibold">Pattern Adherence</Label>
+                      <Select 
+                        value={form.watch('patternMode') || 'locked'}
+                        onValueChange={(value) => form.setValue('patternMode', value as 'locked' | 'guided')}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select mode" />
+                        </SelectTrigger>
+                        <SelectContent className="z-50 bg-background">
+                          <SelectItem value="locked">
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">🔒 Locked (Strict)</span>
+                              <span className="text-xs text-muted-foreground">Each person stays on pattern (2E→2L→2N→2R)</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="guided">
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">⚖️ Guided (Flexible)</span>
+                              <span className="text-xs text-muted-foreground">Allow fairness fills to meet demand</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {form.watch('patternMode') === 'locked' || !form.watch('patternMode')
+                          ? '🔒 Locked keeps each person on their pattern. Any deficits appear as unmet demand.'
+                          : '⚖️ Guided may deviate from patterns to cover gaps and balance workload.'
+                        }
+                      </p>
+                    </div>
+                    
                     <div>
                       <Label>Presets</Label>
                       <div className="flex flex-wrap gap-2 mt-2">

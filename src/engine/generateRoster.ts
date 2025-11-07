@@ -24,6 +24,7 @@ export interface GenerateRosterInput {
   startDate: Date;
   endDate: Date;
   label?: string;
+  patternAdherenceMode?: 'locked' | 'guided';
 }
 
 export interface RosterAssignment {
@@ -70,6 +71,7 @@ export interface RosterDiagnostics {
     insertMs: number;
     totalMs: number;
   };
+  patternMode?: 'locked' | 'guided';
 }
 
 export interface RosterWithChecks {
@@ -365,17 +367,28 @@ export async function generateRosterWithChecks(
     wtdCompliantStaff: `${compliantStaff}/${Object.keys(weeklyAverageCompliant).length}`
   });
   
-  // 8. Auto-apply safe corrections
+  // 8. Determine pattern adherence mode (default: locked for strict pattern following)
+  const patternMode = input.patternAdherenceMode || 'locked';
+  console.log(`🔒 [AtlasGenerator] Pattern adherence mode: ${patternMode}`);
+  
+  // 9. Auto-apply safe corrections (mode-dependent)
   console.log('🔧 [AtlasGenerator] Applying automatic corrections...');
   const initialDiagnostics: RosterDiagnostics = {
     restViolations,
     weeklyAverageCompliant,
     avgHoursPerWeek,
     staffSummary,
-    overallCompliance: { avgCompliance, totalShifts, fullyCompliant }
+    overallCompliance: { avgCompliance, totalShifts, fullyCompliant },
+    patternMode
   };
   
-  const { roster: correctedRoster, changelog } = await autoApplyCorrections(roster, initialDiagnostics);
+  const { roster: correctedRoster, changelog } = await autoApplyCorrections(
+    roster, 
+    initialDiagnostics,
+    undefined,
+    undefined,
+    patternMode === 'locked' // restOnlyMode flag
+  );
   
   if (changelog.length > 0) {
     console.log(`✅ [AtlasGenerator] Applied ${changelog.length} automatic corrections:`, 
@@ -385,58 +398,66 @@ export async function generateRosterWithChecks(
     console.log('✅ [AtlasGenerator] No automatic corrections needed');
   }
   
-  // 9. Apply AI fairness balancing
-  console.log('⚖️ [AtlasGenerator] Applying AI fairness balancing...');
+  let balancedRoster: RosterAssignment[];
+  let fatiguePreventionCount = 0;
   
-  // Load historical roster data for fairness analysis (last 3 months)
-  const threeMonthsAgo = new Date(input.startDate);
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  
-  const { data: historicalAssignments } = await supabase
-    .from('roster_assignments')
-    .select(`
-      staff_id,
-      date,
-      shift_code,
-      staff_profiles!inner(first_name, last_name)
-    `)
-    .gte('date', threeMonthsAgo.toISOString().split('T')[0])
-    .lt('date', input.startDate.toISOString().split('T')[0]);
-  
-  // Convert to RosterAssignment format
-  const historicalRoster: RosterAssignment[] = (historicalAssignments || []).map((a: any) => ({
-    staffId: a.staff_id,
-    staffName: `${a.staff_profiles?.first_name || ''} ${a.staff_profiles?.last_name || ''}`.trim(),
-    dayIndex: 0,
-    date: new Date(a.date),
-    shift: a.shift_code,
-    patternId: 'historical'
-  }));
-  
-  logger.info('[AtlasGenerator] Loaded historical data', {
-    records: historicalRoster.length,
-    dateRange: `${threeMonthsAgo.toISOString().split('T')[0]} to ${input.startDate.toISOString().split('T')[0]}`
-  });
-  
-  // Apply fairness balancing
-  const balancedRoster = balanceRoster(correctedRoster, historicalRoster);
-  
-  // Log fairness analysis
-  if (historicalRoster.length > 0) {
-    const analysis = computeShiftScores(historicalRoster);
-    console.log('📊 [AtlasGenerator] Fairness analysis:', {
-      averageLoad: analysis.averageLoad,
-      staffAnalyzed: Object.keys(analysis.staffScores).length,
-      adjustmentsNeeded: analysis.adjustmentsNeeded
+  // 10. Apply AI fairness balancing (only in guided mode)
+  if (patternMode === 'guided') {
+    console.log('⚖️ [AtlasGenerator] Applying AI fairness balancing (guided mode)...');
+    
+    // Load historical roster data for fairness analysis (last 3 months)
+    const threeMonthsAgo = new Date(input.startDate);
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const { data: historicalAssignments } = await supabase
+      .from('roster_assignments')
+      .select(`
+        staff_id,
+        date,
+        shift_code,
+        staff_profiles!inner(first_name, last_name)
+      `)
+      .gte('date', threeMonthsAgo.toISOString().split('T')[0])
+      .lt('date', input.startDate.toISOString().split('T')[0]);
+    
+    // Convert to RosterAssignment format
+    const historicalRoster: RosterAssignment[] = (historicalAssignments || []).map((a: any) => ({
+      staffId: a.staff_id,
+      staffName: `${a.staff_profiles?.first_name || ''} ${a.staff_profiles?.last_name || ''}`.trim(),
+      dayIndex: 0,
+      date: new Date(a.date),
+      shift: a.shift_code,
+      patternId: 'historical'
+    }));
+    
+    logger.info('[AtlasGenerator] Loaded historical data', {
+      records: historicalRoster.length,
+      dateRange: `${threeMonthsAgo.toISOString().split('T')[0]} to ${input.startDate.toISOString().split('T')[0]}`
     });
+    
+    // Apply fairness balancing
+    balancedRoster = balanceRoster(correctedRoster, historicalRoster);
+    
+    // Log fairness analysis
+    if (historicalRoster.length > 0) {
+      const analysis = computeShiftScores(historicalRoster);
+      console.log('📊 [AtlasGenerator] Fairness analysis:', {
+        averageLoad: analysis.averageLoad,
+        staffAnalyzed: Object.keys(analysis.staffScores).length,
+        adjustmentsNeeded: analysis.adjustmentsNeeded
+      });
+    }
+    
+    fatiguePreventionCount = balancedRoster.filter(a => a.notes?.includes('Fatigue prevention')).length;
+    if (fatiguePreventionCount > 0) {
+      console.log(`✅ [AtlasGenerator] Applied ${fatiguePreventionCount} fatigue prevention adjustments`);
+    }
+  } else {
+    console.log('🔒 [AtlasGenerator] Skipping fairness balancing (locked mode - strict pattern adherence)');
+    balancedRoster = correctedRoster;
   }
   
-  const fatiguePreventionCount = balancedRoster.filter(a => a.notes?.includes('Fatigue prevention')).length;
-  if (fatiguePreventionCount > 0) {
-    console.log(`✅ [AtlasGenerator] Applied ${fatiguePreventionCount} fatigue prevention adjustments`);
-  }
-  
-  // 10. Persist roster to database with tenant isolation
+  // 11. Persist roster to database with tenant isolation
   console.log('💾 [AtlasGenerator] Persisting roster to database...');
   perf.start('RosterGeneration-Persist');
   const version = await saveRoster({
@@ -464,16 +485,17 @@ export async function generateRosterWithChecks(
       staffSummary,
       overallCompliance: { avgCompliance, totalShifts, fullyCompliant },
       autoApplied: changelog,
-      fairnessBalancing: {
+      fairnessBalancing: patternMode === 'guided' ? {
         appliedCount: fatiguePreventionCount,
-        historicalDataPoints: historicalRoster.length
-      },
+        historicalDataPoints: 0 // Would need to be captured from guided mode
+      } : undefined,
       perfMetrics: {
         fetchMs,
         genMs,
         insertMs,
         totalMs
-      }
+      },
+      patternMode
     }
   };
 }

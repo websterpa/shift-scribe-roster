@@ -73,6 +73,7 @@ export interface RosterConfig {
   operational_hours_per_day: number;
   handshake_minutes: number;
   start_date: string;
+  pattern_adherence_mode?: 'locked' | 'guided';
 }
 
 export interface LeaveEntry {
