@@ -41,6 +41,29 @@ export interface RosterAssignment {
   notes?: string;
 }
 
+export interface PatternDeviation {
+  date: string;
+  expected: string;
+  actual: string;
+  reason: 'rest_override' | 'unmet_demand_fill' | 'guided_fairness' | 'wtd_compliance' | 'absence';
+}
+
+export interface StaffAdherenceDetail {
+  staffId: string;
+  staffName: string;
+  adherencePercent: number;
+  totalDays: number;
+  deviations: PatternDeviation[];
+}
+
+export interface PatternAdherenceReport {
+  overallAdherence: number;
+  totalStaff: number;
+  restOverrides: number;
+  unmetDemandFills: number;
+  staffDetails: StaffAdherenceDetail[];
+}
+
 export interface RosterDiagnostics {
   restViolations: Record<string, Array<{ day: string; gap: number; message: string }>>;
   weeklyAverageCompliant: Record<string, boolean>;
@@ -72,6 +95,7 @@ export interface RosterDiagnostics {
     totalMs: number;
   };
   patternMode?: 'locked' | 'guided';
+  patternAdherenceReport?: PatternAdherenceReport;
 }
 
 export interface RosterWithChecks {
@@ -371,7 +395,16 @@ export async function generateRosterWithChecks(
   const patternMode = input.patternAdherenceMode || 'locked';
   console.log(`🔒 [AtlasGenerator] Pattern adherence mode: ${patternMode}`);
   
-  // 9. Auto-apply safe corrections (mode-dependent)
+  // 9. Calculate detailed pattern adherence report
+  console.log('📊 [AtlasGenerator] Calculating detailed pattern adherence report...');
+  const patternAdherenceReport = calculatePatternAdherenceReport(
+    roster,
+    patternMap,
+    staffPatternMap,
+    input.startDate
+  );
+  
+  // 10. Auto-apply safe corrections (mode-dependent)
   console.log('🔧 [AtlasGenerator] Applying automatic corrections...');
   const initialDiagnostics: RosterDiagnostics = {
     restViolations,
@@ -379,7 +412,8 @@ export async function generateRosterWithChecks(
     avgHoursPerWeek,
     staffSummary,
     overallCompliance: { avgCompliance, totalShifts, fullyCompliant },
-    patternMode
+    patternMode,
+    patternAdherenceReport
   };
   
   const { roster: correctedRoster, changelog } = await autoApplyCorrections(
@@ -401,7 +435,7 @@ export async function generateRosterWithChecks(
   let balancedRoster: RosterAssignment[];
   let fatiguePreventionCount = 0;
   
-  // 10. Apply AI fairness balancing (only in guided mode)
+  // 11. Apply AI fairness balancing (only in guided mode)
   if (patternMode === 'guided') {
     console.log('⚖️ [AtlasGenerator] Applying AI fairness balancing (guided mode)...');
     
@@ -457,7 +491,7 @@ export async function generateRosterWithChecks(
     balancedRoster = correctedRoster;
   }
   
-  // 11. Persist roster to database with tenant isolation
+  // 12. Persist roster to database with tenant isolation
   console.log('💾 [AtlasGenerator] Persisting roster to database...');
   perf.start('RosterGeneration-Persist');
   const version = await saveRoster({
@@ -495,8 +529,105 @@ export async function generateRosterWithChecks(
         insertMs,
         totalMs
       },
-      patternMode
+      patternMode,
+      patternAdherenceReport
     }
+  };
+}
+
+/**
+ * Calculate detailed pattern adherence report with deviation reasons
+ */
+function calculatePatternAdherenceReport(
+  roster: RosterAssignment[],
+  patternMap: Record<string, PatternDefinition>,
+  staffPatternMap: Record<string, StaffPattern>,
+  anchorDate: Date
+): PatternAdherenceReport {
+  const staffDetails: StaffAdherenceDetail[] = [];
+  let totalRestOverrides = 0;
+  let totalUnmetDemandFills = 0;
+
+  // Group roster by staff
+  const rosterByStaff: Record<string, RosterAssignment[]> = {};
+  for (const assignment of roster) {
+    if (!rosterByStaff[assignment.staffId]) {
+      rosterByStaff[assignment.staffId] = [];
+    }
+    rosterByStaff[assignment.staffId].push(assignment);
+  }
+
+  // Calculate adherence for each staff member
+  for (const [staffId, assignments] of Object.entries(rosterByStaff)) {
+    const binding = staffPatternMap[staffId];
+    if (!binding) continue;
+
+    const pattern = patternMap[binding.patternId];
+    if (!pattern) continue;
+
+    const deviations: PatternDeviation[] = [];
+    let matchingDays = 0;
+
+    for (const assignment of assignments) {
+      // Calculate expected shift from pattern
+      const daysSinceAnchor = assignment.dayIndex;
+      const patternIndex = (daysSinceAnchor + binding.offset) % pattern.sequence.length;
+      const expectedShift = pattern.sequence[patternIndex];
+      const actualShift = assignment.shift;
+
+      if (expectedShift === actualShift) {
+        matchingDays++;
+      } else {
+        // Determine deviation reason
+        let reason: PatternDeviation['reason'] = 'guided_fairness';
+        
+        if (actualShift === 'R' && expectedShift !== 'R') {
+          // Changed to rest - likely WTD compliance or rest override
+          reason = 'rest_override';
+          totalRestOverrides++;
+        } else if (expectedShift === 'R' && actualShift !== 'R') {
+          // Filled a rest day - unmet demand fill
+          reason = 'unmet_demand_fill';
+          totalUnmetDemandFills++;
+        } else if (assignment.notes?.includes('wtd') || assignment.notes?.includes('WTD')) {
+          reason = 'wtd_compliance';
+        }
+
+        deviations.push({
+          date: assignment.date.toISOString().split('T')[0],
+          expected: expectedShift,
+          actual: actualShift,
+          reason
+        });
+      }
+    }
+
+    const adherencePercent = assignments.length > 0 
+      ? (matchingDays / assignments.length) * 100 
+      : 100;
+
+    staffDetails.push({
+      staffId,
+      staffName: assignments[0]?.staffName || staffId,
+      adherencePercent,
+      totalDays: assignments.length,
+      deviations
+    });
+  }
+
+  // Calculate overall adherence
+  const overallAdherence = staffDetails.length > 0
+    ? staffDetails.reduce((sum, s) => sum + s.adherencePercent, 0) / staffDetails.length
+    : 100;
+
+  console.log(`✅ Pattern adherence report: ${overallAdherence.toFixed(1)}% overall, ${totalRestOverrides} rest overrides, ${totalUnmetDemandFills} unmet demand fills`);
+
+  return {
+    overallAdherence,
+    totalStaff: staffDetails.length,
+    restOverrides: totalRestOverrides,
+    unmetDemandFills: totalUnmetDemandFills,
+    staffDetails: staffDetails.sort((a, b) => a.adherencePercent - b.adherencePercent) // Worst first
   };
 }
 

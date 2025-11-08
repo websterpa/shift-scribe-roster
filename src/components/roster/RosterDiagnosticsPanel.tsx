@@ -8,8 +8,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, Clock, TrendingUp, Lightbulb } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Clock, TrendingUp, Lightbulb, Lock } from "lucide-react";
 import type { RosterDiagnostics } from "@/engine/generateRoster";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface RosterDiagnosticsPanelProps {
   diagnostics: RosterDiagnostics;
@@ -23,8 +25,12 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
     staffSummary, 
     overallCompliance,
     autoApplied,
-    fairnessBalancing
+    fairnessBalancing,
+    patternAdherenceReport,
+    patternMode
   } = diagnostics;
+
+  const [showAllAdherence, setShowAllAdherence] = useState(false);
 
   const totalViolations = Object.values(restViolations).reduce(
     (sum, violations) => sum + violations.length, 
@@ -65,6 +71,16 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
           <Lightbulb className="h-4 w-4 text-purple-600" />
           <AlertDescription>
             <strong>🤖 AI Fairness Balancing Applied:</strong> {fairnessBalancing.appliedCount} shift(s) adjusted based on historical workload analysis ({fairnessBalancing.historicalDataPoints} past assignments) to prevent staff fatigue and ensure equitable distribution.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Pattern Adherence Mode Alert */}
+      {patternMode === 'locked' && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Lock className="h-4 w-4 text-blue-600" />
+          <AlertDescription>
+            <strong>🔒 Locked Pattern Mode:</strong> Staff assignments strictly follow their assigned patterns. Deviations only occur for WTD rest compliance.
           </AlertDescription>
         </Alert>
       )}
@@ -141,6 +157,138 @@ export function RosterDiagnosticsPanel({ diagnostics }: RosterDiagnosticsPanelPr
           </CardContent>
         </Card>
       </div>
+
+      {/* Pattern Adherence Report Card */}
+      {patternAdherenceReport && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="h-5 w-5" />
+                  Pattern Adherence Report
+                </CardTitle>
+                <CardDescription>
+                  Deviation tracking and pattern compliance analysis
+                </CardDescription>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold">
+                  {patternAdherenceReport.overallAdherence.toFixed(1)}%
+                </div>
+                <p className="text-xs text-muted-foreground">Overall Adherence</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Summary Statistics */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {patternAdherenceReport.restOverrides}
+                </div>
+                <p className="text-xs text-muted-foreground">Rest Overrides</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-amber-600">
+                  {patternAdherenceReport.unmetDemandFills}
+                </div>
+                <p className="text-xs text-muted-foreground">Unmet Demand Fills</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {patternAdherenceReport.staffDetails.filter(s => s.adherencePercent === 100).length}
+                </div>
+                <p className="text-xs text-muted-foreground">Perfect Adherence</p>
+              </div>
+            </div>
+
+            {/* Staff Adherence Table - Worst 5 or All */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold">
+                  {showAllAdherence ? 'All Staff' : 'Lowest Adherence (Top 5)'}
+                </h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllAdherence(!showAllAdherence)}
+                >
+                  {showAllAdherence ? 'Show Top 5' : 'View All'}
+                </Button>
+              </div>
+              <div className="rounded-md border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-left font-medium">Staff</th>
+                      <th className="p-2 text-center font-medium">Adherence</th>
+                      <th className="p-2 text-center font-medium">Total Days</th>
+                      <th className="p-2 text-center font-medium">Deviations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(showAllAdherence 
+                      ? patternAdherenceReport.staffDetails 
+                      : patternAdherenceReport.staffDetails.slice(0, 5)
+                    ).map((staff) => (
+                      <tr key={staff.staffId} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="p-2 font-medium">{staff.staffName}</td>
+                        <td className="p-2 text-center">
+                          <Badge 
+                            variant={staff.adherencePercent === 100 ? "default" : "outline"}
+                            className={
+                              staff.adherencePercent === 100 ? "bg-green-100 text-green-800" :
+                              staff.adherencePercent >= 90 ? "bg-blue-100 text-blue-800" :
+                              staff.adherencePercent >= 70 ? "bg-yellow-100 text-yellow-800" :
+                              "bg-red-100 text-red-800"
+                            }
+                          >
+                            {staff.adherencePercent.toFixed(1)}%
+                          </Badge>
+                        </td>
+                        <td className="p-2 text-center">{staff.totalDays}</td>
+                        <td className="p-2 text-center">
+                          {staff.deviations.length > 0 ? (
+                            <details className="inline-block">
+                              <summary className="cursor-pointer text-xs text-blue-600 hover:underline">
+                                {staff.deviations.length} deviations
+                              </summary>
+                              <div className="mt-2 space-y-1 text-xs p-2 bg-muted/50 rounded">
+                                {staff.deviations.slice(0, 5).map((dev, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <span className="font-mono">{dev.date}</span>
+                                    <span className="text-muted-foreground">→</span>
+                                    <span className="font-mono text-red-600">{dev.expected}</span>
+                                    <span className="text-muted-foreground">to</span>
+                                    <span className="font-mono text-green-600">{dev.actual}</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {dev.reason.replace(/_/g, ' ')}
+                                    </Badge>
+                                  </div>
+                                ))}
+                                {staff.deviations.length > 5 && (
+                                  <p className="text-muted-foreground">
+                                    ...and {staff.deviations.length - 5} more
+                                  </p>
+                                )}
+                              </div>
+                            </details>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700">
+                              None
+                            </Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Rest Violations Alert */}
       {totalViolations > 0 && (
