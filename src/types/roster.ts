@@ -43,6 +43,7 @@ export interface StaffMember {
   wtd_opt_out?: boolean; // WTD 48-hour opt-out flag
   pattern_id?: string | null; // Reference to site_patterns for repeating shift pattern
   pattern_offset?: number; // Starting index in the pattern sequence (0-based)
+  team_index?: number | null; // Team/offset index for deterministic pattern positioning (0-based)
   // Computed field for backwards compatibility
   name?: string;
   preferences?: {
@@ -74,6 +75,7 @@ export interface RosterConfig {
   handshake_minutes: number;
   start_date: string;
   pattern_adherence_mode?: 'locked' | 'guided';
+  cycle_anchor_date?: string | null; // Reference date for pattern cycle calculations
 }
 
 export interface LeaveEntry {

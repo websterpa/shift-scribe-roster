@@ -14,6 +14,7 @@ import { saveRoster, type RosterVersion } from "./persistRoster";
 import { autoApplyCorrections } from "./corrective/autoApply";
 import { balanceRoster, computeShiftScores } from "./balancer/fairness";
 import { perf } from "@/lib/perf";
+import { ensureTeamIndices, calculateExpectedToken, getCycleAnchorDate } from "./teamIndexAssignment";
 
 const logger = createLogger('AtlasRosterGenerator');
 
@@ -123,7 +124,7 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
   // 1. Load staff with their pattern assignments
   const { data: staff, error: staffError } = await supabase
     .from("staff_profiles")
-    .select("id, first_name, last_name, pattern_id, pattern_offset")
+    .select("id, first_name, last_name, pattern_id, pattern_offset, team_index")
     .eq("is_active", true)
     .not("pattern_id", "is", null);
   
@@ -144,7 +145,7 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
   
   const { data: patterns, error: patternsError } = await supabase
     .from("site_patterns")
-    .select("id, name, sequence, cycle_length, system")
+    .select("id, name, sequence, cycle_length, system, teams_required")
     .in("id", patternIds);
   
   if (patternsError) {
@@ -173,6 +174,7 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
           sequence,
           cycle_length: p.cycle_length,
           system: p.system,
+          teams_required: p.teams_required ?? 5, // Default to 5 if not set
         }
       ];
     })
@@ -181,6 +183,55 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
   console.log(`[AtlasGenerator] Loaded ${patterns.length} patterns:`, 
     patterns.map(p => ({ id: p.id, name: p.name, system: p.system }))
   );
+  
+  // 2.5. Load roster config for deterministic positioning
+  const { data: configData, error: configError } = await supabase
+    .from('roster_config')
+    .select('cycle_anchor_date, start_date, shift_type, pattern')
+    .eq('id', input.configId)
+    .maybeSingle();
+  
+  if (configError) {
+    logger.error(new Error('Failed to load roster config'), { error: configError });
+    throw new Error(`Failed to load roster config: ${configError.message}`);
+  }
+  
+  // Get pattern mode from input (defaults to 'locked')
+  const patternMode = input.patternAdherenceMode || 'locked';
+  const framework = configData?.shift_type === '12h' ? '12h' : '8h';
+  
+  console.log(`[AtlasGenerator] Pattern adherence mode: ${patternMode}, Framework: ${framework}`);
+  
+  // 2.6. Ensure team indices are assigned (only in locked mode)
+  let teamIndexMap = new Map<string, number>();
+  let cycleAnchorDate: Date | null = null;
+  
+  if (patternMode === 'locked') {
+    // Determine teams_required from pattern
+    const firstPattern = patterns[0];
+    const teamsRequired = firstPattern?.teams_required || 5;
+    
+    console.log(`[AtlasGenerator] Ensuring team indices (teams_required: ${teamsRequired})`);
+    
+    // Ensure all staff have team_index
+    teamIndexMap = await ensureTeamIndices(
+      staff.map(s => ({
+        id: s.id,
+        first_name: s.first_name || '',
+        last_name: s.last_name || '',
+        team_index: s.team_index ?? null
+      })),
+      teamsRequired
+    );
+    
+    // Get cycle anchor date
+    cycleAnchorDate = getCycleAnchorDate({
+      cycle_anchor_date: configData?.cycle_anchor_date,
+      start_date: configData?.start_date || input.startDate.toISOString().split('T')[0]
+    });
+    
+    console.log(`[AtlasGenerator] Using cycle_anchor_date: ${cycleAnchorDate.toISOString().split('T')[0]}`);
+  }
   
   // 3. Generate day-by-day shifts
   const roster: RosterAssignment[] = [];
@@ -197,15 +248,36 @@ export async function generateRoster(input: GenerateRosterInput): Promise<Roster
     
     const sequence = pattern.sequence;
     const cycleLength = pattern.cycle_length || sequence.length;
-    const offset = member.pattern_offset || 0;
+    const teamsRequired = pattern.teams_required || 5;
     
     for (let day = 0; day < totalDays; day++) {
       const date = new Date(startDate);
       date.setDate(date.getDate() + day);
       
-      // Calculate position in pattern (with offset)
-      const patternIndex = (day + offset) % cycleLength;
-      const code = sequence[patternIndex];
+      let code: string;
+      
+      // In locked mode with team_index, use deterministic calculation
+      if (patternMode === 'locked' && cycleAnchorDate && teamIndexMap.has(member.id)) {
+        const teamIndex = teamIndexMap.get(member.id)!;
+        code = calculateExpectedToken(
+          date,
+          cycleAnchorDate,
+          teamIndex,
+          teamsRequired,
+          sequence,
+          framework
+        );
+      } else {
+        // Fallback to legacy offset-based calculation (for guided mode or missing team_index)
+        const offset = member.pattern_offset || 0;
+        const patternIndex = (day + offset) % cycleLength;
+        code = sequence[patternIndex];
+        
+        // Remap for framework
+        if (framework === '12h' && (code === 'E' || code === 'L')) {
+          code = 'D';
+        }
+      }
       
       // Skip rest days and invalid codes
       if (!code || code === "R") {
@@ -280,7 +352,7 @@ export async function generateRosterWithChecks(
   // 2. Load pattern data for diagnostics
   const { data: patterns } = await supabase
     .from("site_patterns")
-    .select("id, sequence, cycle_length");
+    .select("id, sequence, cycle_length, teams_required");
   
   const patternMap: Record<string, PatternDefinition> = {};
   if (patterns) {
@@ -291,7 +363,8 @@ export async function generateRosterWithChecks(
       patternMap[p.id] = {
         id: p.id,
         sequence,
-        cycleLength: p.cycle_length || sequence.length
+        cycleLength: p.cycle_length || sequence.length,
+        teams_required: p.teams_required ?? 5
       };
     }
   }

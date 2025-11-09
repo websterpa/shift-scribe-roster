@@ -488,6 +488,7 @@ export type Database = {
         Row: {
           config_name: string
           created_at: string | null
+          cycle_anchor_date: string | null
           cycle_index: number | null
           cycle_length_weeks: number
           default_ot_hours: number | null
@@ -511,6 +512,7 @@ export type Database = {
         Insert: {
           config_name: string
           created_at?: string | null
+          cycle_anchor_date?: string | null
           cycle_index?: number | null
           cycle_length_weeks: number
           default_ot_hours?: number | null
@@ -534,6 +536,7 @@ export type Database = {
         Update: {
           config_name?: string
           created_at?: string | null
+          cycle_anchor_date?: string | null
           cycle_index?: number | null
           cycle_length_weeks?: number
           default_ot_hours?: number | null
@@ -782,6 +785,7 @@ export type Database = {
           role: string | null
           role_id: string | null
           shift_preferences: Json | null
+          team_index: number | null
           unavailability_notes: string | null
           unavailability_reason: string | null
           unavailable_from: string | null
@@ -817,6 +821,7 @@ export type Database = {
           role?: string | null
           role_id?: string | null
           shift_preferences?: Json | null
+          team_index?: number | null
           unavailability_notes?: string | null
           unavailability_reason?: string | null
           unavailable_from?: string | null
@@ -852,6 +857,7 @@ export type Database = {
           role?: string | null
           role_id?: string | null
           shift_preferences?: Json | null
+          team_index?: number | null
           unavailability_notes?: string | null
           unavailability_reason?: string | null
           unavailable_from?: string | null

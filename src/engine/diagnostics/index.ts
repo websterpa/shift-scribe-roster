@@ -15,6 +15,7 @@ export interface PatternDefinition {
   id: string;
   sequence: string[];
   cycleLength: number;
+  teams_required?: number; // Number of teams for deterministic positioning
 }
 
 export interface StaffPattern {
