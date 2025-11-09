@@ -28,13 +28,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock, Calculator, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Loader2, Clock, Calculator, ArrowLeft, CalendarIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import RequirementsMiniComposer from '@/features/roster/builder/RequirementsMiniComposer';
 import { EligibilityInspector } from '@/features/roster/debug/EligibilityInspector';
 import { ActiveConfigBanner } from '@/features/roster/monthly/ActiveConfigBanner';
 import { ConfigDiffPanel } from '@/components/roster/ConfigDiffPanel';
 import { trace } from '@/lib/devTrace';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { TeamIndexManager } from '@/components/roster/TeamIndexManager';
 
 interface PreviewData {
   requirements?: Record<string, number>;
@@ -71,6 +76,7 @@ export default function GuidedRosterBuilderV2() {
       horizonWeeks: 17,
       pattern: "EELLNNRRRR",
       patternMode: "locked",
+      cycleAnchorDate: undefined,
       staffing: DEFAULT_STAFFING_8H,
       rates: {
         staff: 18,
@@ -363,7 +369,10 @@ export default function GuidedRosterBuilderV2() {
           ])
         ),
         pattern: values.pattern.split(''),
-        pattern_adherence_mode: values.patternMode
+        pattern_adherence_mode: values.patternMode,
+        cycle_anchor_date: values.cycleAnchorDate 
+          ? values.cycleAnchorDate.toISOString().split('T')[0]
+          : startDateISO
       };
 
       const { data: config, error: configError } = await supabase
@@ -637,6 +646,69 @@ export default function GuidedRosterBuilderV2() {
                       <Label htmlFor="pattern">Pattern Sequence</Label>
                       <Input {...form.register('pattern')} placeholder="e.g., DDNNRRRR" />
                     </div>
+                    
+                    {/* Cycle Anchor Date - Locked Mode Only */}
+                    {form.watch('patternMode') === 'locked' && (
+                      <div className="space-y-3 p-3 bg-blue-50 rounded-md border border-blue-200">
+                        <Label className="text-base font-semibold">Cycle Anchor Date</Label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Reference date for pattern cycle calculations. Defaults to roster start date if not set.
+                        </p>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !form.watch('cycleAnchorDate') && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {form.watch('cycleAnchorDate') 
+                                ? format(form.watch('cycleAnchorDate')!, "PPP")
+                                : "Use roster start date (default)"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={form.watch('cycleAnchorDate')}
+                              onSelect={(date) => form.setValue('cycleAnchorDate', date)}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {form.watch('cycleAnchorDate') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => form.setValue('cycleAnchorDate', undefined)}
+                            className="w-full"
+                          >
+                            Clear (use default)
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Team Index Management - Locked Mode Only */}
+                    {form.watch('patternMode') === 'locked' && staffList.length > 0 && (
+                      <div className="space-y-3 p-3 bg-purple-50 rounded-md border border-purple-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-base font-semibold">Team Index Assignment</Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Assign team indices to staff for deterministic pattern positioning.
+                            </p>
+                          </div>
+                          <TeamIndexManager 
+                            staffList={staffList} 
+                            onUpdate={() => loadStaffAndSettings()}
+                          />
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Pattern Adherence Mode */}
                     <div className="space-y-3 p-3 bg-slate-50 rounded-md border border-slate-200">
