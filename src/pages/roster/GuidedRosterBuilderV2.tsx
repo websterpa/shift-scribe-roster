@@ -40,6 +40,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { TeamIndexManager } from '@/components/roster/TeamIndexManager';
+import { checkConfig } from '@/utils/consistency/checkConfig';
+import { ConfigValidationGuard } from '@/components/roster/ConfigValidationGuard';
+import type { ConsistencyIssue } from '@/utils/consistency/checkConfig';
+import { getTenantId } from '@/features/tenant/useTenant';
 
 interface PreviewData {
   requirements?: Record<string, number>;
@@ -60,6 +64,9 @@ export default function GuidedRosterBuilderV2() {
   const [ackWarnings, setAckWarnings] = useState(false);
   const [hasFeasibilityConfig, setHasFeasibilityConfig] = useState(false);
   const [savedConfigRequirements, setSavedConfigRequirements] = useState<RequirementsV2 | null>(null);
+  const [consistencyIssues, setConsistencyIssues] = useState<ConsistencyIssue[]>([]);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [configData, setConfigData] = useState<any>(null);
   const [openSections, setOpenSections] = useState({
     basics: true,
     pattern: true,
@@ -75,7 +82,7 @@ export default function GuidedRosterBuilderV2() {
       siteStartHour: 6,
       horizonWeeks: 17,
       pattern: "EELLNNRRRR",
-      patternMode: "locked",
+      patternMode: "locked", // Always locked for MVP
       cycleAnchorDate: undefined,
       staffing: DEFAULT_STAFFING_8H,
       rates: {
@@ -95,6 +102,9 @@ export default function GuidedRosterBuilderV2() {
     loadStaffAndSettings();
     loadFeasibilityConfig();
     loadSavedConfig();
+    // Load tenant ID synchronously
+    const tid = getTenantId();
+    setTenantId(tid);
   }, []);
 
   // Update staffing defaults when system changes
@@ -225,7 +235,7 @@ export default function GuidedRosterBuilderV2() {
     try {
       const { data, error } = await supabase
         .from('roster_config')
-        .select('requirements_v2')
+        .select('*')
         .eq('tenant_id', '00000000-0000-0000-0000-000000000001')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -233,41 +243,46 @@ export default function GuidedRosterBuilderV2() {
       
       if (error) throw error;
       
-      if (data?.requirements_v2) {
-        const rawReqV2 = data.requirements_v2 as unknown as RequirementsV2;
+      if (data) {
+        // Store full config for consistency checking
+        setConfigData(data);
         
-        // Normalize: ensure saturday and sunday exist, default to weekdays if missing
-        let reqV2: RequirementsV2;
-        
-        if (rawReqV2.framework === '8h') {
-          reqV2 = {
-            framework: '8h',
-            days: {
-              weekdays: rawReqV2.days.weekdays as { E: number; L: number; N: number },
-              saturday: (rawReqV2.days.saturday as { E: number; L: number; N: number }) || (rawReqV2.days.weekdays as { E: number; L: number; N: number }),
-              sunday: (rawReqV2.days.sunday as { E: number; L: number; N: number }) || (rawReqV2.days.weekdays as { E: number; L: number; N: number }),
-            }
-          };
-        } else {
-          reqV2 = {
-            framework: '12h',
-            days: {
-              weekdays: rawReqV2.days.weekdays as { D: number; N: number },
-              saturday: (rawReqV2.days.saturday as { D: number; N: number }) || (rawReqV2.days.weekdays as { D: number; N: number }),
-              sunday: (rawReqV2.days.sunday as { D: number; N: number }) || (rawReqV2.days.weekdays as { D: number; N: number }),
-            }
-          };
+        if (data.requirements_v2) {
+          const rawReqV2 = data.requirements_v2 as unknown as RequirementsV2;
+          
+          // Normalize: ensure saturday and sunday exist, default to weekdays if missing
+          let reqV2: RequirementsV2;
+          
+          if (rawReqV2.framework === '8h') {
+            reqV2 = {
+              framework: '8h',
+              days: {
+                weekdays: rawReqV2.days.weekdays as { E: number; L: number; N: number },
+                saturday: (rawReqV2.days.saturday as { E: number; L: number; N: number }) || (rawReqV2.days.weekdays as { E: number; L: number; N: number }),
+                sunday: (rawReqV2.days.sunday as { E: number; L: number; N: number }) || (rawReqV2.days.weekdays as { E: number; L: number; N: number }),
+              }
+            };
+          } else {
+            reqV2 = {
+              framework: '12h',
+              days: {
+                weekdays: rawReqV2.days.weekdays as { D: number; N: number },
+                saturday: (rawReqV2.days.saturday as { D: number; N: number }) || (rawReqV2.days.weekdays as { D: number; N: number }),
+                sunday: (rawReqV2.days.sunday as { D: number; N: number }) || (rawReqV2.days.weekdays as { D: number; N: number }),
+              }
+            };
+          }
+          
+          setSavedConfigRequirements(reqV2);
+          
+          // Trace the saved config
+          trace("builder.savedConfig.loaded", {
+            framework: reqV2.framework,
+            weekdays: reqV2.days.weekdays,
+            saturday: reqV2.days.saturday,
+            sunday: reqV2.days.sunday,
+          });
         }
-        
-        setSavedConfigRequirements(reqV2);
-        
-        // Trace the saved config
-        trace("builder.savedConfig.loaded", {
-          framework: reqV2.framework,
-          weekdays: reqV2.days.weekdays,
-          saturday: reqV2.days.saturday,
-          sunday: reqV2.days.sunday,
-        });
       }
     } catch (error) {
       console.error('❌ Error loading saved config:', error);
@@ -439,8 +454,10 @@ export default function GuidedRosterBuilderV2() {
     if (fatalErrors.length > 0) return false;
     if (warnings.length > 0 && !ackWarnings) return false;
     if (isLoadingPreview || isGenerating) return false;
+    // Block if there are consistency errors
+    if (consistencyIssues.filter(i => i.severity === 'error').length > 0) return false;
     return true;
-  }, [fatalErrors.length, warnings.length, ackWarnings, isLoadingPreview, isGenerating]);
+  }, [fatalErrors.length, warnings.length, ackWarnings, isLoadingPreview, isGenerating, consistencyIssues]);
 
   // Convert staffing array to RequirementsV2 for consistency checking
   const builderRequirementsV2 = useMemo<RequirementsV2 | null>(() => {
@@ -501,6 +518,44 @@ export default function GuidedRosterBuilderV2() {
     }
   }, [builderRequirementsV2]);
 
+  // Run consistency checks whenever builder state changes
+  useEffect(() => {
+    if (!configData || !builderRequirementsV2) return;
+
+    const issues = checkConfig({
+      tenantId,
+      config: {
+        tenant_id: configData.tenant_id,
+        shift_length_hours: configData.shift_length_hours,
+        buffer_pct: configData.buffer_pct,
+        standard_contract_hours: configData.standard_contract_hours,
+        auto_reduce_enabled: configData.auto_reduce_enabled,
+        pattern_id: configData.pattern_id,
+        requirements_v2: savedConfigRequirements,
+      },
+      builder: {
+        requirements_v2: builderRequirementsV2,
+        shift_length_hours: form.watch('system') === '8h' ? 8 : 12,
+      },
+      pattern: form.watch('pattern') ? {
+        id: 'current',
+        sequence: form.watch('pattern').split(''),
+      } : null,
+      snapshot: null, // Could add feasibility snapshot here if available
+    });
+
+    setConsistencyIssues(issues);
+    
+    // Log issues for dev
+    if (issues.length > 0) {
+      console.group('⚠️ Configuration Consistency Issues');
+      issues.forEach(issue => {
+        console.log(`[${issue.severity.toUpperCase()}] ${issue.message}`, issue.details);
+      });
+      console.groupEnd();
+    }
+  }, [configData, builderRequirementsV2, savedConfigRequirements, tenantId, form.watch('system'), form.watch('pattern')]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -527,6 +582,13 @@ export default function GuidedRosterBuilderV2() {
                 Configuration loaded from Feasibility Calculator. Review and adjust as needed.
               </AlertDescription>
             </Alert>
+          )}
+          
+          {/* Configuration Validation Guard - Blocks generation on drift */}
+          {consistencyIssues.length > 0 && (
+            <div className="mt-4">
+              <ConfigValidationGuard issues={consistencyIssues} />
+            </div>
           )}
           
           {/* Consistency Banner */}
@@ -642,58 +704,63 @@ export default function GuidedRosterBuilderV2() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent className="space-y-4">
+                    {/* Pattern Mode Notice - Always Locked for MVP */}
+                    <Alert className="bg-blue-50 border-blue-200">
+                      <AlertDescription className="text-sm text-blue-900">
+                        <strong>Pattern Mode:</strong> Locked — Roster will strictly follow the selected pattern. Each staff member will be assigned shifts based on their position in the pattern cycle.
+                      </AlertDescription>
+                    </Alert>
+                    
                     <div>
                       <Label htmlFor="pattern">Pattern Sequence</Label>
                       <Input {...form.register('pattern')} placeholder="e.g., DDNNRRRR" />
                     </div>
                     
-                    {/* Cycle Anchor Date - Locked Mode Only */}
-                    {form.watch('patternMode') === 'locked' && (
-                      <div className="space-y-3 p-3 bg-blue-50 rounded-md border border-blue-200">
-                        <Label className="text-base font-semibold">Cycle Anchor Date</Label>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Reference date for pattern cycle calculations. Defaults to roster start date if not set.
-                        </p>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !form.watch('cycleAnchorDate') && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {form.watch('cycleAnchorDate') 
-                                ? format(form.watch('cycleAnchorDate')!, "PPP")
-                                : "Use roster start date (default)"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={form.watch('cycleAnchorDate')}
-                              onSelect={(date) => form.setValue('cycleAnchorDate', date)}
-                              initialFocus
-                              className={cn("p-3 pointer-events-auto")}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        {form.watch('cycleAnchorDate') && (
+                    {/* Cycle Anchor Date - Always shown since we're always in locked mode */}
+                    <div className="space-y-3 p-3 bg-blue-50 rounded-md border border-blue-200">
+                      <Label className="text-base font-semibold">Cycle Anchor Date</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Reference date for pattern cycle calculations. Defaults to roster start date if not set.
+                      </p>
+                      <Popover>
+                        <PopoverTrigger asChild>
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => form.setValue('cycleAnchorDate', undefined)}
-                            className="w-full"
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !form.watch('cycleAnchorDate') && "text-muted-foreground"
+                            )}
                           >
-                            Clear (use default)
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {form.watch('cycleAnchorDate') 
+                              ? format(form.watch('cycleAnchorDate')!, "PPP")
+                              : "Use roster start date (default)"}
                           </Button>
-                        )}
-                      </div>
-                    )}
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={form.watch('cycleAnchorDate')}
+                            onSelect={(date) => form.setValue('cycleAnchorDate', date)}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {form.watch('cycleAnchorDate') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => form.setValue('cycleAnchorDate', undefined)}
+                          className="w-full"
+                        >
+                          Clear (use default)
+                        </Button>
+                      )}
+                    </div>
 
-                    {/* Team Index Management - Locked Mode Only */}
-                    {form.watch('patternMode') === 'locked' && staffList.length > 0 && (
+                    {/* Team Index Management - Always shown since we're always in locked mode */}
+                    {staffList.length > 0 && (
                       <div className="space-y-3 p-3 bg-purple-50 rounded-md border border-purple-200">
                         <div className="flex items-center justify-between">
                           <div>

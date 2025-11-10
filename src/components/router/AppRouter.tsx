@@ -50,6 +50,7 @@ export function AppRouter() {
             
             {/* Authenticated routes with layout */}
             {/* 
+              MVP ROUTES ONLY - Non-MVP routes commented out
               CANONICAL ROUTE PATHS (keep in sync with src/navigation/routes.ts):
               - /roster/builder → Roster Builder landing (GuidedRosterBuilderV2)
               - /roster/monthly?month=YYYY-MM&version=uuid → Monthly roster view (MonthlyPage)
@@ -57,31 +58,35 @@ export function AppRouter() {
             <Route path="/" element={<ProtectedRoute><AuthenticatedLayout /></ProtectedRoute>}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="staff" element={<Staff />} />
-              <Route path="roster-config" element={<RosterConfig />} />
-              <Route path="generate-roster" element={<GenerateRoster />} />
-              <Route path="manager/generate" element={<GenerateRosterPanel />} />
-              <Route path="roster-viewer" element={<RosterViewer />} />
-              <Route path="my-rosters" element={<MyRosters />} />
-              <Route path="my-configurations" element={<MyConfigurations />} />
-              <Route path="manage-leave" element={<ManageLeave />} />
-              <Route path="leave-requests" element={<LeaveRequests />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="reports/archived-rosters" element={<ArchivedRostersReport />} />
-              <Route path="staffing-analysis" element={<StaffingAnalysis />} />
-              <Route path="roster-testing" element={<RosterTesting />} />
-              <Route path="test-pro" element={<TestPro />} />
+              <Route path="feasibility" element={<FeasibilityCalculator />} />
+              <Route path="roster/builder" element={<GuidedRosterBuilderV2 />} />
+              <Route path="roster/monthly" element={<MonthlyPage />} />
+              
+              {/* MVP Support Routes */}
               <Route path="support" element={<SupportPage />} />
               <Route path="help" element={<HelpSupport />} />
-              <Route path="patterns" element={<PatternManagement />} />
-              <Route path="roster/builder" element={<GuidedRosterBuilderV2 />} />
-              <Route path="roster/summary" element={<RosterSummary />} />
-              <Route path="roster/monthly" element={<MonthlyPage />} />
-              <Route path="wizard" element={<Wizard />} />
-              <Route path="admin/rls-setup" element={<RLSHelp />} />
-              <Route path="admin/patterns" element={<ShiftPatterns />} />
-              <Route path="admin/pattern-library" element={<PatternLibrary />} />
-              <Route path="feasibility" element={<FeasibilityCalculator />} />
-              <Route path="scenarios/compare" element={<ScenarioComparison />} />
+              
+              {/* NON-MVP ROUTES - Temporarily disabled for MVP hardening */}
+              {/* <Route path="roster-config" element={<RosterConfig />} /> */}
+              {/* <Route path="generate-roster" element={<GenerateRoster />} /> */}
+              {/* <Route path="manager/generate" element={<GenerateRosterPanel />} /> */}
+              {/* <Route path="roster-viewer" element={<RosterViewer />} /> */}
+              {/* <Route path="my-rosters" element={<MyRosters />} /> */}
+              {/* <Route path="my-configurations" element={<MyConfigurations />} /> */}
+              {/* <Route path="manage-leave" element={<ManageLeave />} /> */}
+              {/* <Route path="leave-requests" element={<LeaveRequests />} /> */}
+              {/* <Route path="reports" element={<ReportsPage />} /> */}
+              {/* <Route path="reports/archived-rosters" element={<ArchivedRostersReport />} /> */}
+              {/* <Route path="staffing-analysis" element={<StaffingAnalysis />} /> */}
+              {/* <Route path="roster-testing" element={<RosterTesting />} /> */}
+              {/* <Route path="test-pro" element={<TestPro />} /> */}
+              {/* <Route path="patterns" element={<PatternManagement />} /> */}
+              {/* <Route path="roster/summary" element={<RosterSummary />} /> */}
+              {/* <Route path="wizard" element={<Wizard />} /> */}
+              {/* <Route path="admin/rls-setup" element={<RLSHelp />} /> */}
+              {/* <Route path="admin/patterns" element={<ShiftPatterns />} /> */}
+              {/* <Route path="admin/pattern-library" element={<PatternLibrary />} /> */}
+              {/* <Route path="scenarios/compare" element={<ScenarioComparison />} /> */}
             </Route>
             
       {/* 404 route */}
