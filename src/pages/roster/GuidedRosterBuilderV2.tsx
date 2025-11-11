@@ -233,10 +233,15 @@ export default function GuidedRosterBuilderV2() {
 
   const loadSavedConfig = async () => {
     try {
+      const tid = getTenantId();
+      if (!tid) {
+        console.warn('GuidedRosterBuilderV2: No tenant ID; skipping loadSavedConfig');
+        return;
+      }
       const { data, error } = await supabase
         .from('roster_config')
         .select('*')
-        .eq('tenant_id', '00000000-0000-0000-0000-000000000001')
+        .eq('tenant_id', tid)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -406,7 +411,8 @@ export default function GuidedRosterBuilderV2() {
         { 
           ...config, 
           start_date: configData.start_date,
-          pattern_adherence_mode: configData.pattern_adherence_mode 
+          pattern_adherence_mode: configData.pattern_adherence_mode,
+          patternLocked: configData.pattern_adherence_mode === 'locked'
         }, 
         'Initial Generation'
       );
