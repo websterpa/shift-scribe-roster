@@ -202,6 +202,57 @@ const FeasibilityCalculator = () => {
       return updated;
     });
   }, [system]);
+
+  // Sync requirementsV2 from requiredPerDay to include complete weekend buckets
+  useEffect(() => {
+    const framework = shiftLengthHours === 12 ? '12h' : '8h';
+
+    // Helper to deep compare objects
+    const deepEqual = (a: unknown, b: unknown) => {
+      try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+    };
+
+    if (framework === '8h') {
+      const weekdayReqs = {
+        E: Number(requiredPerDay.E ?? 0),
+        L: Number(requiredPerDay.L ?? 0),
+        N: Number(requiredPerDay.N ?? 0),
+      };
+
+      const next: RequirementsV2 = {
+        framework: '8h',
+        days: {
+          weekdays: weekdayReqs,
+          saturday: { ...weekdayReqs }, // default same as weekdays
+          sunday: { ...weekdayReqs },   // default same as weekdays
+        },
+      };
+
+      if (!deepEqual(requirementsV2, next)) {
+        setRequirementsV2(next);
+        console.log('📝 Updated requirementsV2 (8h) with complete weekend buckets:', next);
+      }
+    } else {
+      const weekdayReqs = {
+        D: Number(requiredPerDay.D ?? 0),
+        N: Number(requiredPerDay.N ?? 0),
+      };
+
+      const next: RequirementsV2 = {
+        framework: '12h',
+        days: {
+          weekdays: weekdayReqs,
+          saturday: { ...weekdayReqs }, // default same as weekdays
+          sunday: { ...weekdayReqs },   // default same as weekdays
+        },
+      };
+
+      if (!deepEqual(requirementsV2, next)) {
+        setRequirementsV2(next);
+        console.log('📝 Updated requirementsV2 (12h) with complete weekend buckets:', next);
+      }
+    }
+  }, [requiredPerDay, shiftLengthHours]);
   
   // Auto-adjust filter when shift length changes
   useEffect(() => {

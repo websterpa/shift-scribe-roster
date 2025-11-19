@@ -260,4 +260,76 @@ describe('checkConfig', () => {
     expect(missingIssue).toBeDefined();
     expect(missingIssue?.severity).toBe('error');
   });
+
+  // T9: Feasibility builds complete weekend buckets
+  it('should validate 8h config with complete weekend buckets from Feasibility', () => {
+    const cfg = {
+      tenant_id: 'tenant-1',
+      shift_length_hours: 8,
+      buffer_pct: 10,
+      standard_contract_hours: 37.5,
+      auto_reduce_enabled: false,
+      requirements_v2: {
+        framework: '8h' as const,
+        days: {
+          weekdays: { E: 2, L: 2, N: 1 },
+          saturday: { E: 2, L: 2, N: 1 },
+          sunday: { E: 2, L: 2, N: 1 },
+        },
+      },
+    };
+
+    const input: CheckInput = {
+      tenantId: 'tenant-1',
+      config: cfg,
+      builder: {
+        requirements_v2: cfg.requirements_v2,
+        shift_length_hours: 8,
+      },
+      pattern: {
+        id: 'pattern-1',
+        sequence: ['E', 'E', 'L', 'L', 'N', 'N', 'R', 'R', 'R', 'R'],
+      },
+      snapshot: null,
+    };
+
+    const issues = checkConfig(input);
+    expect(issues).toHaveLength(0);
+  });
+
+  // T10: Feasibility builds complete weekend buckets for 12h
+  it('should validate 12h config with complete weekend buckets from Feasibility', () => {
+    const cfg = {
+      tenant_id: 'tenant-1',
+      shift_length_hours: 12,
+      buffer_pct: 10,
+      standard_contract_hours: 37.5,
+      auto_reduce_enabled: false,
+      requirements_v2: {
+        framework: '12h' as const,
+        days: {
+          weekdays: { D: 2, N: 2 },
+          saturday: { D: 2, N: 2 },
+          sunday: { D: 2, N: 2 },
+        },
+      },
+    };
+
+    const input: CheckInput = {
+      tenantId: 'tenant-1',
+      config: cfg,
+      builder: {
+        requirements_v2: cfg.requirements_v2,
+        shift_length_hours: 12,
+      },
+      pattern: {
+        id: 'pattern-1',
+        sequence: ['D', 'D', 'N', 'N', 'R', 'R', 'R'],
+      },
+      snapshot: null,
+    };
+
+    const issues = checkConfig(input);
+    expect(issues).toHaveLength(0);
+  });
 });
